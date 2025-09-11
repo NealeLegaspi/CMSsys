@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use App\Models\Announcement;
 use App\Models\Grade;
 
@@ -13,15 +14,17 @@ class StudentController extends Controller
     {
         $user = Auth::user();
 
-        // 🔹 Get announcements (general + for student's section)
+        // 🔹 Announcements (general + section-based)
         $announcements = Announcement::with(['user', 'section'])
-            ->whereNull('section_id')
-            ->orWhereIn('section_id', $user->enrollments->pluck('section_id'))
+            ->where(function ($query) use ($user) {
+                $query->whereNull('section_id')
+                      ->orWhereIn('section_id', $user->enrollments->pluck('section_id'));
+            })
             ->latest()
             ->take(5)
             ->get();
 
-        // 🔹 Get student's grades
+        // 🔹 Grades
         $grades = Grade::with('subject')
             ->where('student_id', $user->id)
             ->get();
@@ -32,7 +35,6 @@ class StudentController extends Controller
     public function announcements()
     {
         $user = Auth::user();
-
         $sectionIds = $user->enrollments->pluck('section_id')->toArray();
 
         $announcements = Announcement::with(['user', 'section'])
@@ -42,6 +44,19 @@ class StudentController extends Controller
             ->get();
 
         return view('students.announcements', compact('announcements'));
+    }
+
+    public function assignments()
+    {
+        $user = Auth::user();
+
+        // Example: kunin lang yung assignments na ginawa ng teacher para sa section ng student
+        $assignments = \App\Models\Assignment::with('teacher')
+            ->whereIn('section_id', $user->enrollments->pluck('section_id'))
+            ->latest()
+            ->get();
+
+        return view('students.assignments', compact('assignments'));
     }
 
 
@@ -58,30 +73,66 @@ class StudentController extends Controller
 
     public function settings()
     {
-        $user = Auth::user();
-        return view('students.settings', compact('user'));
+        $student = Auth::user();
+        return view('students.settings', compact('student'));
     }
 
     public function updateSettings(Request $request)
     {
-        $user = Auth::user();
+        $student = Auth::user();
 
         $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $user->id,
-            'password' => 'nullable|min:8|confirmed'
+            'first_name' => 'required|string|max:100',
+            'middle_name' => 'nullable|string|max:100',
+            'last_name' => 'required|string|max:100',
+            'email' => 'required|email|unique:users,email,' . $student->id,
+            'contact_number' => 'nullable|string|max:20',
+            'sex' => 'nullable|string|in:Male,Female',
+            'birthdate' => 'nullable|date',
+            'address' => 'nullable|string|max:255',
+            'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
-        $user->name = $request->name;
-        $user->email = $request->email;
+        // Update email sa users table
+        $student->update([
+            'email' => $request->email,
+        ]);
 
-        if ($request->filled('password')) {
-            $user->password = bcrypt($request->password);
+        $profile = $student->profile ?? $student->profile()->create();
+        
+        if ($request->hasFile('profile_picture')) {
+            $path = $request->file('profile_picture')->store('profile_pictures', 'public');
+            $profile->profile_picture = $path;
         }
 
-        $user->save();
+        $profile->first_name = $request->first_name;
+        $profile->middle_name = $request->middle_name;
+        $profile->last_name = $request->last_name;
+        $profile->contact_number = $request->contact_number;
+        $profile->sex = $request->sex;
+        $profile->birthdate = $request->birthdate;
+        $profile->address = $request->address;
+        $profile->save();
 
-        return redirect()->route('students.settings')
-            ->with('success', 'Settings updated successfully.');
+        return back()->with('success', 'Profile updated successfully!');
+    }
+
+    public function changePassword(Request $request)
+    {
+        $student = Auth::user();
+
+        $request->validate([
+            'current_password' => 'required',
+            'new_password' => 'required|min:8|confirmed',
+        ]);
+
+        if (!Hash::check($request->current_password, $student->password)) {
+            return back()->withErrors(['current_password' => 'The current password is incorrect.']);
+        }
+
+        $student->password = Hash::make($request->new_password);
+        $student->save();
+
+        return back()->with('success', 'Password updated successfully!');
     }
 }

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>@yield('title', 'Teacher Portal')</title>
+  <title>@yield('title', 'Student Portal')</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
   <style>
@@ -26,43 +26,25 @@
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="text-center mb-4">
-      <img src="{{ asset(auth()->user()->profile->profile_picture ?? 'images/default-teacher.png') }}" 
+      <img src="{{ asset(auth()->user()->profile->profile_picture ?? 'images/default-student.png') }}" 
            alt="Profile" class="rounded-circle mb-2" style="width:80px;height:80px;object-fit:cover;">
       <h5 class="mb-0">{{ auth()->user()->profile->first_name ?? auth()->user()->email }}</h5>
     </div>
-    
-    <a href="{{ route('teachers.dashboard') }}" 
-       class="nav-link {{ request()->routeIs('teachers.dashboard') ? 'active' : '' }}">
+
+    <a href="{{ route('students.dashboard') }}" 
+       class="nav-link {{ request()->routeIs('students.dashboard') ? 'active' : '' }}">
        <i class='bx bx-home me-2'></i> Dashboard
     </a>
-
-      <a href="{{ route('teachers.announcements') }}" 
-       class="nav-link {{ request()->routeIs('teachers.announcements') ? 'active' : '' }}">
+    <a href="{{ route('students.announcements') }}" 
+       class="nav-link {{ request()->routeIs('students.announcements') ? 'active' : '' }}">
        <i class='bx bx-bell me-2'></i> Announcements
     </a>
-
-    <a href="{{ route('teachers.assignments') }}" 
-       class="nav-link {{ request()->routeIs('teachers.assignments') ? 'active' : '' }}">
-       <i class='bx bx-book me-2'></i> Assignments
+    <a href="{{ route('students.grades') }}" 
+       class="nav-link {{ request()->routeIs('students.grades') ? 'active' : '' }}">
+       <i class='bx bx-book me-2'></i> Grades
     </a>
-
-    <a href="{{ route('teachers.classlist') }}" 
-       class="nav-link {{ request()->routeIs('teachers.classlist') ? 'active' : '' }}">
-       <i class='bx bx-group me-2'></i> Class List
-    </a>
-
-    <a href="{{ route('teachers.grades') }}" 
-       class="nav-link {{ request()->routeIs('teachers.grades') ? 'active' : '' }}">
-       <i class='bx bx-edit me-2'></i> Grades
-    </a>
-
-    <a href="{{ route('teachers.reports') }}" 
-       class="nav-link {{ request()->routeIs('teachers.reports') ? 'active' : '' }}">
-       <i class='bx bx-bar-chart-alt-2 me-2'></i> Reports
-    </a>
-
-    <a href="{{ route('teachers.settings') }}" 
-       class="nav-link {{ request()->routeIs('teachers.settings') ? 'active' : '' }}">
+    <a href="{{ route('students.settings') }}" 
+       class="nav-link {{ request()->routeIs('students.settings') ? 'active' : '' }}">
        <i class='bx bx-cog me-2'></i> Settings
     </a>
   </div>
@@ -76,10 +58,10 @@
       </div>
       <div class="dropdown">
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-          Hi, {{ auth()->user()->profile->first_name ?? 'Teacher' }} 👩‍🏫
+          Hi, {{ auth()->user()->profile->first_name ?? 'Student' }} 🧑‍🎓
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{{ route('teachers.settings') }}">⚙️ Settings</a></li>
+          <li><a class="dropdown-item" href="{{ route('students.settings') }}">⚙️ Settings</a></li>
           <li><hr class="dropdown-divider"></li>
           <li>
             <a class="dropdown-item text-danger" href="{{ route('logout') }}"

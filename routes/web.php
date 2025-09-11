@@ -5,10 +5,25 @@ use App\Http\Controllers\RegistrarController;
 use App\Http\Controllers\TeacherController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    if (Auth::check()) {
+        $role = Auth::user()->role->name;
+
+        if ($role === 'Administrator') {
+            return redirect()->route('admin.dashboard');
+        } elseif ($role === 'Teacher') {
+            return redirect()->route('teachers.dashboard');
+        } elseif ($role === 'Student') {
+            return redirect()->route('students.dashboard');
+        } elseif ($role === 'Registrar') {
+            return redirect()->route('registrar.dashboard');
+        }
+    }
+
+    return view('welcome'); 
 });
 
 // -------------------- AUTH ROUTES --------------------
@@ -56,6 +71,7 @@ Route::prefix('teacher')->middleware(['auth', 'role:Teacher'])->group(function (
 
     Route::get('/settings', [TeacherController::class, 'settings'])->name('teachers.settings');
     Route::put('/settings', [TeacherController::class, 'updateSettings'])->name('teachers.updateSettings');
+    Route::post('/settings/change-password', [TeacherController::class, 'changePassword'])->name('teachers.changePassword');
 
     Route::get('/classlist', [TeacherController::class, 'classList'])->name('teachers.classlist');
     Route::get('/classlist/{section}', [TeacherController::class, 'viewClassList'])->name('teachers.viewClasslist');
@@ -66,7 +82,12 @@ Route::prefix('teacher')->middleware(['auth', 'role:Teacher'])->group(function (
 Route::prefix('student')->middleware(['auth', 'role:Student'])->group(function () {
     Route::get('/dashboard', [StudentController::class, 'dashboard'])->name('students.dashboard');
     Route::get('/announcements', [StudentController::class, 'announcements'])->name('students.announcements');
+    Route::get('/assignments', [StudentController::class, 'assignments'])->name('students.assignments');
     Route::get('/grades', [StudentController::class, 'grades'])->name('students.grades');
+
     Route::get('/settings', [StudentController::class, 'settings'])->name('students.settings');
-    Route::put('/settings', [StudentController::class, 'updateSettings'])->name('students.updateSettings');
+    Route::put('/settings/update', [StudentController::class, 'updateSettings'])->name('students.update-settings');
+    Route::post('/settings/change-password', [StudentController::class, 'changePassword'])->name('students.change-password');
 });
+
+Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');

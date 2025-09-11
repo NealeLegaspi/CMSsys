@@ -118,6 +118,7 @@ class TeacherController extends Controller
         return back()->with('success', 'Announcement deleted successfully!');
     }
 
+    // ---------------- ASSIGNMENTS ----------------
     public function assignments() {
         $assignments = Assignment::where('teacher_id', Auth::id())
         ->with('section.gradeLevel')
@@ -170,6 +171,7 @@ class TeacherController extends Controller
         return redirect()->route('teachers.assignments')->with('success', 'Assignment deleted.');
     }
 
+    // ---------------- CLASS LIST ----------------
     public function classlist()
     {
         $teacher = Auth::user();
@@ -281,9 +283,69 @@ class TeacherController extends Controller
         return view('teachers.reports', compact('students'));
     }
 
+    // ---------------- SETTINGS ----------------
     public function settings()
     {
-        $user = Auth::user();
-        return view('teachers.settings', compact('user'));
+        $teacher = Auth::user();
+        return view('teachers.settings', compact('teacher'));
+    }
+
+    public function updateSettings(Request $request)
+    {
+        $teacher = Auth::user();
+
+        $request->validate([
+            'first_name' => 'required|string|max:100',
+            'middle_name' => 'nullable|string|max:100',
+            'last_name' => 'required|string|max:100',
+            'email' => 'required|email|unique:users,email,' . $teacher->id,
+            'contact_number' => 'nullable|string|max:20',
+            'sex' => 'nullable|string|in:Male,Female',
+            'birthdate' => 'nullable|date',
+            'address' => 'nullable|string|max:255',
+            'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        $teacher->update([
+            'email' => $request->email,
+        ]);
+
+        $profile = $teacher->profile;
+        if ($request->hasFile('profile_picture')) {
+            $path = $request->file('profile_picture')->store('profile_pictures', 'public');
+            $profile->profile_picture = $path;
+        }
+
+        $profile->first_name = $request->first_name;
+        $profile->middle_name = $request->middle_name;
+        $profile->last_name = $request->last_name;
+        $profile->contact_number = $request->contact_number;
+        $profile->sex = $request->sex;
+        $profile->birthdate = $request->birthdate;
+        $profile->address = $request->address;
+        $profile->save();
+
+        return back()->with('success', 'Settings updated successfully!');
+    }
+
+
+
+    public function changePassword(Request $request)
+    {
+        $teacher = Auth::user();
+
+        $request->validate([
+            'current_password' => 'required',
+            'new_password' => 'required|min:6|confirmed',
+        ]);
+
+        if (!\Hash::check($request->current_password, $teacher->password)) {
+            return back()->withErrors(['current_password' => 'Current password is incorrect.']);
+        }
+
+        $teacher->password = \Hash::make($request->new_password);
+        $teacher->save();
+
+        return back()->with('success', 'Password changed successfully!');
     }
 }

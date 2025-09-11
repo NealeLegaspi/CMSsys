@@ -24,10 +24,20 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    // 🔹 Relations
     public function profile()
     {
         return $this->hasOne(UserProfile::class, 'user_id');
+    }
+
+    protected static function booted()
+    {
+        static::created(function ($user) {
+            if (!$user->profile) {
+                $user->profile()->create([
+                    'profile_picture' => 'images/default.png',
+                ]);
+            }
+        });
     }
 
     public function enrollments()

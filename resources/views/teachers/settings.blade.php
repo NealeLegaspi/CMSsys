@@ -6,10 +6,6 @@
 @section('content')
 <div class="container my-4">
 
-  <!-- Success / Error Alerts (dummy) -->
-  {{-- <div class="alert alert-success">Profile updated successfully!</div> --}}
-  {{-- <div class="alert alert-danger">Failed to update profile.</div> --}}
-
   <!-- Tabs -->
   <ul class="nav nav-tabs" id="settingsTabs" role="tablist">
     <li class="nav-item" role="presentation">
@@ -38,24 +34,27 @@
 
         <!-- Profile Summary -->
         <div class="text-center mb-3">
-          <img src="{{ asset('images/default.png') }}" 
+          <img src="{{ $teacher->profile && $teacher->profile->profile_picture ? asset('storage/'.$teacher->profile->profile_picture) : asset('images/default.png') }}" 
                alt="Profile Picture" class="rounded-circle mb-2"
                style="width: 120px; height: 120px; object-fit: cover;">
-          <h6 class="mt-2">Juan Dela Cruz</h6>
+          <h6 class="mt-2">{{ $teacher->profile->first_name }} {{ $teacher->profile->last_name }}</h6>
         </div>
 
         <table class="table table-striped table-bordered">
-          <tr><th>Full Name</th><td>Juan Santos Dela Cruz</td></tr>
-          <tr><th>Email</th><td>juan.cruz@example.com</td></tr>
-          <tr><th>Contact Number</th><td>09123456789</td></tr>
-          <tr><th>Gender</th><td>Male</td></tr>
-          <tr><th>Birthdate</th><td>1990-01-01</td></tr>
-          <tr><th>Address</th><td>Quezon City</td></tr>
+          <tr><th>Full Name</th><td>{{ $teacher->profile->first_name }} {{ $teacher->profile->middle_name }} {{ $teacher->profile->last_name }}</td></tr>
+          <tr><th>Email</th><td>{{ $teacher->email }}</td></tr>
+          <tr><th>Contact Number</th><td>{{ $teacher->profile->contact_number ?? 'N/A' }}</td></tr>
+          <tr><th>Gender</th><td>{{ $teacher->profile->sex ?? 'N/A' }}</td></tr>
+          <tr><th>Birthdate</th><td>{{ $teacher->profile->birthdate ?? 'N/A' }}</td></tr>
+          <tr><th>Address</th><td>{{ $teacher->profile->address ?? 'N/A' }}</td></tr>
         </table>
 
         <!-- Logout -->
         <div class="text-end">
-          <a href="#" class="btn btn-danger"><i class='bx bx-log-out me-1'></i> Logout</a>
+          <form method="POST" action="{{ route('logout') }}">
+            @csrf
+            <button type="submit" class="btn btn-danger"><i class='bx bx-log-out me-1'></i> Logout</button>
+          </form>
         </div>
       </div>
     </div>
@@ -64,20 +63,21 @@
     <div class="tab-pane fade" id="password" role="tabpanel">
       <div class="card p-4">
         <h5 class="mb-3">Change Password</h5>
-        <form id="changePasswordForm">
+        <form id="changePasswordForm" method="POST" action="{{ route('teachers.changePassword') }}">
+          @csrf
           <div class="mb-3">
             <label class="form-label">Current Password</label>
-            <input type="password" class="form-control" required>
+            <input type="password" class="form-control" name="current_password" required>
           </div>
           <div class="mb-3">
             <label class="form-label">New Password</label>
-            <input type="password" class="form-control" required>
+            <input type="password" class="form-control" name="new_password" required>
           </div>
           <div class="mb-3">
             <label class="form-label">Confirm New Password</label>
-            <input type="password" class="form-control" required>
+            <input type="password" class="form-control" name="new_password_confirmation" required>
           </div>
-          <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#confirmPasswordModal">
+          <button type="submit" class="btn btn-warning">
             Change Password
           </button>
         </form>
@@ -94,101 +94,65 @@
         <h5 class="modal-title"><i class='bx bx-user me-2'></i>Update Profile</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <form id="updateProfileForm">
+      <form id="updateProfileForm" method="POST" action="{{ route('teachers.updateSettings') }}" enctype="multipart/form-data">
+        @csrf
+        @method('PUT')
         <div class="modal-body">
           <div class="row">
             <div class="col-md-4 text-center mb-3">
-              <img src="{{ asset('images/default.png') }}" 
-                   alt="Profile Picture" class="rounded-circle mb-2"
-                   style="width: 120px; height: 120px; object-fit: cover;">
-              <input type="file" class="form-control mt-2" accept="image/*">
+              <img src="{{ $teacher->profile && $teacher->profile->profile_picture ? asset('storage/'.$teacher->profile->profile_picture) : asset('images/default.png') }}" 
+                  alt="Profile Picture" class="rounded-circle mb-2"
+                  style="width: 120px; height: 120px; object-fit: cover;">
+              <input type="file" class="form-control mt-2" name="profile_picture" accept="image/*">
             </div>
             <div class="col-md-8">
               <div class="row mb-3">
                 <div class="col">
                   <label class="form-label">First Name</label>
-                  <input type="text" class="form-control" value="Juan" required>
+                  <input type="text" class="form-control" name="first_name" value="{{ old('first_name', $teacher->profile->first_name) }}" required>
                 </div>
                 <div class="col">
                   <label class="form-label">Middle Name</label>
-                  <input type="text" class="form-control" value="Santos">
+                  <input type="text" class="form-control" name="middle_name" value="{{ old('middle_name', $teacher->profile->middle_name) }}">
                 </div>
                 <div class="col">
                   <label class="form-label">Last Name</label>
-                  <input type="text" class="form-control" value="Dela Cruz" required>
+                  <input type="text" class="form-control" name="last_name" value="{{ old('last_name', $teacher->profile->last_name) }}" required>
                 </div>
               </div>
               <div class="mb-3">
                 <label class="form-label">Email</label>
-                <input type="email" class="form-control" value="juan.cruz@example.com">
+                <input type="email" class="form-control" name="email" value="{{ old('email', $teacher->email) }}">
               </div>
               <div class="mb-3">
                 <label class="form-label">Contact Number</label>
-                <input type="text" class="form-control" value="09123456789">
+                <input type="text" class="form-control" name="contact_number" value="{{ old('contact_number', $teacher->profile->contact_number) }}">
               </div>
               <div class="mb-3">
-                <label class="form-label">Gender</label>
-                <select class="form-select">
-                  <option value="Male" selected>Male</option>
-                  <option value="Female">Female</option>
+                <label class="form-label">Sex</label>
+                <select class="form-select" name="sex">
+                  <option value="Male" {{ $teacher->profile->sex == 'Male' ? 'selected' : '' }}>Male</option>
+                  <option value="Female" {{ $teacher->profile->sex == 'Female' ? 'selected' : '' }}>Female</option>
                 </select>
               </div>
               <div class="mb-3">
                 <label class="form-label">Birthdate</label>
-                <input type="date" class="form-control" value="1990-01-01">
+                <input type="date" class="form-control" name="birthdate" value="{{ old('birthdate', $teacher->profile->birthdate) }}">
               </div>
               <div class="mb-3">
                 <label class="form-label">Address</label>
-                <textarea class="form-control" rows="2">Quezon City</textarea>
+                <textarea class="form-control" rows="2" name="address">{{ old('address', $teacher->profile->address) }}</textarea>
               </div>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#confirmUpdateProfileModal">
+          <button type="submit" class="btn btn-primary">
             <i class='bx bx-save me-1'></i> Save Changes
           </button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         </div>
       </form>
-    </div>
-  </div>
-</div>
-
-<!-- Confirm Update Modal -->
-<div class="modal fade" id="confirmUpdateProfileModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title"><i class='bx bx-user-check me-2'></i>Confirm Profile Update</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure you want to update your profile information?</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-primary" form="updateProfileForm">Yes, Update</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Confirm Password Modal -->
-<div class="modal fade" id="confirmPasswordModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-warning">
-        <h5 class="modal-title"><i class='bx bx-lock-alt me-2'></i>Confirm Password Change</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure you want to change your password?</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-warning" form="changePasswordForm">Yes, Change It</button>
-      </div>
     </div>
   </div>
 </div>
