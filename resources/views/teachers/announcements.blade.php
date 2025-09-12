@@ -8,19 +8,22 @@
 
   <!-- Flash messages -->
   @if(session('success'))
-    <div class="alert alert-success">{{ session('success') }}</div>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      {{ session('success') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
   @endif
 
   <!-- Tabs -->
   <ul class="nav nav-tabs" id="announcementTabs" role="tablist">
     <li class="nav-item" role="presentation">
       <button class="nav-link active" id="create-tab" data-bs-toggle="tab" data-bs-target="#create" type="button" role="tab">
-        Create Announcement
+        <i class="bi bi-plus-circle"></i> Create Announcement
       </button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="my-tab" data-bs-toggle="tab" data-bs-target="#my" type="button" role="tab">
-        My Announcements
+        <i class="bi bi-megaphone"></i> My Announcements
       </button>
     </li>
   </ul>
@@ -29,7 +32,7 @@
 
     <!-- Create Tab -->
     <div class="tab-pane fade show active" id="create" role="tabpanel">
-      <div class="card">
+      <div class="card shadow-sm border-0 rounded-3">
         <div class="card-body">
           <form action="{{ route('teachers.announcements.store') }}" method="POST">
             @csrf
@@ -50,7 +53,9 @@
                 @endforeach
               </select>
             </div>
-            <button type="submit" class="btn btn-primary">Post</button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-send"></i> Post
+            </button>
           </form>
         </div>
       </div>
@@ -58,31 +63,62 @@
 
     <!-- My Announcements Tab -->
     <div class="tab-pane fade" id="my" role="tabpanel">
+
+      <!-- Search + Filter -->
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+          <form method="GET" action="{{ route('teachers.announcements') }}" class="row g-2">
+            <div class="col-md-4">
+              <input type="text" name="search" class="form-control" placeholder="🔍 Search by title or content" value="{{ request('search') }}">
+            </div>
+            <div class="col-md-4">
+              <select name="section_filter" class="form-select">
+                <option value="">All Sections</option>
+                @foreach(\App\Models\Section::all() as $section)
+                  <option value="{{ $section->id }}" {{ request('section_filter') == $section->id ? 'selected' : '' }}>
+                    {{ $section->name }}
+                  </option>
+                @endforeach
+              </select>
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+              <button type="submit" class="btn btn-outline-primary"><i class="bi bi-funnel"></i> Filter</button>
+              <a href="{{ route('teachers.announcements') }}" class="btn btn-outline-secondary"><i class="bi bi-x-circle"></i> Reset</a>
+            </div>
+          </form>
+        </div>
+      </div>
+
       @if($myAnnouncements->count() > 0)
         @foreach($myAnnouncements as $ann)
-          <div class="card mb-3">
+          <div class="card shadow-sm border-0 rounded-3 mb-3" id="announcementCard{{ $ann->id }}">
+            <div class="card-header bg-light d-flex align-items-center">
+              <i class="bi bi-megaphone text-primary fs-5 me-2"></i>
+              <h6 class="fw-bold mb-0">{{ $ann->title }}</h6>
+            </div>
             <div class="card-body">
-              <h6>{{ $ann->title }}</h6>
-              <p>{{ $ann->content }}</p>
-              <small class="text-muted">
-                Posted on {{ $ann->created_at->format('M d, Y h:i A') }}
+              <p class="mb-2">{{ $ann->content }}</p>
+              <small class="text-secondary d-block">
+                <i class="bi bi-calendar-event"></i> {{ $ann->created_at->format('M d, Y h:i A') }}
                 @if($ann->section)
-                  | Section: {{ $ann->section->name }}
+                  | <i class="bi bi-people"></i> Section: {{ $ann->section->name }}
                 @else
-                  | All Sections
+                  | <i class="bi bi-globe"></i> All Sections
                 @endif
               </small>
-              <div class="mt-2">
-                <!-- Edit Button (Modal Trigger) -->
-                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ $ann->id }}">
-                  Edit
+
+              <div class="mt-3 d-flex gap-2">
+                <!-- Edit Button -->
+                <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ $ann->id }}">
+                  <i class="bi bi-pencil"></i> Edit
                 </button>
 
                 <!-- Delete -->
-                <form action="{{ route('teachers.announcements.destroy',$ann) }}" method="POST" class="d-inline">
+                <form action="{{ route('teachers.announcements.destroy',$ann) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this announcement?')">
                   @csrf
                   @method('DELETE')
-                  <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this announcement?')">Delete</button>
+                 <!-- Delete Button -->
+                  <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ $ann->id }}"><i class="bi bi-trash"></i> Delete</button>
                 </form>
               </div>
             </div>
@@ -95,8 +131,8 @@
                 @csrf
                 @method('PUT')
                 <div class="modal-content">
-                  <div class="modal-header">
-                    <h5 class="modal-title">Edit Announcement</h5>
+                  <div class="modal-header bg-light">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Announcement</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                   </div>
                   <div class="modal-body">
@@ -110,21 +146,47 @@
                     </div>
                   </div>
                   <div class="modal-footer">
-                    <button type="submit" class="btn btn-success">Update</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Update</button>
                   </div>
                 </div>
               </form>
+            </div>
+          </div>
+
+          <!-- Delete Modal -->
+          <div class="modal fade" id="deleteModal{{ $ann->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $ann->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                  <h5 class="modal-title" id="deleteModalLabel{{ $ann->id }}"><i class="bi bi-exclamation-triangle"></i> Confirm Delete</h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  Are you sure you want to delete the announcement?  
+                  This action cannot be undone.
+                </div>
+                <div class="modal-footer">
+                  <form action="{{ route('teachers.announcements.destroy',$ann) }}" method="POST">
+                    @csrf
+                    @method('DELETE')
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Delete</button>
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
         @endforeach
 
         <!-- Pagination -->
         <div class="mt-3">
-          {{ $myAnnouncements->links('pagination::bootstrap-5') }}
+          {{ $myAnnouncements->appends(request()->query())->links('pagination::bootstrap-5') }}
         </div>
 
       @else
-        <p>No announcements yet.</p>
+        <div class="card shadow-sm border-0 text-center p-4">
+          <p class="text-muted mb-0"><i class="bi bi-exclamation-circle"></i> No announcements found.</p>
+        </div>
       @endif
     </div>
   </div>

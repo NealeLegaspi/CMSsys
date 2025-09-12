@@ -64,10 +64,20 @@ Route::prefix('teacher')->middleware(['auth', 'role:Teacher'])->group(function (
 
 
     Route::get('/grades', [TeacherController::class, 'grades'])->name('teachers.grades');
+    Route::get('/grades/{subject}/{section}/encode', [TeacherController::class, 'encodeGrades'])->name('teachers.grades.encode');
     Route::post('/grades', [TeacherController::class, 'storeGrades'])->name('teachers.storeGrades');
+    Route::get('/grades/{subject}/edit', [TeacherController::class, 'editGrades'])->name('teachers.grades.edit');
+    Route::put('/grades/{subject}', [TeacherController::class, 'updateGrades'])->name('teachers.grades.update');
+    Route::delete('/grades/{subject}', [TeacherController::class, 'destroyGrades'])->name('teachers.grades.destroy');
 
     Route::get('/reports', [TeacherController::class, 'reports'])->name('teachers.reports');
+    Route::post('/reports', [TeacherController::class, 'storeReport'])->name('teachers.reports.store');
+    Route::get('/reports/{report}/edit', [TeacherController::class, 'editReport'])->name('teachers.reports.edit');
+    Route::put('/reports/{report}', [TeacherController::class, 'updateReport'])->name('teachers.reports.update');
+    Route::delete('/reports/{report}', [TeacherController::class, 'destroyReport'])->name('teachers.reports.destroy');
     Route::post('/reports/filter', [TeacherController::class, 'filterReports'])->name('teachers.filterReports');
+    Route::get('/reports/{report}/download', [TeacherController::class, 'downloadReport'])->name('teachers.reports.download');
+    Route::post('/reports/export', [TeacherController::class, 'exportReportsPDF'])->name('teachers.reports.export.pdf');
 
     Route::get('/settings', [TeacherController::class, 'settings'])->name('teachers.settings');
     Route::put('/settings', [TeacherController::class, 'updateSettings'])->name('teachers.updateSettings');
@@ -75,7 +85,9 @@ Route::prefix('teacher')->middleware(['auth', 'role:Teacher'])->group(function (
 
     Route::get('/classlist', [TeacherController::class, 'classList'])->name('teachers.classlist');
     Route::get('/classlist/{section}', [TeacherController::class, 'viewClassList'])->name('teachers.viewClasslist');
-
+    Route::post('/classlist/{section}/add', [TeacherController::class, 'addStudentToClass'])->name('teachers.classlist.addStudent');
+    Route::delete('/classlist/{section}/remove/{student}', [TeacherController::class, 'removeStudentFromClass'])->name('teachers.classlist.removeStudent');
+    Route::get('/classlist/{section}/export', [TeacherController::class, 'exportClassList'])->name('teachers.classlist.export');
 });
 
 // -------------------- STUDENT ROUTES --------------------

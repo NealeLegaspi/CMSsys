@@ -11,7 +11,9 @@ use App\Models\Grade;
 use App\Models\Section;
 use App\Models\Student;
 use App\Models\Enrollment;
+use App\Models\GradeLevel;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class TeacherController extends Controller
 {
@@ -59,15 +61,31 @@ class TeacherController extends Controller
     }
 
     // ---------------- ANNOUNCEMENTS ----------------
-    public function announcements()
+    public function announcements(Request $request)
     {
         $teacher = Auth::user();
 
-        $myAnnouncements = Announcement::where('user_id', $teacher->id)
-            ->latest()
-            ->paginate(5);
+        $query = Announcement::where('user_id', $teacher->id);
 
-        return view('teachers.announcements', compact('teacher', 'myAnnouncements'));
+        // search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                ->orWhere('content', 'like', "%{$search}%");
+            });
+        }
+
+        // filter
+        if ($request->filled('section_id')) {
+            $query->where('section_id', $request->section_id);
+        }
+
+        $myAnnouncements = $query->latest()->paginate(5);
+
+        $sections = Section::with('gradeLevel')->get();
+
+        return view('teachers.announcements', compact('teacher', 'myAnnouncements', 'sections'));
     }
 
     public function storeAnnouncement(Request $request)
@@ -188,18 +206,29 @@ class TeacherController extends Controller
         if ($advisorySection) {
             $studentsMale = Enrollment::where('section_id', $sectionId)
                 ->whereHas('student.profile', fn($q) => $q->where('sex','Male'))
-                ->with('student')
+                ->with(['student', 'student.profile'])
                 ->get()
-                ->map(fn($enr) => $enr->student->profile);
+                ->map(fn($enr) => (object)[
+                    'lrn'         => $enr->student->lrn ?? 'N/A',
+                    'first_name'  => $enr->student->profile->first_name ?? '',
+                    'middle_name' => $enr->student->profile->middle_name ?? '',
+                    'last_name'   => $enr->student->profile->last_name ?? '',
+                    'status'      => $enr->student->status ?? 'inactive',
+                ]);
 
             $studentsFemale = Enrollment::where('section_id', $sectionId)
-                ->whereHas('student.profile', fn($q) => $q->where('sex','Female'))
-                ->with('student')
+                ->whereHas('student.profile', fn($q) => $q->where('sex','Male'))
+                ->with(['student', 'student.profile'])
                 ->get()
-                ->map(fn($enr) => $enr->student->profile);
+                ->map(fn($enr) => (object)[
+                    'lrn'         => $enr->student->lrn ?? 'N/A',
+                    'first_name'  => $enr->student->profile->first_name ?? '',
+                    'middle_name' => $enr->student->profile->middle_name ?? '',
+                    'last_name'   => $enr->student->profile->last_name ?? '',
+                    'status'      => $enr->student->status ?? 'inactive',
+                ]);
         }
 
-        // Subjects handled (sample join, depende sa setup mo ng subjects table)
         $mySubjects = DB::table('subject_teacher')
         ->join('subjects', 'subject_teacher.subject_id', '=', 'subjects.id')
         ->join('sections', 'subject_teacher.section_id', '=', 'sections.id')
@@ -223,25 +252,99 @@ class TeacherController extends Controller
         ));
     }
 
-
-
-    // ---------------- GRADES ----------------
-    public function grades()
+    public function exportClassList()
     {
         $teacher = Auth::user();
 
-        // Kunin subjects na hawak ng teacher
+        $section = $teacher->advisorySection ?? null;
+        $sectionId = $section->id ?? null;
+        $sectionName = $section->name ?? null;
+
+        $studentsMale = $section ? $section->students()->where('gender', 'male')->get() : [];
+        $studentsFemale = $section ? $section->students()->where('gender', 'female')->get() : [];
+
+        $pdf = Pdf::loadView('teachers.reports.classlist-pdf', compact(
+            'sectionName',
+            'studentsMale',
+            'studentsFemale'
+        ));
+
+        return $pdf->download('classlist.pdf');
+    }
+
+    // ---------------- GRADES ----------------
+    public function grades(Request $request)
+    {
+        $teacher = Auth::user();
+
+        // kuha lahat ng subjects assigned kay teacher
         $subjects = Subject::whereHas('assignments', function ($q) use ($teacher) {
             $q->where('teacher_id', $teacher->id);
-        })->get();
+        })->with('section')->get();
 
-        return view('teachers.grades', compact('subjects'));
+        // default values
+        $subject = null;
+        $section = null;
+        $students = collect();
+
+        // kapag may pinili sa dropdown
+        if ($request->filled('subject_id')) {
+            $subject = Subject::with('section')->findOrFail($request->subject_id);
+            $section = $subject->section;
+
+            $students = $section->students()->with(['grades' => function ($q) use ($subject) {
+                $q->where('subject_id', $subject->id);
+            }])->get();
+        }
+
+        return view('teachers.grades', compact('subjects', 'subject', 'section', 'students'));
+    }
+
+
+    public function encodeGrades(Subject $subject, Section $section)
+    {
+        // kunin students sa section na ito
+        $enrollments = $section->enrollments()->with('student.profile')->get();
+
+        $students = [];
+        foreach ($enrollments as $enrollment) {
+            $student = $enrollment->student;
+            if (! $student) continue;
+
+            // kunin existing grades ng bawat student
+            $grades = Grade::where('student_id', $student->id)
+                ->where('subject_id', $subject->id)
+                ->pluck('grade', 'quarter')
+                ->toArray();
+
+            $students[$student->id] = [
+                'lrn'   => $student->lrn ?? 'N/A',
+                'name'  => ($student->profile->last_name ?? '') . ', ' . ($student->profile->first_name ?? ''),
+                'grades'=> $grades,
+            ];
+        }
+
+        return view('teachers.encode-grades', compact('subject', 'section', 'students'));
+    }
+
+    public function editGrades(Subject $subject)
+    {
+        $section = $subject->section;
+
+        // Students under that section
+        $students = $section->students()->with(['grades' => function ($q) use ($subject) {
+            $q->where('subject_id', $subject->id);
+        }])->get();
+
+        return view('teachers.grades.edit', compact('subject', 'section', 'students'));
     }
 
     public function storeGrades(Request $request)
     {
         $request->validate([
-            'grades' => 'required|array',
+            'grades'     => 'required|array',
+            'subject_id' => 'required|exists:subjects,id',
+            'section_id' => 'required|exists:sections,id',
         ]);
 
         foreach ($request->grades as $studentId => $quarters) {
@@ -250,37 +353,102 @@ class TeacherController extends Controller
                     Grade::updateOrCreate(
                         [
                             'student_id' => $studentId,
+                            'subject_id' => $request->subject_id,
                             'quarter'    => $quarter,
                         ],
                         [
                             'grade'      => $gradeValue,
                             'teacher_id' => Auth::id(),
-                            'subject_id' => $request->subject_id,
                         ]
                     );
                 }
             }
         }
 
-        return redirect()->route('teachers.grades')->with('success', 'Grades saved successfully!');
+        return redirect()
+            ->route('teachers.grades', ['subject_id' => $request->subject_id])
+            ->with('success', 'Grades saved successfully!');
+    }
+
+
+
+    public function encode($subjectId, $sectionId)
+    {
+        $subject = Subject::with('section.enrollments.student.profile')
+            ->findOrFail($subjectId);
+
+        $students = [];
+        foreach ($subject->section->enrollments as $enrollment) {
+            $student = $enrollment->student;
+            $grades = Grade::where('student_id', $student->id)
+                        ->where('subject_id', $subjectId)
+                        ->pluck('grade', 'quarter')
+                        ->toArray();
+
+            $students[$student->id] = [
+                'lrn'    => $student->lrn,
+                'name'   => $student->profile->last_name . ', ' . $student->profile->first_name,
+                'grades' => $grades,
+            ];
+        }
+
+        return view('teachers.encode-grades', compact('subject', 'students'));
     }
 
     // ---------------- REPORTS ----------------
     public function reports()
     {
-        $sections = Section::all();
-        return view('teachers.reports', compact('sections'));
+        $gradeLevels = GradeLevel::all();
+        $sections = Section::with('gradeLevel')->get();
+        $schoolYears = ['2022-2023', '2023-2024', '2024-2025']; // pwede mo din gawin dynamic kung may table ka
+        $students = Student::with('user.profile', 'section.gradeLevel')->get();
+
+        return view('teachers.reports', compact('gradeLevels', 'sections', 'schoolYears', 'students'));
     }
 
     public function filterReports(Request $request)
     {
         $students = Student::with('user.profile', 'section.gradeLevel')
+            ->when($request->gradelevel_id, function ($q) use ($request) {
+                $q->whereHas('section', function ($s) use ($request) {
+                    $s->where('gradelevel_id', $request->gradelevel_id);
+                });
+            })
             ->when($request->section_id, function ($q) use ($request) {
                 $q->where('section_id', $request->section_id);
             })
+            ->when($request->school_year, function ($q) use ($request) {
+                $q->where('school_year', $request->school_year);
+            })
             ->get();
 
-        return view('teachers.reports', compact('students'));
+        $gradeLevels = GradeLevel::all();
+        $sections = Section::with('gradeLevel')->get();
+        $schoolYears = ['2022-2023', '2023-2024', '2024-2025'];
+
+        return view('teachers.reports', compact('students', 'gradeLevels', 'sections', 'schoolYears'));
+    }
+
+    public function exportReportsPDF(Request $request)
+    {
+        $students = Student::with('user.profile', 'section.gradeLevel')
+            ->when($request->gradelevel_id, function ($q) use ($request) {
+                $q->whereHas('section', function ($s) use ($request) {
+                    $s->where('gradelevel_id', $request->gradelevel_id);
+                });
+            })
+            ->when($request->section_id, function ($q) use ($request) {
+                $q->where('section_id', $request->section_id);
+            })
+            ->when($request->school_year, function ($q) use ($request) {
+                $q->where('school_year', $request->school_year);
+            })
+            ->get();
+
+        $pdf = Pdf::loadView('teachers.reports_pdf', compact('students'))
+                ->setPaper('a4', 'landscape');
+
+        return $pdf->download('students_report.pdf');
     }
 
     // ---------------- SETTINGS ----------------
