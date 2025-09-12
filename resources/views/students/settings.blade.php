@@ -50,6 +50,14 @@
           <tr><th>Birthdate</th><td>{{ optional(auth()->user()->profile)->birthdate ?? 'N/A' }}</td></tr>
           <tr><th>Address</th><td>{{ optional(auth()->user()->profile)->address ?? 'N/A' }}</td></tr>
         </table>
+
+        <!-- Logout -->
+        <div class="text-end">
+          <form method="POST" action="{{ route('logout') }}">
+            @csrf
+            <button type="submit" class="btn btn-danger"><i class='bx bx-log-out me-1'></i> Logout</button>
+          </form>
+        </div>
       </div>
     </div>
 
