@@ -14,7 +14,6 @@ class StudentController extends Controller
     {
         $user = Auth::user();
 
-        // 🔹 Announcements (general + section-based)
         $announcements = Announcement::with(['user', 'section'])
             ->where(function ($query) use ($user) {
                 $query->whereNull('section_id')
@@ -24,7 +23,6 @@ class StudentController extends Controller
             ->take(5)
             ->get();
 
-        // 🔹 Grades
         $grades = Grade::with('subject')
             ->where('student_id', $user->id)
             ->get();
@@ -49,16 +47,19 @@ class StudentController extends Controller
     public function assignments()
     {
         $user = Auth::user();
+        $sectionIds = $user->enrollments->pluck('section_id')->toArray();
 
-        // Example: kunin lang yung assignments na ginawa ng teacher para sa section ng student
-        $assignments = \App\Models\Assignment::with('teacher')
-            ->whereIn('section_id', $user->enrollments->pluck('section_id'))
-            ->latest()
-            ->get();
+        if (empty($sectionIds)) {
+            $assignments = collect(); 
+        } else {
+            $assignments = \App\Models\Assignment::with(['teacher.profile', 'section.gradeLevel', 'subject'])
+                ->whereIn('section_id', $sectionIds)
+                ->latest()
+                ->get();
+        }
 
         return view('students.assignments', compact('assignments'));
     }
-
 
     public function grades()
     {
@@ -81,37 +82,45 @@ class StudentController extends Controller
     {
         $student = Auth::user();
 
-        $request->validate([
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email,' . $student->id,
-            'contact_number' => 'nullable|string|max:20',
-            'sex' => 'nullable|string|in:Male,Female',
-            'birthdate' => 'nullable|date',
-            'address' => 'nullable|string|max:255',
-            'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        $validated = $request->validate([
+            'first_name'      => ['required', 'string', 'max:100'],
+            'middle_name'     => ['nullable', 'string', 'max:100'],
+            'last_name'       => ['required', 'string', 'max:100'],
+            'email'           => ['required', 'email', 'max:255', 'unique:users,email,' . $student->id],
+            'contact_number'  => ['nullable', 'string', 'max:20'],
+            'sex'             => ['nullable', 'in:Male,Female'],
+            'birthdate'       => ['nullable', 'date', 'before:today'],
+            'address'         => ['nullable', 'string', 'max:255'],
+            'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:2048'],
         ]);
 
-        // Update email sa users table
+        // Update email sa `users` table
         $student->update([
-            'email' => $request->email,
+            'email' => $validated['email'],
         ]);
 
-        $profile = $student->profile ?? $student->profile()->create();
-        
+        // Siguraduhin may profile
+        $profile = $student->profile;
+        if (!$profile) {
+            $profile = $student->profile()->create([
+                'profile_picture' => 'images/default.png',
+            ]);
+        }
+
+        // Upload profile picture kung meron
         if ($request->hasFile('profile_picture')) {
             $path = $request->file('profile_picture')->store('profile_pictures', 'public');
             $profile->profile_picture = $path;
         }
 
-        $profile->first_name = $request->first_name;
-        $profile->middle_name = $request->middle_name;
-        $profile->last_name = $request->last_name;
-        $profile->contact_number = $request->contact_number;
-        $profile->sex = $request->sex;
-        $profile->birthdate = $request->birthdate;
-        $profile->address = $request->address;
+        // Update profile info
+        $profile->first_name     = $validated['first_name'];
+        $profile->middle_name    = $validated['middle_name'] ?? null;
+        $profile->last_name      = $validated['last_name'];
+        $profile->contact_number = $validated['contact_number'] ?? null;
+        $profile->sex            = $validated['sex'] ?? null;
+        $profile->birthdate      = $validated['birthdate'] ?? null;
+        $profile->address        = $validated['address'] ?? null;
         $profile->save();
 
         return back()->with('success', 'Profile updated successfully!');
@@ -122,16 +131,17 @@ class StudentController extends Controller
         $student = Auth::user();
 
         $request->validate([
-            'current_password' => 'required',
-            'new_password' => 'required|min:8|confirmed',
+            'current_password' => ['required'],
+            'new_password'     => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::min(8)->mixedCase()->numbers()->symbols()],
         ]);
 
-        if (!Hash::check($request->current_password, $student->password)) {
+        if (!\Hash::check($request->current_password, $student->password)) {
             return back()->withErrors(['current_password' => 'The current password is incorrect.']);
         }
 
-        $student->password = Hash::make($request->new_password);
-        $student->save();
+        $student->update([
+            'password' => \Hash::make($request->new_password),
+        ]);
 
         return back()->with('success', 'Password updated successfully!');
     }

@@ -32,7 +32,11 @@
           : asset('images/default-teacher.png') }}" 
           alt="Profile" class="rounded-circle mb-2" 
           style="width:80px;height:80px;object-fit:cover;">
-      <h5 class="mb-0">{{ optional(auth()->user()->profile)->first_name ?? auth()->user()->email }}</h5>
+      <h5 class="mb-0">@if(auth()->user()->profile)
+        {{ auth()->user()->profile->first_name }} {{ auth()->user()->profile->last_name }}
+      @else
+        {{ auth()->user()->email }}
+      @endif</h5>
     </div>
 
     <a href="{{ route('teachers.dashboard') }}" 
@@ -100,29 +104,33 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    document.querySelectorAll('.sidebar .nav-link').forEach(link => {
-      link.addEventListener('click', function(e) {
-        e.preventDefault();
-        const url = this.href;
+  document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      const url = this.href;
 
-        document.querySelector('#loader').style.display = 'block';
+      document.querySelector('#loader').style.display = 'block';
 
-        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-          .then(res => res.text())
-          .then(html => {
-            let doc = new DOMParser().parseFromString(html, 'text/html');
-            document.querySelector('#main-content').innerHTML = doc.querySelector('#main-content').innerHTML || '';
-            document.querySelector('#page-header').innerHTML = doc.querySelector('#page-header').innerHTML || '';
-            
-            window.history.pushState({}, '', url); 
-            document.querySelector('#loader').style.display = 'none';
-          })
-          .catch(err => {
-            console.error(err);
-            document.querySelector('#loader').style.display = 'none';
-          });
-      });
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(res => res.text())
+        .then(html => {
+          let doc = new DOMParser().parseFromString(html, 'text/html');
+          document.querySelector('#main-content').innerHTML = doc.querySelector('#main-content').innerHTML || '';
+          document.querySelector('#page-header').innerHTML = doc.querySelector('#page-header').innerHTML || '';
+
+          window.history.pushState({}, '', url);
+
+          document.querySelectorAll('.sidebar .nav-link').forEach(a => a.classList.remove('active'));
+          this.classList.add('active');
+
+          document.querySelector('#loader').style.display = 'none';
+        })
+        .catch(err => {
+          console.error(err);
+          document.querySelector('#loader').style.display = 'none';
+        });
     });
-  </script>
+  });
+</script>
 </body>
 </html>

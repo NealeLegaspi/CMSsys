@@ -14,6 +14,8 @@ use App\Models\Enrollment;
 use App\Models\GradeLevel;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Hash;
 
 class TeacherController extends Controller
 {
@@ -139,13 +141,14 @@ class TeacherController extends Controller
     // ---------------- ASSIGNMENTS ----------------
     public function assignments() {
         $assignments = Assignment::where('teacher_id', Auth::id())
-        ->with('section.gradeLevel')
-        ->latest()
-        ->get();    
+            ->with('section.gradeLevel')
+            ->latest()
+            ->get();    
+
         $sections = Section::with('gradeLevel')->get(); 
         $subjects = Subject::all()->groupBy('grade_level_id');
 
-    return view('teachers.assignments', compact('assignments', 'sections', 'subjects'));
+        return view('teachers.assignments', compact('assignments', 'sections', 'subjects'));
     }
 
     public function storeAssignment(Request $request) {
@@ -163,13 +166,17 @@ class TeacherController extends Controller
             'due_date' => $request->due_date,
             'section_id' => $request->section_id,
             'subject_id' => $request->subject_id,
-            'teacher_id' => Auth::id(),
+            'teacher_id' => Auth::id(), // laging naka-bind sa logged-in teacher
         ]);
 
         return redirect()->route('teachers.assignments')->with('success', 'Assignment created.');
     }
 
     public function updateAssignment(Request $request, Assignment $assignment) {
+        // ownership check
+        if ($assignment->teacher_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
 
         $request->validate([
             'title' => 'required|string|max:255',
@@ -185,9 +192,15 @@ class TeacherController extends Controller
     }
 
     public function destroyAssignment(Assignment $assignment) {
+        // ownership check
+        if ($assignment->teacher_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $assignment->delete();
         return redirect()->route('teachers.assignments')->with('success', 'Assignment deleted.');
     }
+
 
     // ---------------- CLASS LIST ----------------
     public function classlist()
@@ -462,57 +475,63 @@ class TeacherController extends Controller
     {
         $teacher = Auth::user();
 
-        $request->validate([
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email,' . $teacher->id,
-            'contact_number' => 'nullable|string|max:20',
-            'sex' => 'nullable|string|in:Male,Female',
-            'birthdate' => 'nullable|date',
-            'address' => 'nullable|string|max:255',
-            'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        $validated = $request->validate([
+            'first_name'       => ['required', 'string', 'max:100'],
+            'middle_name'      => ['nullable', 'string', 'max:100'],
+            'last_name'        => ['required', 'string', 'max:100'],
+            'email'            => ['required', 'email', 'max:255', 'unique:users,email,' . $teacher->id],
+            'contact_number'   => ['nullable', 'string', 'max:20'],
+            'sex'              => ['nullable', 'in:Male,Female'],
+            'birthdate'        => ['nullable', 'date', 'before:today'],
+            'address'          => ['nullable', 'string', 'max:255'],
+            'profile_picture'  => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:2048'],
         ]);
 
+        // Update email directly in users table
         $teacher->update([
-            'email' => $request->email,
+            'email' => $validated['email'],
         ]);
 
         $profile = $teacher->profile;
+        if (!$profile) {
+            $profile = $teacher->profile()->create([
+                'profile_picture' => 'images/default.png',
+            ]);
+        }
+
         if ($request->hasFile('profile_picture')) {
             $path = $request->file('profile_picture')->store('profile_pictures', 'public');
             $profile->profile_picture = $path;
         }
 
-        $profile->first_name = $request->first_name;
-        $profile->middle_name = $request->middle_name;
-        $profile->last_name = $request->last_name;
-        $profile->contact_number = $request->contact_number;
-        $profile->sex = $request->sex;
-        $profile->birthdate = $request->birthdate;
-        $profile->address = $request->address;
+        $profile->first_name     = $validated['first_name'];
+        $profile->middle_name    = $validated['middle_name'] ?? null;
+        $profile->last_name      = $validated['last_name'];
+        $profile->contact_number = $validated['contact_number'] ?? null;
+        $profile->sex            = $validated['sex'] ?? null;
+        $profile->birthdate      = $validated['birthdate'] ?? null;
+        $profile->address        = $validated['address'] ?? null;
         $profile->save();
 
         return back()->with('success', 'Settings updated successfully!');
     }
-
-
 
     public function changePassword(Request $request)
     {
         $teacher = Auth::user();
 
         $request->validate([
-            'current_password' => 'required',
-            'new_password' => 'required|min:6|confirmed',
+            'current_password' => ['required'],
+            'new_password'     => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
         ]);
 
-        if (!\Hash::check($request->current_password, $teacher->password)) {
+        if (!Hash::check($request->current_password, $teacher->password)) {
             return back()->withErrors(['current_password' => 'Current password is incorrect.']);
         }
 
-        $teacher->password = \Hash::make($request->new_password);
-        $teacher->save();
+        $teacher->update([
+            'password' => Hash::make($request->new_password),
+        ]);
 
         return back()->with('success', 'Password changed successfully!');
     }

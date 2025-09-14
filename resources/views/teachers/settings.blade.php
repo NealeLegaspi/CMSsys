@@ -6,16 +6,31 @@
 @section('content')
 <div class="container my-4">
 
+  {{-- Flash Messages --}}
+  @if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <i class="bx bx-check-circle me-1"></i> {{ session('success') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  @endif
+
+  @if(session('error'))
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <i class="bx bx-error-circle me-1"></i> {{ session('error') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  @endif
+
   <!-- Tabs -->
   <ul class="nav nav-tabs" id="settingsTabs" role="tablist">
     <li class="nav-item" role="presentation">
       <button class="nav-link active" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile" type="button" role="tab">
-        Profile Settings
+        <i class="bx bx-user me-1"></i> Profile Settings
       </button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="password-tab" data-bs-toggle="tab" data-bs-target="#password" type="button" role="tab">
-        Change Password
+        <i class="bx bx-lock-alt me-1"></i> Change Password
       </button>
     </li>
   </ul>
@@ -24,23 +39,27 @@
 
     <!-- Profile Tab -->
     <div class="tab-pane fade show active" id="profile" role="tabpanel">
-      <div class="card p-4">
+      <div class="card p-4 shadow-sm border-0">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="mb-0">Profile Information</h5>
-          <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#updateProfileModal">
+          <h5 class="fw-bold mb-0">Profile Information</h5>
+          <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#updateProfileModal">
             <i class='bx bx-edit-alt me-1'></i> Update Profile
           </button>
         </div>
 
         <!-- Profile Summary -->
         <div class="text-center mb-3">
-          <img src="{{ $teacher->profile && $teacher->profile->profile_picture ? asset('storage/'.$teacher->profile->profile_picture) : asset('images/default.png') }}" 
-               alt="Profile Picture" class="rounded-circle mb-2"
+          <img src="{{ $teacher->profile && $teacher->profile->profile_picture 
+              ? asset('storage/'.$teacher->profile->profile_picture) 
+              : asset('images/default.png') }}" 
+               alt="Profile Picture" class="rounded-circle mb-2 shadow-sm"
                style="width: 120px; height: 120px; object-fit: cover;">
-          <h6 class="mt-2">{{ $teacher->profile->first_name }} {{ $teacher->profile->last_name }}</h6>
+          <h6 class="mt-2 fw-semibold">
+            {{ $teacher->profile->first_name }} {{ $teacher->profile->last_name }}
+          </h6>
         </div>
 
-        <table class="table table-striped table-bordered">
+        <table class="table table-bordered table-striped align-middle">
           <tr><th>Full Name</th><td>{{ $teacher->profile->first_name }} {{ $teacher->profile->middle_name }} {{ $teacher->profile->last_name }}</td></tr>
           <tr><th>Email</th><td>{{ $teacher->email }}</td></tr>
           <tr><th>Contact Number</th><td>{{ $teacher->profile->contact_number ?? 'N/A' }}</td></tr>
@@ -53,7 +72,9 @@
         <div class="text-end">
           <form method="POST" action="{{ route('logout') }}">
             @csrf
-            <button type="submit" class="btn btn-danger"><i class='bx bx-log-out me-1'></i> Logout</button>
+            <button type="submit" class="btn btn-danger">
+              <i class='bx bx-log-out me-1'></i> Logout
+            </button>
           </form>
         </div>
       </div>
@@ -61,24 +82,38 @@
 
     <!-- Change Password Tab -->
     <div class="tab-pane fade" id="password" role="tabpanel">
-      <div class="card p-4">
-        <h5 class="mb-3">Change Password</h5>
+      <div class="card p-4 shadow-sm border-0">
+        <h5 class="fw-bold mb-3">
+          <i class="bx bx-lock-alt me-1"></i> Change Password
+        </h5>
         <form id="changePasswordForm" method="POST" action="{{ route('teachers.changePassword') }}">
           @csrf
           <div class="mb-3">
             <label class="form-label">Current Password</label>
-            <input type="password" class="form-control" name="current_password" required>
+            <input type="password" class="form-control @error('current_password') is-invalid @enderror" 
+                   name="current_password" required>
+            @error('current_password')
+              <div class="invalid-feedback">{{ $message }}</div>
+            @enderror
           </div>
           <div class="mb-3">
             <label class="form-label">New Password</label>
-            <input type="password" class="form-control" name="new_password" required>
+            <input type="password" class="form-control @error('new_password') is-invalid @enderror" 
+                   name="new_password" required>
+            @error('new_password')
+              <div class="invalid-feedback">{{ $message }}</div>
+            @enderror
           </div>
           <div class="mb-3">
             <label class="form-label">Confirm New Password</label>
-            <input type="password" class="form-control" name="new_password_confirmation" required>
+            <input type="password" class="form-control @error('new_password_confirmation') is-invalid @enderror" 
+                   name="new_password_confirmation" required>
+            @error('new_password_confirmation')
+              <div class="invalid-feedback">{{ $message }}</div>
+            @enderror
           </div>
           <button type="submit" class="btn btn-warning">
-            Change Password
+            <i class="bx bx-refresh me-1"></i> Change Password
           </button>
         </form>
       </div>
@@ -100,48 +135,85 @@
         <div class="modal-body">
           <div class="row">
             <div class="col-md-4 text-center mb-3">
-              <img src="{{ $teacher->profile && $teacher->profile->profile_picture ? asset('storage/'.$teacher->profile->profile_picture) : asset('images/default.png') }}" 
-                  alt="Profile Picture" class="rounded-circle mb-2"
+              <img src="{{ $teacher->profile && $teacher->profile->profile_picture 
+                  ? asset('storage/'.$teacher->profile->profile_picture) 
+                  : asset('images/default.png') }}" 
+                  alt="Profile Picture" class="rounded-circle mb-2 shadow-sm"
                   style="width: 120px; height: 120px; object-fit: cover;">
-              <input type="file" class="form-control mt-2" name="profile_picture" accept="image/*">
+              <input type="file" class="form-control mt-2 @error('profile_picture') is-invalid @enderror" 
+                     name="profile_picture" accept="image/*">
+              @error('profile_picture')
+                <div class="invalid-feedback">{{ $message }}</div>
+              @enderror
             </div>
             <div class="col-md-8">
               <div class="row mb-3">
                 <div class="col">
                   <label class="form-label">First Name</label>
-                  <input type="text" class="form-control" name="first_name" value="{{ old('first_name', $teacher->profile->first_name) }}" required>
+                  <input type="text" class="form-control @error('first_name') is-invalid @enderror" 
+                         name="first_name" value="{{ old('first_name', $teacher->profile->first_name) }}" required>
+                  @error('first_name')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
                 </div>
                 <div class="col">
                   <label class="form-label">Middle Name</label>
-                  <input type="text" class="form-control" name="middle_name" value="{{ old('middle_name', $teacher->profile->middle_name) }}">
+                  <input type="text" class="form-control @error('middle_name') is-invalid @enderror" 
+                         name="middle_name" value="{{ old('middle_name', $teacher->profile->middle_name) }}">
+                  @error('middle_name')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
                 </div>
                 <div class="col">
                   <label class="form-label">Last Name</label>
-                  <input type="text" class="form-control" name="last_name" value="{{ old('last_name', $teacher->profile->last_name) }}" required>
+                  <input type="text" class="form-control @error('last_name') is-invalid @enderror" 
+                         name="last_name" value="{{ old('last_name', $teacher->profile->last_name) }}" required>
+                  @error('last_name')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                  @enderror
                 </div>
               </div>
               <div class="mb-3">
                 <label class="form-label">Email</label>
-                <input type="email" class="form-control" name="email" value="{{ old('email', $teacher->email) }}">
+                <input type="email" class="form-control @error('email') is-invalid @enderror" 
+                       name="email" value="{{ old('email', $teacher->email) }}">
+                @error('email')
+                  <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
               </div>
               <div class="mb-3">
                 <label class="form-label">Contact Number</label>
-                <input type="text" class="form-control" name="contact_number" value="{{ old('contact_number', $teacher->profile->contact_number) }}">
+                <input type="text" class="form-control @error('contact_number') is-invalid @enderror" 
+                       name="contact_number" value="{{ old('contact_number', $teacher->profile->contact_number) }}">
+                @error('contact_number')
+                  <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
               </div>
               <div class="mb-3">
-                <label class="form-label">Sex</label>
-                <select class="form-select" name="sex">
+                <label class="form-label">Gender</label>
+                <select class="form-select @error('sex') is-invalid @enderror" name="sex">
                   <option value="Male" {{ $teacher->profile->sex == 'Male' ? 'selected' : '' }}>Male</option>
                   <option value="Female" {{ $teacher->profile->sex == 'Female' ? 'selected' : '' }}>Female</option>
                 </select>
+                @error('sex')
+                  <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
               </div>
               <div class="mb-3">
                 <label class="form-label">Birthdate</label>
-                <input type="date" class="form-control" name="birthdate" value="{{ old('birthdate', $teacher->profile->birthdate) }}">
+                <input type="date" class="form-control @error('birthdate') is-invalid @enderror" 
+                       name="birthdate" value="{{ old('birthdate', $teacher->profile->birthdate) }}">
+                @error('birthdate')
+                  <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
               </div>
               <div class="mb-3">
                 <label class="form-label">Address</label>
-                <textarea class="form-control" rows="2" name="address">{{ old('address', $teacher->profile->address) }}</textarea>
+                <textarea class="form-control @error('address') is-invalid @enderror" 
+                          rows="2" name="address">{{ old('address', $teacher->profile->address) }}</textarea>
+                @error('address')
+                  <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
               </div>
             </div>
           </div>

@@ -9,18 +9,22 @@ class Enrollment extends Model
     protected $fillable = [
         'student_id',
         'section_id',
-        'school_year',
+        'school_year_id',
         'status'
     ];
 
-    public function students()
+    public function student()
     {
-        return $this->hasManyThrough(User::class, Enrollment::class, 'section_id', 'id', 'id', 'student_id');
+        return $this->belongsTo(Student::class, 'student_id');
     }
-
 
     public function section()
     {
         return $this->belongsTo(Section::class, 'section_id');
+    }
+
+    public function schoolYear()
+    {
+        return $this->belongsTo(SchoolYear::class, 'school_year_id');
     }
 }

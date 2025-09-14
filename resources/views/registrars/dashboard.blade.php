@@ -1,6 +1,6 @@
-@extends('layouts.teacher')
+@extends('layouts.registrar')
 
-@section('title','Teacher Dashboard')
+@section('title','Registrar Dashboard')
 @section('header','Dashboard')
 
 @section('content')
@@ -8,37 +8,41 @@
   <!-- Quick Cards -->
   <div class="col-md-3">
     <div class="card card-custom p-3 shadow-sm border-0">
-      <h6 class="fw-bold text-primary">📘 Class List</h6>
+      <h6 class="fw-bold text-primary">🎓 Students</h6>
       <hr>
-      <p class="mb-1">You are handling <strong>{{ $sectionCount ?? 0 }}</strong> section(s).</p>
-      <a href="{{ route('teachers.classlist') }}" class="text-decoration-none">View Classes →</a>
+      <p class="mb-1">Total enrolled: <strong>{{ $studentCount ?? 0 }}</strong></p>
+      <a href="{{ route('registrars.students') }}" class="text-decoration-none">View Students →</a>
     </div>
   </div>
 
   <div class="col-md-3">
     <div class="card card-custom p-3 shadow-sm border-0">
-      <h6 class="fw-bold text-success">📢 Announcements</h6>
+      <h6 class="fw-bold text-success">👩‍🏫 Teachers</h6>
       <hr>
-      <p class="mb-1">You have posted <strong>{{ $announcements->count() ?? 0 }}</strong> announcement(s).</p>
-      <a href="{{ route('teachers.announcements') }}" class="text-decoration-none">View Announcements →</a>
+      <p class="mb-1">Registered: <strong>{{ $teacherCount ?? 0 }}</strong></p>
+      <a href="{{ route('registrars.teachers') }}" class="text-decoration-none">View Teachers →</a>
     </div>
   </div>
 
   <div class="col-md-3">
     <div class="card card-custom p-3 shadow-sm border-0">
-      <h6 class="fw-bold text-warning">📝 Grades</h6>
+      <h6 class="fw-bold text-warning">🏫 Sections</h6>
       <hr>
-      <p class="mb-1">View and encode student grades.</p>
-      <a href="{{ route('teachers.grades') }}" class="text-decoration-none">Manage Grades →</a>
+      <p class="mb-1">Total: <strong>{{ $sectionCount ?? 0 }}</strong></p>
+      <a href="{{ route('registrars.sections') }}" class="text-decoration-none">Manage Sections →</a>
     </div>
   </div>
 
   <div class="col-md-3">
     <div class="card card-custom p-3 shadow-sm border-0">
-      <h6 class="fw-bold text-danger">📊 Reports</h6>
+      <h6 class="fw-bold text-danger">📅 School Year</h6>
       <hr>
-      <p class="mb-1">Generate performance reports for your classes.</p>
-      <a href="{{ route('teachers.reports') }}" class="text-decoration-none">Generate Reports →</a>
+      <p class="mb-1">
+        Current: <strong>
+          {{ $schoolYear ? $schoolYear->start_date.' - '.$schoolYear->end_date : 'No active SY' }}
+        </strong>
+      </p>
+      <a href="{{ route('registrars.schoolyear') }}" class="text-decoration-none">Manage SY →</a>
     </div>
   </div>
 </div>
@@ -47,7 +51,7 @@
 <div class="row g-3 mt-4">
   <div class="col-md-8">
     <div class="card card-custom p-3 shadow-sm border-0">
-      <h6 class="fw-bold">👩‍🏫 Total Students per Section</h6>
+      <h6 class="fw-bold">📊 Students per Section</h6>
       @if(!empty($sections) && count($sections) > 0)
         <canvas id="sectionChart"></canvas>
       @else
@@ -71,32 +75,26 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 @if(!empty($sections) && count($sections) > 0)
 <script>
-  const ctx1 = document.getElementById('sectionChart').getContext('2d');
-  new Chart(ctx1, {
+  new Chart(document.getElementById('sectionChart').getContext('2d'), {
     type: 'bar',
     data: {
       labels: @json($sections),
       datasets: [{
         label: 'Students',
         data: @json($totals),
-        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-        borderColor: 'rgba(54, 162, 235, 1)',
+        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+        borderColor: 'rgba(75, 192, 192, 1)',
         borderWidth: 1
       }]
     },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } }
-    }
+    options: { responsive: true, plugins: { legend: { display: false } } }
   });
 </script>
 @endif
 
 @if(!empty($genderLabels) && !empty($genderData))
 <script>
-  const ctx2 = document.getElementById('genderChart').getContext('2d');
-  new Chart(ctx2, {
+  new Chart(document.getElementById('genderChart').getContext('2d'), {
     type: 'pie',
     data: {
       labels: @json($genderLabels),
@@ -105,10 +103,7 @@
         backgroundColor: ['#36A2EB', '#FF6384']
       }]
     },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: 'bottom' } }
-    }
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
   });
 </script>
 @endif

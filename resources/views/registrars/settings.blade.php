@@ -1,4 +1,4 @@
-@extends('layouts.student')
+@extends('layouts.registrar')
 
 @section('title','Settings')
 @section('header','Settings')
@@ -51,7 +51,7 @@
         <div class="text-center mb-3">
           <img src="{{ auth()->user()->profile && auth()->user()->profile->profile_picture 
               ? asset('storage/'.auth()->user()->profile->profile_picture) 
-              : asset('images/default-student.png') }}" 
+              : asset('images/default-registrar.png') }}" 
                alt="Profile Picture" class="rounded-circle mb-2 shadow-sm"
                style="width: 120px; height: 120px; object-fit: cover;">
           <h6 class="mt-2 fw-semibold">
@@ -86,7 +86,7 @@
         <h5 class="fw-bold mb-3">
           <i class="bx bx-lock-alt me-1"></i> Change Password
         </h5>
-        <form id="changePasswordForm" method="POST" action="{{ route('students.change-password') }}">
+        <form id="changePasswordForm" method="POST" action="{{ route('registrars.changePassword') }}">
           @csrf
           <div class="mb-3">
             <label class="form-label">Current Password</label>
@@ -126,7 +126,7 @@
         <h5 class="modal-title"><i class='bx bx-user me-2'></i>Update Profile</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <form id="updateProfileForm" method="POST" action="{{ route('students.update-settings') }}" enctype="multipart/form-data">
+      <form id="updateProfileForm" method="POST" action="{{ route('registrars.updateSettings') }}" enctype="multipart/form-data">
         @csrf
         @method('PUT')
         <div class="modal-body">
@@ -134,7 +134,7 @@
             <div class="col-md-4 text-center mb-3">
               <img src="{{ auth()->user()->profile && auth()->user()->profile->profile_picture 
                   ? asset('storage/'.auth()->user()->profile->profile_picture) 
-                  : asset('images/default-student.png') }}" 
+                  : asset('images/default-registrar.png') }}" 
                   alt="Profile Picture" class="rounded-circle mb-2 shadow-sm"
                   style="width: 120px; height: 120px; object-fit: cover;">
               <input type="file" class="form-control mt-2 @error('profile_picture') is-invalid @enderror" name="profile_picture" accept="image/*">
