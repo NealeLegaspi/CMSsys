@@ -1,4 +1,4 @@
-@extends('layouts.teacher')
+@extends('layouts.admin')
 
 @section('title','Settings')
 @section('header','Settings')
@@ -49,13 +49,13 @@
 
         <!-- Profile Summary -->
         <div class="text-center mb-3">
-          <img src="{{ $teacher->profile && $teacher->profile->profile_picture 
-              ? asset('storage/'.$teacher->profile->profile_picture) 
-              : asset('images/default.png') }}" 
+          <img src="{{ auth()->user()->profile && auth()->user()->profile->profile_picture 
+              ? asset('storage/'.auth()->user()->profile->profile_picture) 
+              : asset('images/default-admin.png') }}" 
                alt="Profile Picture" class="rounded-circle mb-2 shadow-sm"
                style="width: 120px; height: 120px; object-fit: cover;">
           <h6 class="mt-2 fw-semibold">
-             {{ optional(auth()->user()->profile)->first_name }} {{ optional(auth()->user()->profile)->last_name }}
+            {{ optional(auth()->user()->profile)->first_name }} {{ optional(auth()->user()->profile)->last_name }}
           </h6>
         </div>
 
@@ -86,28 +86,25 @@
         <h5 class="fw-bold mb-3">
           <i class="bx bx-lock-alt me-1"></i> Change Password
         </h5>
-        <form id="changePasswordForm" method="POST" action="{{ route('teachers.changePassword') }}">
+        <form id="changePasswordForm" method="POST" action="{{ route('admins.changePassword') }}">
           @csrf
           <div class="mb-3">
             <label class="form-label">Current Password</label>
-            <input type="password" class="form-control @error('current_password') is-invalid @enderror" 
-                   name="current_password" required>
+            <input type="password" class="form-control @error('current_password') is-invalid @enderror" name="current_password" required>
             @error('current_password')
               <div class="invalid-feedback">{{ $message }}</div>
             @enderror
           </div>
           <div class="mb-3">
             <label class="form-label">New Password</label>
-            <input type="password" class="form-control @error('new_password') is-invalid @enderror" 
-                   name="new_password" required>
+            <input type="password" class="form-control @error('new_password') is-invalid @enderror" name="new_password" required>
             @error('new_password')
               <div class="invalid-feedback">{{ $message }}</div>
             @enderror
           </div>
           <div class="mb-3">
             <label class="form-label">Confirm New Password</label>
-            <input type="password" class="form-control @error('new_password_confirmation') is-invalid @enderror" 
-                   name="new_password_confirmation" required>
+            <input type="password" class="form-control @error('new_password_confirmation') is-invalid @enderror" name="new_password_confirmation" required>
             @error('new_password_confirmation')
               <div class="invalid-feedback">{{ $message }}</div>
             @enderror
@@ -129,19 +126,18 @@
         <h5 class="modal-title"><i class='bx bx-user me-2'></i>Update Profile</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <form id="updateProfileForm" method="POST" action="{{ route('teachers.updateSettings') }}" enctype="multipart/form-data">
+      <form id="updateProfileForm" method="POST" action="{{ route('admins.updateSettings') }}" enctype="multipart/form-data">
         @csrf
         @method('PUT')
         <div class="modal-body">
           <div class="row">
             <div class="col-md-4 text-center mb-3">
-              <img src="{{ $teacher->profile && $teacher->profile->profile_picture 
-                  ? asset('storage/'.$teacher->profile->profile_picture) 
-                  : asset('images/default.png') }}" 
+              <img src="{{ auth()->user()->profile && auth()->user()->profile->profile_picture 
+                  ? asset('storage/'.auth()->user()->profile->profile_picture) 
+                  : asset('images/default-admin.png') }}" 
                   alt="Profile Picture" class="rounded-circle mb-2 shadow-sm"
                   style="width: 120px; height: 120px; object-fit: cover;">
-              <input type="file" class="form-control mt-2 @error('profile_picture') is-invalid @enderror" 
-                     name="profile_picture" accept="image/*">
+              <input type="file" class="form-control mt-2 @error('profile_picture') is-invalid @enderror" name="profile_picture" accept="image/*">
               @error('profile_picture')
                 <div class="invalid-feedback">{{ $message }}</div>
               @enderror

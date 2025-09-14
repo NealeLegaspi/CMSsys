@@ -60,8 +60,8 @@ class RegisteredUserController extends Controller
     protected function redirectBasedOnRole(User $user): RedirectResponse
     {
         return match ($user->role->name) {
-            'Administrator' => redirect()->route('admin.dashboard'),
-            'Registrar' => redirect()->route('registrar.dashboard'),
+            'Admin' => redirect()->route('admins.dashboard'),
+            'Registrar' => redirect()->route('registrars.dashboard'),
             'Teacher' => redirect()->route('teachers.dashboard'),
             'Student' => redirect()->route('students.dashboard'),
             default => redirect()->route('dashboard'),

@@ -1,12 +1,18 @@
 <?php
-// app/Models/Grade.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
 class Grade extends Model
 {
-    protected $fillable = ['student_id', 'teacher_id', 'subject_id', 'quarter', 'grade'];
+    protected $fillable = [
+        'student_id',
+        'teacher_id',
+        'subject_id',
+        'school_year_id',
+        'quarter',
+        'grade',
+    ];
 
     public function student()
     {
@@ -15,11 +21,16 @@ class Grade extends Model
 
     public function teacher()
     {
-        return $this->belongsTo(User::class, 'teacher_id');
+        return $this->belongsTo(Teacher::class, 'teacher_id');
     }
 
     public function subject()
     {
         return $this->belongsTo(Subject::class, 'subject_id');
+    }
+
+    public function schoolYear()
+    {
+        return $this->belongsTo(SchoolYear::class, 'school_year_id');
     }
 }

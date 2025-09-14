@@ -86,7 +86,7 @@
         <h5 class="fw-bold mb-3">
           <i class="bx bx-lock-alt me-1"></i> Change Password
         </h5>
-        <form id="changePasswordForm" method="POST" action="{{ route('students.change-password') }}">
+        <form id="changePasswordForm" method="POST" action="{{ route('students.changePassword') }}">
           @csrf
           <div class="mb-3">
             <label class="form-label">Current Password</label>
@@ -126,7 +126,7 @@
         <h5 class="modal-title"><i class='bx bx-user me-2'></i>Update Profile</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <form id="updateProfileForm" method="POST" action="{{ route('students.update-settings') }}" enctype="multipart/form-data">
+      <form id="updateProfileForm" method="POST" action="{{ route('students.updateSettings') }}" enctype="multipart/form-data">
         @csrf
         @method('PUT')
         <div class="modal-body">

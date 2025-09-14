@@ -24,7 +24,6 @@ class TeacherController extends Controller
     {
         $teacher = Auth::user();
 
-        // Sections assigned to this teacher
         $sections = Section::where('adviser_id', $teacher->id)->pluck('name', 'id')->toArray();
 
         $sectionCount = count($sections);
@@ -34,11 +33,9 @@ class TeacherController extends Controller
         $female = 0;
 
         foreach ($sections as $id => $name) {
-            // Count enrolled students in this section
             $totalStudents = Enrollment::where('section_id', $id)->count();
             $totals[] = $totalStudents;
 
-            // Count gender distribution
             $male += Enrollment::where('section_id', $id)
                         ->whereHas('student.profile', fn($q) => $q->where('sex','Male'))->count();
 
@@ -69,7 +66,6 @@ class TeacherController extends Controller
 
         $query = Announcement::where('user_id', $teacher->id);
 
-        // search
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -78,7 +74,6 @@ class TeacherController extends Controller
             });
         }
 
-        // filter
         if ($request->filled('section_id')) {
             $query->where('section_id', $request->section_id);
         }
@@ -100,7 +95,7 @@ class TeacherController extends Controller
 
         Announcement::create([
             'title'      => $request->title,
-            'content'    => $request->content,   // migration column
+            'content'    => $request->content,
             'user_id'    => Auth::id(),
             'section_id' => $request->section_id ?? null,
         ]);
@@ -121,7 +116,7 @@ class TeacherController extends Controller
 
         $announcement->update([
             'title'   => $request->title,
-            'content' => $request->content, // use content column
+            'content' => $request->content,
         ]);
 
         return back()->with('success', 'Announcement updated successfully!');
@@ -166,14 +161,13 @@ class TeacherController extends Controller
             'due_date' => $request->due_date,
             'section_id' => $request->section_id,
             'subject_id' => $request->subject_id,
-            'teacher_id' => Auth::id(), // laging naka-bind sa logged-in teacher
+            'teacher_id' => Auth::id(),
         ]);
 
         return redirect()->route('teachers.assignments')->with('success', 'Assignment created.');
     }
 
     public function updateAssignment(Request $request, Assignment $assignment) {
-        // ownership check
         if ($assignment->teacher_id !== Auth::id()) {
             abort(403, 'Unauthorized action.');
         }
@@ -192,7 +186,6 @@ class TeacherController extends Controller
     }
 
     public function destroyAssignment(Assignment $assignment) {
-        // ownership check
         if ($assignment->teacher_id !== Auth::id()) {
             abort(403, 'Unauthorized action.');
         }
@@ -207,7 +200,6 @@ class TeacherController extends Controller
     {
         $teacher = Auth::user();
 
-        // Advisory section
         $advisorySection = Section::where('adviser_id', $teacher->id)->first();
 
         $sectionId = $advisorySection->id ?? null;
@@ -290,17 +282,14 @@ class TeacherController extends Controller
     {
         $teacher = Auth::user();
 
-        // kuha lahat ng subjects assigned kay teacher
         $subjects = Subject::whereHas('assignments', function ($q) use ($teacher) {
             $q->where('teacher_id', $teacher->id);
         })->with('section')->get();
 
-        // default values
         $subject = null;
         $section = null;
         $students = collect();
 
-        // kapag may pinili sa dropdown
         if ($request->filled('subject_id')) {
             $subject = Subject::with('section')->findOrFail($request->subject_id);
             $section = $subject->section;
@@ -316,7 +305,6 @@ class TeacherController extends Controller
 
     public function encodeGrades(Subject $subject, Section $section)
     {
-        // kunin students sa section na ito
         $enrollments = $section->enrollments()->with('student.profile')->get();
 
         $students = [];
@@ -324,7 +312,6 @@ class TeacherController extends Controller
             $student = $enrollment->student;
             if (! $student) continue;
 
-            // kunin existing grades ng bawat student
             $grades = Grade::where('student_id', $student->id)
                 ->where('subject_id', $subject->id)
                 ->pluck('grade', 'quarter')
@@ -344,7 +331,6 @@ class TeacherController extends Controller
     {
         $section = $subject->section;
 
-        // Students under that section
         $students = $section->students()->with(['grades' => function ($q) use ($subject) {
             $q->where('subject_id', $subject->id);
         }])->get();
@@ -413,7 +399,7 @@ class TeacherController extends Controller
     {
         $gradeLevels = GradeLevel::all();
         $sections = Section::with('gradeLevel')->get();
-        $schoolYears = ['2022-2023', '2023-2024', '2024-2025']; // pwede mo din gawin dynamic kung may table ka
+        $schoolYears = ['2022-2023', '2023-2024', '2024-2025'];
         $students = Student::with('user.profile', 'section.gradeLevel')->get();
 
         return view('teachers.reports', compact('gradeLevels', 'sections', 'schoolYears', 'students'));
@@ -487,7 +473,6 @@ class TeacherController extends Controller
             'profile_picture'  => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:2048'],
         ]);
 
-        // Update email directly in users table
         $teacher->update([
             'email' => $validated['email'],
         ]);

@@ -12,7 +12,7 @@ Route::get('/', function () {
     if (Auth::check()) {
         $role = Auth::user()->role->name;
 
-        if ($role === 'Administrator') {
+        if ($role === 'Admin') {
             return redirect()->route('admins.dashboard');
         } elseif ($role === 'Teacher') {
             return redirect()->route('teachers.dashboard');
@@ -37,8 +37,29 @@ Route::middleware('auth')->group(function () {
 });
 
 // -------------------- ADMIN ROUTES --------------------
-Route::prefix('admin')->middleware(['auth', 'role:Administrator'])->group(function () {
-    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+Route::prefix('admin')->middleware(['auth', 'role:Admin'])->group(function () {
+    // Dashboard
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admins.dashboard');
+
+    // User Management
+    Route::get('users', [AdminController::class, 'users'])->name('admins.users');
+    Route::post('users', [AdminController::class, 'storeUser'])->name('admins.users.store');
+    Route::put('users/{id}', [AdminController::class, 'updateUser'])->name('admins.users.update');
+    Route::delete('users/{id}', [AdminController::class, 'destroyUser'])->name('admins.users.destroy');
+    Route::patch('users/{id}/deactivate', [AdminController::class, 'deactivateUser'])->name('admins.users.deactivate');
+    Route::patch('users/{id}/reset-password', [AdminController::class, 'resetPassword'])->name('admins.users.reset');
+
+
+    // Activity Logs
+    Route::get('/logs', [AdminController::class, 'logs'])->name('admins.logs');
+
+    // Reports
+    Route::get('/reports', [AdminController::class, 'reports'])->name('admins.reports');
+
+    // Settings
+    Route::get('/settings', [AdminController::class, 'settings'])->name('admins.settings');
+    Route::put('/settings', [AdminController::class, 'updateSettings'])->name('admins.updateSettings');
+    Route::post('/settings/change-password', [AdminController::class, 'changePassword'])->name('admins.changePassword');
     // Add more admin routes here
 });
 
@@ -142,8 +163,8 @@ Route::prefix('student')->middleware(['auth', 'role:Student'])->group(function (
     Route::get('/grades', [StudentController::class, 'grades'])->name('students.grades');
 
     Route::get('/settings', [StudentController::class, 'settings'])->name('students.settings');
-    Route::put('/settings/update', [StudentController::class, 'updateSettings'])->name('students.update-settings');
-    Route::post('/settings/change-password', [StudentController::class, 'changePassword'])->name('students.change-password');
+    Route::put('/settings/update', [StudentController::class, 'updateSettings'])->name('students.updateSettings');
+    Route::post('/settings/change-password', [StudentController::class, 'changePassword'])->name('students.changePassword');
 });
 
 Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');

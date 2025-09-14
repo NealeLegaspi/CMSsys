@@ -81,8 +81,8 @@ class RegistrarController extends Controller
 
         $user = User::create([
             'email'    => $request->email,
-            'password' => bcrypt('password123'), // default password
-            'role_id'  => 4, // Student
+            'password' => bcrypt('password123'), 
+            'role_id'  => 4, 
         ]);
 
         $user->profile()->create([
@@ -91,7 +91,6 @@ class RegistrarController extends Controller
             'last_name'   => $request->last_name,
         ]);
 
-        // Auto-generate LRN (student number)
         $year          = now()->format('Y');
         $random        = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
         $studentNumber = $year . $random;
@@ -294,7 +293,6 @@ class RegistrarController extends Controller
             'end_date'   => 'required|date|after:start_date',
         ]);
 
-        // Close previous active year
         SchoolYear::where('status', 'active')->update(['status' => 'closed']);
 
         SchoolYear::create([
