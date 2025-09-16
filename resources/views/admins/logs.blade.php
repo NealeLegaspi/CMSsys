@@ -11,24 +11,20 @@
     <table class="table table-bordered table-striped">
       <thead class="table-primary">
         <tr>
-          <th>#</th>
           <th>User</th>
           <th>Action</th>
-          <th>IP</th>
-          <th>Date</th>
+          <th>Date & Time</th>
         </tr>
       </thead>
       <tbody>
-        @forelse($logs as $i => $log)
+        @forelse($logs as $log)
         <tr>
-          <td>{{ $logs->firstItem() + $i }}</td>
           <td>{{ optional($log->user)->email ?? 'System' }}</td>
           <td>{{ $log->action }}</td>
-          <td>{{ $log->ip_address }}</td>
-          <td>{{ $log->created_at->format('Y-m-d H:i') }}</td>
+          <td>{{ $log->created_at->format('M d, Y h:i A') }}</td>
         </tr>
         @empty
-        <tr><td colspan="5" class="text-center text-muted">No activity yet.</td></tr>
+        <tr><td colspan="3" class="text-center text-muted">No activity logs found.</td></tr>
         @endforelse
       </tbody>
     </table>

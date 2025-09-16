@@ -22,8 +22,10 @@
                             <option value="">-- Select Subject --</option>
                             @foreach($subjects as $subj)
                                 <option value="{{ $subj->id }}" 
-                                    {{ request('subject_id') == $subj->id ? 'selected' : '' }}>
-                                    {{ $subj->name }} ({{ $subj->section->name ?? 'No Section' }})
+                                    {{ (isset($selectedSubject) && $selectedSubject->id == $subj->id) ? 'selected' : '' }}>
+                                    {{ $subj->name }} - 
+                                    {{ $subj->section->gradeLevel->name ?? 'No Grade Level' }} 
+                                    {{ $subj->section->name ?? 'No Section' }}
                                 </option>
                             @endforeach
                         </select>
@@ -39,11 +41,21 @@
     </div>
 
     <!-- Encode Grades Table -->
-    @if($subject && $section)
+    @if(isset($selectedSubject))
+        @php
+            $subject = $selectedSubject;
+            $section = $subject->section;
+            $students = $section->students()->with(['grades' => function ($q) use ($subject) {
+                $q->where('subject_id', $subject->id);
+            }])->get();
+        @endphp
     <div class="card shadow-sm">
         <div class="card-body">
             <h5 class="fw-bold mb-3">
-                {{ $subject->name }} - {{ $section->name }}
+                📋 Encoding Grades for 
+                {{ $subject->name }} - 
+                {{ $section->gradeLevel->name ?? 'No Grade Level' }} 
+                {{ $section->name ?? 'No Section' }}
             </h5>
 
             <form action="{{ route('teachers.grades.store') }}" method="POST">
@@ -67,31 +79,30 @@
                         <tbody>
                             @foreach($students as $student)
                                 @php
-                                    $grades = $student->grades
-                                        ->where('subject_id', $subject->id)
-                                        ->pluck('grade', 'quarter')
-                                        ->toArray();
-
-                                    $final = isset($grades['1st'], $grades['2nd'], $grades['3rd'], $grades['4th'])
-                                        ? round(array_sum([
-                                            $grades['1st'], $grades['2nd'],
-                                            $grades['3rd'], $grades['4th']
-                                        ]) / 4, 2)
-                                        : null;
-
-                                    $remarks = $final !== null ? ($final >= 75 ? 'PASSED' : 'FAILED') : null;
-                                @endphp
+                                    $grades = [];
+                                    foreach (['1st', '2nd', '3rd', '4th'] as $q) {
+                                        $gradeRecord = $student->grades->firstWhere('quarter', $q);
+                                        $grades[$q] = $gradeRecord ? $gradeRecord->grade : null;
+                                    }
+                                    $final = null;
+                                    $remarks = null;
+                                    if (count(array_filter($grades)) === 4) {
+                                        $final = round(array_sum($grades) / 4);
+                                        $remarks = $final >= 75 ? 'PASSED' : 'FAILED';
+                                    }
                                 <tr>
                                     <td class="text-start fw-semibold">
-                                        {{ $student->name }}
+                                        {{ $student->user->profile->first_name ?? '' }} 
+                                        {{ $student->user->profile->last_name ?? '' }}
+                                        <input type="hidden" name="students[]" value="{{ $student->id }}">
                                     </td>
                                     @foreach(['1st', '2nd', '3rd', '4th'] as $q)
                                         <td>
-                                            <input type="number" 
-                                                name="grades[{{ $student->id }}][{{ $q }}]"
-                                                value="{{ $grades[$q] ?? '' }}"
+                                            <input type="number" name="grades[{{ $student->id }}][{{ $q }}]" 
+                                                value="{{ old('grades.'.$student->id.'.'.$q, $grades[$q]) ?? '' }}"
                                                 class="form-control text-center"
-                                                min="0" max="100">
+                                                min="0" max="100" step="1"
+                                                onchange="this.value = Math.min(100, Math.max(0, this.value))">
                                         </td>
                                     @endforeach
                                     <td>

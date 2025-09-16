@@ -43,17 +43,21 @@
        class="nav-link {{ request()->routeIs('admins.dashboard') ? 'active' : '' }}">
        <i class="bx bx-home me-2"></i> Dashboard
     </a>
+    <a href="{{ route('admins.announcements') }}" 
+       class="nav-link {{ request()->routeIs('admins.announcements*') ? 'active' : '' }}">
+       <i class="bi bi-megaphone me-2"></i> Announcements
+    </a>
     <a href="{{ route('admins.users') }}" 
        class="nav-link {{ request()->routeIs('admins.users') ? 'active' : '' }}">
        <i class="bx bx-user me-2"></i> Users
     </a>
-    <a href="{{ route('admins.logs') }}" 
-       class="nav-link {{ request()->routeIs('admins.logs') ? 'active' : '' }}">
-       <i class="bx bx-list-ul me-2"></i> Activity Logs
-    </a>
     <a href="{{ route('admins.reports') }}" 
        class="nav-link {{ request()->routeIs('admins.reports') ? 'active' : '' }}">
        <i class="bx bx-file me-2"></i> Reports
+    </a>
+    <a href="{{ route('admins.logs') }}" 
+       class="nav-link {{ request()->routeIs('admins.logs') ? 'active' : '' }}">
+       <i class="bx bx-list-ul me-2"></i> Activity Logs
     </a>
     <a href="{{ route('admins.settings') }}" 
        class="nav-link {{ request()->routeIs('admins.settings') ? 'active' : '' }}">

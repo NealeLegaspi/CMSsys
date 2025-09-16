@@ -30,7 +30,7 @@
         @forelse($users as $i => $u)
         <tr>
           <td>{{ $i+1 }}</td>
-          <td>{{ $u->first_name }} {{ $u->last_name }}</td>
+          <td>{{ $u->profile->first_name ?? '' }} {{ $u->profile->middle_name ?? '' }} {{ $u->profile->last_name ?? '' }}</td>
           <td>{{ $u->email }}</td>
           <td>{{ $u->role->name ?? '-' }}</td>
           <td>
@@ -122,6 +122,7 @@
         </div>
         <div class="modal-body">
           <input type="text" class="form-control mb-2" name="first_name" placeholder="First Name" required>
+          <input type="text" class="form-control mb-2" name="middle_name" placeholder="Middle Name" required>
           <input type="text" class="form-control mb-2" name="last_name" placeholder="Last Name" required>
           <input type="email" class="form-control mb-2" name="email" placeholder="Email" required>
           <select name="role_id" class="form-select mb-2" required>

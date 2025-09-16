@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\Announcement;
 use App\Models\Grade;
+use App\Models\Assignment;
 
 class StudentController extends Controller
 {
+
     public function dashboard()
     {
         $user = Auth::user();
@@ -49,14 +52,10 @@ class StudentController extends Controller
         $user = Auth::user();
         $sectionIds = $user->enrollments->pluck('section_id')->toArray();
 
-        if (empty($sectionIds)) {
-            $assignments = collect(); 
-        } else {
-            $assignments = \App\Models\Assignment::with(['teacher.profile', 'section.gradeLevel', 'subject'])
-                ->whereIn('section_id', $sectionIds)
-                ->latest()
-                ->get();
-        }
+        $assignments = Assignment::with(['subject', 'section'])
+            ->whereIn('section_id', $sectionIds)
+            ->latest()
+            ->get();
 
         return view('students.assignments', compact('assignments'));
     }
@@ -64,10 +63,10 @@ class StudentController extends Controller
     public function grades()
     {
         $user = Auth::user();
-
         $grades = Grade::with('subject')
             ->where('student_id', $user->id)
-            ->get();
+            ->get()
+            ->groupBy('subject.name');
 
         return view('students.grades', compact('grades'));
     }
@@ -94,12 +93,10 @@ class StudentController extends Controller
             'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:2048'],
         ]);
 
-        // Update email sa `users` table
         $student->update([
             'email' => $validated['email'],
         ]);
 
-        // Siguraduhin may profile
         $profile = $student->profile;
         if (!$profile) {
             $profile = $student->profile()->create([
@@ -107,13 +104,11 @@ class StudentController extends Controller
             ]);
         }
 
-        // Upload profile picture kung meron
         if ($request->hasFile('profile_picture')) {
             $path = $request->file('profile_picture')->store('profile_pictures', 'public');
             $profile->profile_picture = $path;
         }
 
-        // Update profile info
         $profile->first_name     = $validated['first_name'];
         $profile->middle_name    = $validated['middle_name'] ?? null;
         $profile->last_name      = $validated['last_name'];
@@ -122,6 +117,8 @@ class StudentController extends Controller
         $profile->birthdate      = $validated['birthdate'] ?? null;
         $profile->address        = $validated['address'] ?? null;
         $profile->save();
+
+        $this->logActivity('Update Profile', "Updated profile for {$student->email}");
 
         return back()->with('success', 'Profile updated successfully!');
     }
@@ -143,6 +140,17 @@ class StudentController extends Controller
             'password' => \Hash::make($request->new_password),
         ]);
 
+        $this->logActivity('Change Password', "Changed password for {$student->email}");
+
         return back()->with('success', 'Password updated successfully!');
+    }
+
+    protected function logActivity($action, $description)
+    {
+        ActivityLog::create([
+            'user_id'    => Auth::id(),
+            'action'     => $action,
+            'description'=> $description,
+        ]);
     }
 }

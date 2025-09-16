@@ -1,67 +1,88 @@
-@extends('layouts.admin')
+@extends('layouts.admin') 
+{{-- Gumamit ng layout mo (yung sidebar + header) --}}
 
 @section('title','Admin Dashboard')
 @section('header','Dashboard')
 
 @section('content')
-<div class="row mb-4">
+<div class="row g-3">
+
+  <!-- Quick Stats -->
   <div class="col-md-3">
-    <div class="card card-custom p-3 text-center">
-      <h6>Total Users</h6>
-      <h3>{{ $userCount }}</h3>
+    <div class="card text-center shadow-sm border-0">
+      <div class="card-body">
+        <i class="bi bi-person-check fs-1 text-primary"></i>
+        <h6 class="mt-2">Administrators</h6>
+        <h3>{{ $adminCount }}</h3>
+      </div>
     </div>
   </div>
   <div class="col-md-3">
-    <div class="card card-custom p-3 text-center">
-      <h6>Admins</h6>
-      <h3>{{ $adminCount }}</h3>
+    <div class="card text-center shadow-sm border-0">
+      <div class="card-body">
+        <i class="bi bi-person-lines-fill fs-1 text-success"></i>
+        <h6 class="mt-2">Registrars</h6>
+        <h3>{{ $registrarCount }}</h3>
+      </div>
     </div>
   </div>
   <div class="col-md-3">
-    <div class="card card-custom p-3 text-center">
-      <h6>Teachers</h6>
-      <h3>{{ $teacherCount }}</h3>
+    <div class="card text-center shadow-sm border-0">
+      <div class="card-body">
+        <i class="bi bi-mortarboard fs-1 text-warning"></i>
+        <h6 class="mt-2">Teachers</h6>
+        <h3>{{ $teacherCount }}</h3>
+      </div>
     </div>
   </div>
   <div class="col-md-3">
-    <div class="card card-custom p-3 text-center">
-      <h6>Students</h6>
-      <h3>{{ $studentCount }}</h3>
+    <div class="card text-center shadow-sm border-0">
+      <div class="card-body">
+        <i class="bi bi-people fs-1 text-danger"></i>
+        <h6 class="mt-2">Students</h6>
+        <h3>{{ $studentCount }}</h3>
+      </div>
     </div>
   </div>
+
 </div>
 
-<div class="row mb-4">
-  <div class="col-md-8">
-    <div class="card card-custom p-3">
-      <h6 class="mb-3">📈 Enrollment Trends</h6>
-      <canvas id="enrollmentChart" height="120"></canvas>
-    </div>
-  </div>
-  <div class="col-md-4">
-    <div class="card card-custom p-3">
-      <h6 class="mb-3">📊 User Role Distribution</h6>
-      <canvas id="roleChart" height="250"></canvas>
-    </div>
-  </div>
-</div>
-
-<div class="row">
-  <div class="col-md-12">
-    <div class="card card-custom p-3">
-      <h6 class="mb-3">🕒 Recent Activity Logs</h6>
+<!-- Activity & Announcements -->
+<div class="row g-3 mt-3">
+  <div class="col-md-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-header fw-bold">Recent Activity Logs</div>
       <ul class="list-group list-group-flush">
-        @foreach($logs as $log)
-          <li class="list-group-item small">
-            <strong>{{ $log->user->name ?? 'Unknown' }}</strong> 
-            {{ $log->action }} 
-            <br>
-            <span class="text-muted">{{ $log->created_at->diffForHumans() }}</span>
+        @forelse($logs as $log)
+          <li class="list-group-item">
+            <small class="text-muted">
+              {{ $log->created_at->format('M d, Y h:i A') }} - 
+              <strong>{{ optional($log->user)->email ?? 'System' }}</strong> 
+              {{ $log->action }}
+            </small>
           </li>
-        @endforeach
-        @if($logs->isEmpty())
-          <li class="list-group-item text-muted">No recent logs</li>
-        @endif
+        @empty
+          <li class="list-group-item text-muted">No recent activity.</li>
+        @endforelse
+      </ul>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-header fw-bold">Latest Announcements</div>
+      <ul class="list-group list-group-flush">
+        @forelse($announcements as $a)
+          <li class="list-group-item">
+            <h6 class="mb-1">{{ $a->title }}</h6>
+            <p class="mb-1 text-secondary">{{ Str::limit($a->content, 100) }}</p>
+            <small class="text-muted">
+              By {{ $a->user->profile->first_name ?? '' }} {{ $a->user->profile->last_name ?? '' }} 
+              on {{ $a->created_at->format('M d, Y h:i A') }}
+            </small>
+          </li>
+        @empty
+          <li class="list-group-item text-muted">No announcements yet.</li>
+        @endforelse
       </ul>
     </div>
   </div>
@@ -70,35 +91,4 @@
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-  // Enrollment Trends (line chart)
-  const ctx = document.getElementById('enrollmentChart');
-  new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: @json(array_keys($enrollmentTrends->toArray())),
-      datasets: [{
-        label: 'Enrollments',
-        data: @json(array_values($enrollmentTrends->toArray())),
-        borderColor: '#0077b6',
-        backgroundColor: 'rgba(0,119,182,0.2)',
-        fill: true,
-        tension: 0.3
-      }]
-    }
-  });
-
-  // User Role Distribution (pie chart)
-  const roleCtx = document.getElementById('roleChart');
-  new Chart(roleCtx, {
-    type: 'pie',
-    data: {
-      labels: @json(array_keys($roleDistribution)),
-      datasets: [{
-        data: @json(array_values($roleDistribution)),
-        backgroundColor: ['#0077b6','#66c2e0','#90e0ef','#caf0f8']
-      }]
-    }
-  });
-</script>
 @endpush

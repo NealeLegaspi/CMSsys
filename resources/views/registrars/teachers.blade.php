@@ -30,7 +30,7 @@
           @forelse($teachers as $index => $teacher)
           <tr>
             <td>{{ $teachers->firstItem() + $index }}</td>
-            <td>{{ $teacher->profile->first_name ?? '' }} {{ $teacher->profile->last_name ?? '' }}</td>
+            <td>{{ $teacher->profile->first_name ?? '' }} {{ $teacher->profile->middle_name ?? '' }} {{ $teacher->profile->last_name ?? '' }}</td>
             <td>{{ $teacher->email }}</td>
             <td>{{ $teacher->profile->contact_number ?? 'N/A' }}</td>
             <td>

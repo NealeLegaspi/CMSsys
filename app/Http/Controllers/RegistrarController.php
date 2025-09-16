@@ -8,31 +8,58 @@ use App\Models\Subject;
 use App\Models\Enrollment;
 use App\Models\SchoolYear;
 use App\Models\Student;
+use App\Models\GradeLevel;
+use App\Models\UserProfile;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\StudentsExport;
+use App\Imports\StudentsImport;
 
 class RegistrarController extends Controller
 {
     /**
-     * Dashboard overview
+     * Log Activity
+     */
+    protected function logActivity($action, $description)
+    {
+        ActivityLog::create([
+            'user_id'    => Auth::id(),
+            'action'     => $action,
+            'description'=> $description,
+        ]);
+    }
+
+    /**
+     * Dashboard Overview
      */
     public function dashboard()
     {
-        $studentCount = User::where('role_id', 4)->count(); // role_id 4 = Student
-        $teacherCount = User::where('role_id', 3)->count(); // role_id 3 = Teacher
+        $studentCount = User::where('role_id', 4)->count();
+        $teacherCount = User::where('role_id', 3)->count();
         $sectionCount = Section::count();
-        $schoolYear   = SchoolYear::latest()->first();
+        $schoolYear   = SchoolYear::where('status', 'active')->latest()->first();
 
-        // chart: students per section
+        // Students per Section (for bar chart)
         $sections = Section::pluck('name');
         $totals   = $sections->map(fn($sec) =>
             Enrollment::whereHas('section', fn($q) => $q->where('name', $sec))->count()
         );
 
+        // Gender distribution (for pie chart)
+        $genderLabels = ['Male', 'Female'];
+        $genderData   = [
+            UserProfile::where('sex', 'Male')->count(),
+            UserProfile::where('sex', 'Female')->count(),
+        ];
+
         return view('registrars.dashboard', compact(
             'studentCount', 'teacherCount', 'sectionCount', 'schoolYear',
-            'sections', 'totals'
+            'sections', 'totals', 'genderLabels', 'genderData'
         ));
     }
 
@@ -47,25 +74,23 @@ class RegistrarController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('email', 'like', "%{$search}%")
-                ->orWhereHas('profile', function ($sub) use ($search) {
-                    $sub->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('middle_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%");
-                })
-                ->orWhereHas('student', function ($sub) use ($search) {
-                    $sub->where('student_number', 'like', "%{$search}%");
-                });
+                  ->orWhereHas('profile', function ($sub) use ($search) {
+                      $sub->where('first_name', 'like', "%{$search}%")
+                          ->orWhere('middle_name', 'like', "%{$search}%")
+                          ->orWhere('last_name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('student', function ($sub) use ($search) {
+                      $sub->where('student_number', 'like', "%{$search}%");
+                  });
             });
         }
 
         if ($request->filled('section_id')) {
-            $query->whereHas('student.section', function ($q) use ($request) {
-                $q->where('id', $request->section_id);
-            });
+            $query->whereHas('student.section', fn($q) => $q->where('id', $request->section_id));
         }
 
-        $students = $query->orderBy('id', 'desc')->paginate(10)->withQueryString();
-        $sections = \App\Models\Section::all();
+        $students = $query->latest()->paginate(10)->withQueryString();
+        $sections = Section::all();
 
         return view('registrars.students', compact('students', 'sections'));
     }
@@ -73,63 +98,92 @@ class RegistrarController extends Controller
     public function storeStudent(Request $request)
     {
         $request->validate([
-            'email'       => 'required|email|unique:users',
+            'email'       => 'required|email|unique:users,email',
             'first_name'  => 'required|string|max:50',
             'middle_name' => 'nullable|string|max:50',
             'last_name'   => 'required|string|max:50',
         ]);
 
-        $user = User::create([
-            'email'    => $request->email,
-            'password' => bcrypt('password123'), 
-            'role_id'  => 4, 
-        ]);
+        DB::transaction(function () use ($request, &$studentNumber) {
+            $user = User::create([
+                'email'    => $request->email,
+                'password' => bcrypt('password123'), // TODO: Replace with reset system
+                'role_id'  => 4,
+            ]);
 
-        $user->profile()->create([
-            'first_name'  => $request->first_name,
-            'middle_name' => $request->middle_name,
-            'last_name'   => $request->last_name,
-        ]);
+            $user->profile()->create([
+                'first_name'  => $request->first_name,
+                'middle_name' => $request->middle_name,
+                'last_name'   => $request->last_name,
+            ]);
 
-        $year          = now()->format('Y');
-        $random        = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
-        $studentNumber = $year . $random;
+            // Generate unique student number
+            do {
+                $year   = now()->format('Y');
+                $random = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
+                $studentNumber = $year . $random;
+            } while (Student::where('student_number', $studentNumber)->exists());
 
-        $user->student()->create([
-            'student_number' => $studentNumber,
-        ]);
+            $user->student()->create([
+                'student_number' => $studentNumber,
+            ]);
+        });
 
-        return back()->with('success', 'Student added successfully. LRN: ' . $studentNumber);
+        $this->logActivity('Add Student',"Added new student {$request->email} with Student No: {$studentNumber}");
+
+        return back()->with('success', 'Student added successfully. Student No: ' . $studentNumber);
     }
 
     public function updateStudent(Request $request, $id)
     {
-        $student = User::findOrFail($id);
+        $student = User::with('profile')->findOrFail($id);
 
         $request->validate([
             'first_name'  => 'required|string|max:50',
             'middle_name' => 'nullable|string|max:50',
             'last_name'   => 'required|string|max:50',
-            'email'       => 'required|email|unique:users,email,' . $student->id,
+            'email'       => ['required', 'email', Rule::unique('users', 'email')->ignore($student->id)],
         ]);
 
-        $student->update([
-            'email' => $request->email,
-        ]);
+        $student->update(['email' => $request->email]);
 
-        $student->profile->update([
+        $student->profile?->update([
             'first_name'  => $request->first_name,
             'middle_name' => $request->middle_name,
             'last_name'   => $request->last_name,
         ]);
+
+        $this->logActivity('Update Student',"Updated student {$student->email}");
 
         return back()->with('success', 'Student updated successfully.');
     }
 
     public function destroyStudent($id)
     {
-        User::findOrFail($id)->delete();
+        $student = User::findOrFail($id);
+
+        if ($student->role_id !== 4) {
+            return back()->withErrors(['error' => 'Not a student account.']);
+        }
+
+        $student->delete();
+
+        $this->logActivity('Delete Student',"Deleted student {$student->email}");
+
         return back()->with('success', 'Student deleted.');
+    }
+
+    public function exportStudents()
+    {
+        return Excel::download(new StudentsExport, 'students.xlsx');
+    }
+
+    public function importStudents(Request $request)
+    {
+        $request->validate(['file'=>'required|mimes:xlsx,csv']);
+        Excel::import(new StudentsImport, $request->file('file'));
+        $this->logActivity('Import Students','Imported student list');
+        return back()->with('success','Students imported successfully.');
     }
 
     /**
@@ -137,13 +191,13 @@ class RegistrarController extends Controller
      */
     public function enrollment()
     {
+        $schoolYears = SchoolYear::all();
         $students    = Student::with('user.profile')->get();
         $sections    = Section::with('gradeLevel')->get();
-        $enrollments = Enrollment::with(['student.user.profile', 'section', 'schoolYear'])
-            ->latest()
-            ->paginate(10);
+        $enrollments = Enrollment::with(['student.profile', 'section', 'schoolYear'])
+            ->latest()->paginate(10);
 
-        return view('registrars.enrollment', compact('students', 'sections', 'enrollments'));
+        return view('registrars.enrollment', compact('students', 'sections', 'schoolYears', 'enrollments'));
     }
 
     public function storeEnrollment(Request $request)
@@ -151,27 +205,34 @@ class RegistrarController extends Controller
         $request->validate([
             'student_id' => 'required|exists:students,id',
             'section_id' => 'required|exists:sections,id',
+            'school_year_id' => 'required|exists:school_years,id',
         ]);
 
         $activeSY = SchoolYear::where('status', 'active')->first();
         if (!$activeSY) {
-            return back()->withErrors(['school_year' => 'No active school year. Please set one first.']);
+            return back()->withErrors(['school_year' => 'No active school year found.']);
         }
 
         Enrollment::create([
-            'student_id' => $request->student_id,
-            'section_id' => $request->section_id,
+            'student_id'     => $request->student_id,
+            'section_id'     => $request->section_id,
             'school_year_id' => $activeSY->id,
-            'status' => 'enrolled',
+            'status'         => 'enrolled',
         ]);
+
+        $this->logActivity('Enroll Student', "Enrolled student {$request->student_id} in section {$request->section_id}");
 
         return back()->with('success', 'Student enrolled successfully!');
     }
 
     public function destroyEnrollment($id)
     {
-        Enrollment::findOrFail($id)->delete();
-        return back()->with('success', 'Enrollment deleted.');
+        $enrollment = Enrollment::findOrFail($id);
+        $enrollment->delete();
+
+        $this->logActivity('Delete Enrollment', "Deleted enrollment ID {$id}");
+
+        return back()->with('success', 'Enrollment record deleted.');
     }
 
     /**
@@ -179,9 +240,9 @@ class RegistrarController extends Controller
      */
     public function sections()
     {
-        $sections = Section::with(['gradeLevel', 'schoolYear'])->paginate(10);
-        $gradeLevels = \App\Models\GradeLevel::orderBy('name')->get();
-        $schoolYears = SchoolYear::orderBy('start_date', 'desc')->get();
+        $sections    = Section::with('gradeLevel', 'schoolYear')->paginate(10);
+        $gradeLevels = GradeLevel::all();
+        $schoolYears = SchoolYear::all();
 
         return view('registrars.sections', compact('sections', 'gradeLevels', 'schoolYears'));
     }
@@ -189,23 +250,25 @@ class RegistrarController extends Controller
     public function storeSection(Request $request)
     {
         $request->validate([
-            'name'           => 'required|string|max:100|unique:sections',
-            'gradelevel_id'  => 'required|exists:grade_levels,id',
+            'name'           => 'required|string|max:100|unique:sections,name',
+            'grade_level_id' => 'required|exists:grade_levels,id',
             'school_year_id' => 'required|exists:school_years,id',
         ]);
 
-        Section::create([
-            'name'           => $request->name,
-            'gradelevel_id'  => $request->gradelevel_id,
-            'school_year_id' => $request->school_year_id,
-        ]);
+        Section::create($request->only('name', 'grade_level_id', 'school_year_id'));
 
-        return back()->with('success', 'Section created.');
+        $this->logActivity('Add Section', "Added section {$request->name}");
+
+        return back()->with('success', 'Section added.');
     }
 
     public function destroySection($id)
     {
-        Section::findOrFail($id)->delete();
+        $section = Section::findOrFail($id);
+        $section->delete();
+
+        $this->logActivity('Delete Section', "Deleted section {$section->name}");
+
         return back()->with('success', 'Section deleted.');
     }
 
@@ -214,29 +277,48 @@ class RegistrarController extends Controller
      */
     public function subjects()
     {
-        $subjects = Subject::with('gradeLevel')->paginate(10);
-        $gradeLevels = \App\Models\GradeLevel::all();
+        $subjects    = Subject::with('gradeLevel')->paginate(10);
+        $gradeLevels = GradeLevel::all();
         return view('registrars.subjects', compact('subjects', 'gradeLevels'));
     }
 
     public function storeSubject(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:100|unique:subjects',
+            'name'           => 'required|string|max:100|unique:subjects,name',
             'grade_level_id' => 'required|exists:grade_levels,id',
         ]);
 
-        Subject::create([
-            'name' => $request->name,
-            'grade_level_id' => $request->grade_level_id,
-        ]);
+        Subject::create($request->only('name', 'grade_level_id'));
+
+        $this->logActivity('Add Subject', "Added subject {$request->name}");
 
         return back()->with('success', 'Subject added.');
     }
 
+    public function updateSubject(Request $request, $id)
+    {
+        $subject = Subject::findOrFail($id);
+
+        $request->validate([
+            'name'           => ['required', 'string', 'max:100', Rule::unique('subjects', 'name')->ignore($subject->id)],
+            'grade_level_id' => 'required|exists:grade_levels,id',
+        ]);
+
+        $subject->update($request->only('name', 'grade_level_id'));
+
+        $this->logActivity('Update Subject', "Updated subject {$subject->name}");
+
+        return back()->with('success', 'Subject updated.');
+    }
+
     public function destroySubject($id)
     {
-        Subject::findOrFail($id)->delete();
+        $subject = Subject::findOrFail($id);
+        $subject->delete();
+
+        $this->logActivity('Delete Subject', "Deleted subject {$subject->name}");
+
         return back()->with('success', 'Subject deleted.');
     }
 
@@ -252,28 +334,44 @@ class RegistrarController extends Controller
     public function storeTeacher(Request $request)
     {
         $request->validate([
-            'email'      => 'required|email|unique:users',
-            'first_name' => 'required|string|max:50',
-            'last_name'  => 'required|string|max:50',
+            'email'       => 'required|email|unique:users,email',
+            'first_name'  => 'required|string|max:50',
+            'middle_name' => 'nullable|string|max:50',
+            'last_name'   => 'required|string|max:50',
         ]);
 
-        $user = User::create([
-            'email'    => $request->email,
-            'password' => bcrypt('password123'),
-            'role_id'  => 3,
-        ]);
+        DB::transaction(function () use ($request) {
+            $user = User::create([
+                'email'    => $request->email,
+                'password' => bcrypt('password123'),
+                'role_id'  => 3,
+            ]);
 
-        $user->profile()->create([
-            'first_name' => $request->first_name,
-            'last_name'  => $request->last_name,
-        ]);
+            $user->profile()->create([
+                'first_name'     => $request->first_name,
+                'middle_name'    => $request->middle_name ?? null,
+                'last_name'      => $request->last_name,
+                'contact_number' => $request->contact_number ?? null,
+            ]);
+        });
+
+        $this->logActivity('Add Teacher', "Added teacher {$request->first_name} {$request->last_name}");
 
         return back()->with('success', 'Teacher added successfully.');
     }
 
     public function destroyTeacher($id)
     {
-        User::findOrFail($id)->delete();
+        $teacher = User::findOrFail($id);
+
+        if ($teacher->role_id !== 3) {
+            return back()->withErrors(['error' => 'Not a teacher account.']);
+        }
+
+        $teacher->delete();
+
+        $this->logActivity('Delete Teacher', "Deleted teacher {$teacher->email}");
+
         return back()->with('success', 'Teacher deleted.');
     }
 
@@ -282,33 +380,37 @@ class RegistrarController extends Controller
      */
     public function schoolYear()
     {
-        $schoolYears = SchoolYear::orderByDesc('start_date', 'desc')->paginate(10);
+        $schoolYears = SchoolYear::latest()->paginate(10);
         return view('registrars.schoolyear', compact('schoolYears'));
     }
 
     public function storeSchoolYear(Request $request)
     {
         $request->validate([
-            'start_date' => 'required|date',
-            'end_date'   => 'required|date|after:start_date',
+            'name'   => 'required|string|max:100|unique:school_years,name',
+            'status' => 'required|in:active,closed',
         ]);
 
-        SchoolYear::where('status', 'active')->update(['status' => 'closed']);
+        if ($request->status === 'active') {
+            SchoolYear::where('status', 'active')->update(['status' => 'closed']);
+        }
 
-        SchoolYear::create([
-            'start_date' => $request->start_date,
-            'end_date'   => $request->end_date,
-            'status'     => 'active',
-        ]);
+        SchoolYear::create($request->only('name', 'status'));
 
-        return back()->with('success', 'School year created and set to active.');
+        $this->logActivity('Add School Year', "Added school year {$request->name}");
+
+        return back()->with('success', 'School year added.');
     }
 
     public function closeSchoolYear($id)
     {
         $sy = SchoolYear::findOrFail($id);
-        $sy->update(['status' => 'closed']);
-        return back()->with('success', 'School year closed.');
+        SchoolYear::where('status', 'active')->update(['status' => 'closed']);
+        $sy->update(['status' => 'active']);
+
+        $this->logActivity('Change Active School Year', "Changed active school year to {$sy->name}");
+
+        return back()->with('success', 'Active school year updated.');
     }
 
     /**
@@ -341,7 +443,7 @@ class RegistrarController extends Controller
             'first_name'      => 'required|string|max:100',
             'middle_name'     => 'nullable|string|max:100',
             'last_name'       => 'required|string|max:100',
-            'email'           => 'required|email|unique:users,email,' . $registrar->id,
+            'email'           => ['required', 'email', Rule::unique('users', 'email')->ignore($registrar->id)],
             'contact_number'  => 'nullable|string|max:20',
             'sex'             => 'nullable|in:Male,Female',
             'birthdate'       => 'nullable|date|before:today',
@@ -349,14 +451,12 @@ class RegistrarController extends Controller
             'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png,webp,gif|max:2048',
         ]);
 
-        $registrar->update([
-            'email' => $validated['email'],
-        ]);
+        $registrar->update(['email' => $validated['email']]);
 
         $profile = $registrar->profile ?? $registrar->profile()->create();
 
         if ($request->hasFile('profile_picture')) {
-            $path                   = $request->file('profile_picture')->store('profile_pictures', 'public');
+            $path = $request->file('profile_picture')->store('profile_pictures', 'public');
             $profile->profile_picture = $path;
         }
 
@@ -368,6 +468,8 @@ class RegistrarController extends Controller
         $profile->birthdate      = $validated['birthdate'] ?? null;
         $profile->address        = $validated['address'] ?? null;
         $profile->save();
+
+        $this->logActivity('Update Profile', "Updated profile: {$registrar->email}");
 
         return back()->with('success', 'Settings updated successfully!');
     }
@@ -385,9 +487,9 @@ class RegistrarController extends Controller
             return back()->withErrors(['current_password' => 'Current password is incorrect.']);
         }
 
-        $registrar->update([
-            'password' => Hash::make($request->new_password),
-        ]);
+        $registrar->update(['password' => Hash::make($request->new_password)]);
+
+        $this->logActivity('Change Password', "Changed password for {$registrar->email}");
 
         return back()->with('success', 'Password changed successfully!');
     }

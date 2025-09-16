@@ -12,6 +12,7 @@ use App\Models\Section;
 use App\Models\Student;
 use App\Models\Enrollment;
 use App\Models\GradeLevel;
+use App\Models\ActivityLog;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Validation\Rules\Password;
@@ -64,21 +65,13 @@ class TeacherController extends Controller
     {
         $teacher = Auth::user();
 
-        $query = Announcement::where('user_id', $teacher->id);
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                ->orWhere('content', 'like', "%{$search}%");
-            });
-        }
-
-        if ($request->filled('section_id')) {
-            $query->where('section_id', $request->section_id);
-        }
-
-        $myAnnouncements = $query->latest()->paginate(5);
+        $myAnnouncements = Announcement::where('user_id', $teacher->id)
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->search . '%')
+                  ->orWhere('content', 'like', '%' . $request->search . '%');
+            })
+            ->latest()
+            ->paginate(10);
 
         $sections = Section::with('gradeLevel')->get();
 
@@ -96,11 +89,13 @@ class TeacherController extends Controller
         Announcement::create([
             'title'      => $request->title,
             'content'    => $request->content,
-            'user_id'    => Auth::id(),
             'section_id' => $request->section_id ?? null,
+            'user_id'    => Auth::id(),
         ]);
 
-        return back()->with('success', 'Announcement posted successfully!');
+        $this->logActivity('Create Announcement', "Created announcement {$request->title}");
+
+        return back()->with('success', 'Announcement created successfully!');
     }
 
     public function updateAnnouncement(Request $request, Announcement $announcement)
@@ -112,12 +107,16 @@ class TeacherController extends Controller
         $request->validate([
             'title' => 'required|string|max:255',
             'content'  => 'required|string',
+            'section_id' => 'nullable|exists:sections,id',
         ]);
 
         $announcement->update([
-            'title'   => $request->title,
-            'content' => $request->content,
+            'title'      => $request->title,
+            'content'    => $request->content,
+            'section_id' => $request->section_id ?? null,
         ]);
+
+        $this->logActivity('Update Announcement', "Updated announcement {$announcement->id}");
 
         return back()->with('success', 'Announcement updated successfully!');
     }
@@ -130,20 +129,24 @@ class TeacherController extends Controller
 
         $announcement->delete();
 
+        $this->logActivity('Delete Announcement', "Deleted announcement {$announcement->id}");
+
         return back()->with('success', 'Announcement deleted successfully!');
     }
 
     // ---------------- ASSIGNMENTS ----------------
     public function assignments() {
-        $assignments = Assignment::where('teacher_id', Auth::id())
-            ->with('section.gradeLevel')
+        $teacher = Auth::user();
+
+        $assignments = Assignment::with(['section.gradeLevel', 'subject'])
+            ->where('teacher_id', $teacher->id)
             ->latest()
-            ->get();    
+            ->get();
 
-        $sections = Section::with('gradeLevel')->get(); 
-        $subjects = Subject::all()->groupBy('grade_level_id');
+        $sections = Section::with('gradeLevel')->get();
+        $subjects = Subject::all();
 
-        return view('teachers.assignments', compact('assignments', 'sections', 'subjects'));
+        return view('teachers.assignments', compact('teacher', 'assignments', 'sections', 'subjects'));
     }
 
     public function storeAssignment(Request $request) {
@@ -156,13 +159,15 @@ class TeacherController extends Controller
         ]);
 
         Assignment::create([
-            'title' => $request->title,
-            'instructions' => $request->instructions,
-            'due_date' => $request->due_date,
-            'section_id' => $request->section_id,
-            'subject_id' => $request->subject_id,
-            'teacher_id' => Auth::id(),
+            'title'       => $request->title,
+            'instructions'=> $request->instructions,
+            'due_date'    => $request->due_date,
+            'section_id'  => $request->section_id,
+            'subject_id'  => $request->subject_id,
+            'teacher_id'  => Auth::id(),
         ]);
+
+        $this->logActivity('Create Assignment', "Created assignment {$request->title}");
 
         return redirect()->route('teachers.assignments')->with('success', 'Assignment created.');
     }
@@ -180,7 +185,15 @@ class TeacherController extends Controller
             'subject_id' => 'required|exists:subjects,id',
         ]);
 
-        $assignment->update($request->only('title','instructions','due_date','section_id','subject_id'));
+        $assignment->update([
+            'title' => $request->title,
+            'instructions' => $request->instructions,
+            'due_date' => $request->due_date,
+            'section_id' => $request->section_id,
+            'subject_id' => $request->subject_id,
+        ]);
+
+        $this->logActivity('Update Assignment', "Updated assignment {$assignment->id}");
 
         return redirect()->route('teachers.assignments')->with('success', 'Assignment updated.');
     }
@@ -191,6 +204,9 @@ class TeacherController extends Controller
         }
 
         $assignment->delete();
+
+        $this->logActivity('Delete Assignment', "Deleted assignment {$assignment->id}");
+
         return redirect()->route('teachers.assignments')->with('success', 'Assignment deleted.');
     }
 
@@ -274,6 +290,8 @@ class TeacherController extends Controller
             'studentsFemale'
         ));
 
+        $this->logActivity('Export Class List', "Exported class list for section {$sectionName}");
+
         return $pdf->download('classlist.pdf');
     }
 
@@ -282,49 +300,40 @@ class TeacherController extends Controller
     {
         $teacher = Auth::user();
 
-        $subjects = Subject::whereHas('assignments', function ($q) use ($teacher) {
-            $q->where('teacher_id', $teacher->id);
-        })->with('section')->get();
+        $subjects = DB::table('subject_teacher')
+        ->join('subjects', 'subject_teacher.subject_id', '=', 'subjects.id')
+        ->join('sections', 'subject_teacher.section_id', '=', 'sections.id')
+        ->join('grade_levels', 'sections.gradelevel_id', '=', 'grade_levels.id')
+        ->where('subject_teacher.teacher_id', $teacher->id)
+        ->select(
+            'subjects.id as subject_id',
+            'grade_levels.name as gradelevel',
+            'sections.name as section_name',
+            'subjects.name as subject_name'
+        )
+        ->get();
 
-        $subject = null;
-        $section = null;
-        $students = collect();
-
+        $selectedSubject = null;
         if ($request->filled('subject_id')) {
-            $subject = Subject::with('section')->findOrFail($request->subject_id);
-            $section = $subject->section;
-
-            $students = $section->students()->with(['grades' => function ($q) use ($subject) {
-                $q->where('subject_id', $subject->id);
-            }])->get();
+            $selectedSubject = Subject::with('section')->find($request->subject_id);
+            if (!$selectedSubject) {
+                return back()->withErrors(['subject_id' => 'Selected subject not found.']);
+            }
         }
 
-        return view('teachers.grades', compact('subjects', 'subject', 'section', 'students'));
+        return view('teachers.grades', compact('teacher', 'subjects', 'selectedSubject'));
     }
 
 
     public function encodeGrades(Subject $subject, Section $section)
     {
-        $enrollments = $section->enrollments()->with('student.profile')->get();
+        $students = $section->students()->with(['grades' => function ($q) use ($subject) {
+            $q->where('subject_id', $subject->id);
+        }])->get();
 
-        $students = [];
-        foreach ($enrollments as $enrollment) {
-            $student = $enrollment->student;
-            if (! $student) continue;
+        $this->logActivity('Encode Grades', "Accessed grade encoding for {$students->count()} students in {$subject->id}");
 
-            $grades = Grade::where('student_id', $student->id)
-                ->where('subject_id', $subject->id)
-                ->pluck('grade', 'quarter')
-                ->toArray();
-
-            $students[$student->id] = [
-                'lrn'   => $student->lrn ?? 'N/A',
-                'name'  => ($student->profile->last_name ?? '') . ', ' . ($student->profile->first_name ?? ''),
-                'grades'=> $grades,
-            ];
-        }
-
-        return view('teachers.encode-grades', compact('subject', 'section', 'students'));
+        return view('teachers.grades.encode', compact('subject', 'section', 'students'));
     }
 
     public function editGrades(Subject $subject)
@@ -334,6 +343,8 @@ class TeacherController extends Controller
         $students = $section->students()->with(['grades' => function ($q) use ($subject) {
             $q->where('subject_id', $subject->id);
         }])->get();
+
+        $this->logActivity('Edit Grades', "Edited grades for {$students->count()} students in {$subject->id}");
 
         return view('teachers.grades.edit', compact('subject', 'section', 'students'));
     }
@@ -363,6 +374,8 @@ class TeacherController extends Controller
                 }
             }
         }
+
+        $this->logActivity('Save Grades', "Saved grades for {$request->grades->count()} students in {$request->subject_id}");
 
         return redirect()
             ->route('teachers.grades', ['subject_id' => $request->subject_id])
@@ -447,6 +460,8 @@ class TeacherController extends Controller
         $pdf = Pdf::loadView('teachers.reports_pdf', compact('students'))
                 ->setPaper('a4', 'landscape');
 
+        $this->logActivity('Export Reports', "Exported reports for {$students->count()} students");
+
         return $pdf->download('students_report.pdf');
     }
 
@@ -498,6 +513,8 @@ class TeacherController extends Controller
         $profile->address        = $validated['address'] ?? null;
         $profile->save();
 
+        $this->logActivity('Update Profile', "Updated profile for {$teacher->email}");
+
         return back()->with('success', 'Settings updated successfully!');
     }
 
@@ -518,6 +535,17 @@ class TeacherController extends Controller
             'password' => Hash::make($request->new_password),
         ]);
 
+        $this->logActivity('Change Password', "Changed password for {$teacher->email}");
+
         return back()->with('success', 'Password changed successfully!');
+    }
+
+    protected function logActivity($action, $description)
+    {
+        ActivityLog::create([
+            'user_id'    => Auth::id(),
+            'action'     => $action,
+            'description'=> $description,
+        ]);
     }
 }

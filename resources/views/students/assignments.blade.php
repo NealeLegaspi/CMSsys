@@ -18,7 +18,7 @@
               {{ e($assignment->title) }}
             </h5>
             <p class="card-text text-secondary">
-              {!! nl2br(e(Str::limit($assignment->instructions, 200))) !!}
+              {{ e(Str::limit($assignment->description, 200)) }}
             </p>
             <div class="d-flex justify-content-between align-items-center flex-wrap">
               <small class="text-muted d-block">
@@ -39,7 +39,6 @@
           <i class='bx bx-info-circle'></i> No assignments available at the moment.
         </div>
       @endforelse
-
     </div>
   </div>
 </div>
