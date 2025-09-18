@@ -46,10 +46,16 @@
             </div>
             <div class="mb-3">
               <label class="form-label">Section</label>
-              <select name="section_id" class="form-select">
-                <option value="">All Sections</option>
-                @foreach(\App\Models\Section::all() as $section)
-                  <option value="{{ $section->id }}">{{ $section->name }}</option>
+              <select name="section_id" id="sectionSelect" class="form-select" required>
+                <option value="">-- Select Section --</option>
+                @foreach($sections->groupBy('gradelevel_id') as $gradeId => $gradeSections)
+                  <optgroup label="{{ $gradeSections->first()->gradeLevel->name }}">
+                    @foreach($gradeSections as $sec)
+                      <option value="{{ $sec->id }}" data-grade="{{ $sec->gradelevel_id }}">
+                        {{ $sec->name }}
+                      </option>
+                    @endforeach
+                  </optgroup>
                 @endforeach
               </select>
             </div>

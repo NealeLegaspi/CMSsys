@@ -56,7 +56,7 @@
     </a>
     <a href="{{ route('registrars.subjects') }}" 
        class="nav-link {{ request()->routeIs('registrars.subjects') ? 'active' : '' }}">
-       <i class='bx bx-book me-2'></i> Subjects & Schedule
+       <i class='bx bx-book me-2'></i> Subjects
     </a>
     <a href="{{ route('registrars.teachers') }}" 
        class="nav-link {{ request()->routeIs('registrars.teachers') ? 'active' : '' }}">

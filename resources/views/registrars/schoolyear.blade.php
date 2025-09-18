@@ -15,21 +15,39 @@
   <div class="card-body">
     @include('partials.alerts')
 
+    <!-- Search & Filter -->
+    <form method="GET" action="{{ route('registrars.schoolyear') }}" class="row g-2 mb-3">
+      <div class="col-md-6">
+        <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Search school year...">
+      </div>
+      <div class="col-md-3">
+        <select name="status" class="form-select">
+          <option value="">All Statuses</option>
+          <option value="active" {{ request('status')=='active' ? 'selected' : '' }}>Active</option>
+          <option value="inactive" {{ request('status')=='inactive' ? 'selected' : '' }}>Inactive</option>
+        </select>
+      </div>
+      <div class="col-md-3 d-flex">
+        <button type="submit" class="btn btn-primary me-2"><i class="bi bi-search"></i></button>
+        <a href="{{ route('registrars.schoolyear') }}" class="btn btn-secondary"><i class="bi bi-arrow-clockwise"></i></a>
+      </div>
+    </form>
+
     <table class="table table-bordered table-striped align-middle">
       <thead class="table-primary">
         <tr>
-          <th>#</th>
+          <th style="width:50px;">#</th>
           <th>Name</th>
           <th>Start</th>
           <th>End</th>
           <th>Status</th>
-          <th width="120">Actions</th>
+          <th style="width:140px;">Actions</th>
         </tr>
       </thead>
       <tbody>
         @forelse($schoolYears as $i => $sy)
-        <tr>
-          <td>{{ $i+1 }}</td>
+        <tr class="{{ $sy->status === 'active' ? 'table-success' : '' }}">
+          <td>{{ $schoolYears->firstItem() + $i }}</td>
           <td>{{ $sy->name ?? $sy->start_date.' - '.$sy->end_date }}</td>
           <td>{{ $sy->start_date }}</td>
           <td>{{ $sy->end_date }}</td>
@@ -39,20 +57,88 @@
             </span>
           </td>
           <td>
+            <!-- Edit Button -->
+            <button class="btn btn-sm btn-warning me-1" data-bs-toggle="modal" data-bs-target="#editSchoolYearModal{{ $sy->id }}">
+              <i class="bi bi-pencil"></i>
+            </button>
+
+            <!-- Delete Button (only for inactive) -->
+            @if($sy->status !== 'active')
+            <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteSchoolYearModal{{ $sy->id }}">
+              <i class="bi bi-trash"></i>
+            </button>
+            @endif
+
+            <!-- Close Button (only for active) -->
             @if($sy->status === 'active')
-              <form action="{{ route('registrars.schoolyear.close',$sy->id) }}" method="POST">
-                @csrf
-                <button class="btn btn-sm btn-warning">Close</button>
-              </form>
+            <form action="{{ route('registrars.schoolyear.close',$sy->id) }}" method="POST" class="d-inline">
+              @csrf
+              <button class="btn btn-sm btn-secondary" onclick="return confirm('Close this school year?')">Close</button>
+            </form>
             @endif
           </td>
         </tr>
+
+        <!-- Edit Modal -->
+        <div class="modal fade" id="editSchoolYearModal{{ $sy->id }}" tabindex="-1">
+          <div class="modal-dialog">
+            <form method="POST" action="{{ route('registrars.schoolyear.update',$sy->id) }}">
+              @csrf @method('PUT')
+              <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                  <h5 class="modal-title"><i class="bi bi-pencil me-2"></i> Edit School Year</h5>
+                  <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="mb-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" name="start_date" class="form-control" value="{{ $sy->start_date }}" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" name="end_date" class="form-control" value="{{ $sy->end_date }}" required>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <button class="btn btn-warning">Update</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Delete Modal -->
+        <div class="modal fade" id="deleteSchoolYearModal{{ $sy->id }}" tabindex="-1">
+          <div class="modal-dialog">
+            <form method="POST" action="{{ route('registrars.schoolyear.destroy',$sy->id) }}">
+              @csrf @method('DELETE')
+              <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                  <h5 class="modal-title"><i class="bi bi-trash me-2"></i> Delete School Year</h5>
+                  <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  Are you sure you want to delete <strong>{{ $sy->name ?? $sy->start_date.' - '.$sy->end_date }}</strong>?
+                </div>
+                <div class="modal-footer">
+                  <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-danger">Delete</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
         @empty
-        <tr><td colspan="6" class="text-center text-muted">No school years yet.</td></tr>
+        <tr>
+          <td colspan="6" class="text-center text-muted">No school years yet.</td>
+        </tr>
         @endforelse
       </tbody>
     </table>
-    <div class="mt-3">{{ $schoolYears->links('pagination::bootstrap-5') }}</div>
+
+    <div class="mt-3">{{ $schoolYears->appends(request()->query())->links('pagination::bootstrap-5') }}</div>
   </div>
 </div>
 

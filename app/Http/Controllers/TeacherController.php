@@ -238,7 +238,7 @@ class TeacherController extends Controller
                 ]);
 
             $studentsFemale = Enrollment::where('section_id', $sectionId)
-                ->whereHas('student.profile', fn($q) => $q->where('sex','Male'))
+                ->whereHas('student.profile', fn($q) => $q->where('sex','Female'))
                 ->with(['student', 'student.profile'])
                 ->get()
                 ->map(fn($enr) => (object)[
@@ -281,8 +281,13 @@ class TeacherController extends Controller
         $sectionId = $section->id ?? null;
         $sectionName = $section->name ?? null;
 
-        $studentsMale = $section ? $section->students()->where('gender', 'male')->get() : [];
-        $studentsFemale = $section ? $section->students()->where('gender', 'female')->get() : [];
+        $studentsMale = $section 
+            ? $section->students()->whereHas('profile', fn($q) => $q->where('sex', 'Male'))->get()
+            : [];
+
+        $studentsFemale = $section 
+            ? $section->students()->whereHas('profile', fn($q) => $q->where('sex', 'Female'))->get()
+            : [];
 
         $pdf = Pdf::loadView('teachers.reports.classlist-pdf', compact(
             'sectionName',
@@ -375,7 +380,7 @@ class TeacherController extends Controller
             }
         }
 
-        $this->logActivity('Save Grades', "Saved grades for {$request->grades->count()} students in {$request->subject_id}");
+        $this->logActivity('Save Grades', "Saved grades for " . count($request->grades) . " students in {$request->subject_id}");
 
         return redirect()
             ->route('teachers.grades', ['subject_id' => $request->subject_id])

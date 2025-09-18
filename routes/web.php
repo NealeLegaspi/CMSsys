@@ -45,30 +45,34 @@ Route::prefix('admin')->middleware(['auth', 'role:Admin'])->group(function () {
     //Announcements
     Route::get('/announcements', [AdminController::class, 'announcements'])->name('admins.announcements');
     Route::post('/announcements', [AdminController::class, 'storeAnnouncement'])->name('admins.announcements.store');
+    Route::put('/announcements/{id}', [AdminController::class, 'updateAnnouncement'])->name('admins.announcements.update');
     Route::delete('/announcements/{id}', [AdminController::class, 'destroyAnnouncement'])->name('admins.announcements.destroy');
 
     // User Management
-    Route::get('users', [AdminController::class, 'users'])->name('admins.users');
-    Route::post('users', [AdminController::class, 'storeUser'])->name('admins.users.store');
-    Route::put('users/{id}', [AdminController::class, 'updateUser'])->name('admins.users.update');
-    Route::delete('users/{id}', [AdminController::class, 'destroyUser'])->name('admins.users.destroy');
-    Route::patch('users/{id}/deactivate', [AdminController::class, 'deactivateUser'])->name('admins.users.deactivate');
-    Route::patch('users/{id}/reset-password', [AdminController::class, 'resetPassword'])->name('admins.users.reset');
+    Route::get('/users', [AdminController::class, 'users'])->name('admins.users');
+    Route::post('/users', [AdminController::class, 'storeUser'])->name('admins.users.store');
+    Route::put('/users/{id}', [AdminController::class, 'updateUser'])->name('admins.users.update');
+    Route::post('/users/{id}/toggle', [AdminController::class, 'toggleUser'])->name('admins.users.toggle');
+    Route::post('/users/{id}/reset', [AdminController::class, 'resetPassword'])->name('admins.users.reset');
+    Route::delete('/users/{id}', [AdminController::class, 'destroyUser'])->name('admins.users.destroy');
 
     // Activity Logs
     Route::get('/logs', [AdminController::class, 'logs'])->name('admins.logs');
 
     // Reports
     Route::get('/reports', [AdminController::class, 'reports'])->name('admins.reports');
+    Route::get('/reports/export/{type}/{format}', [AdminController::class,'exportReport'])->name('admins.reports.export');
+
 
     // Settings
     Route::get('/settings', [AdminController::class, 'settings'])->name('admins.settings');
     Route::put('/settings', [AdminController::class, 'updateSettings'])->name('admins.updateSettings');
     Route::post('/settings/change-password', [AdminController::class, 'changePassword'])->name('admins.changePassword');
 
-    // System Settings
-    Route::get('/system', [AdminController::class, 'systemSettings'])->name('admins.system');
-    Route::put('/system', [AdminController::class, 'updateSystemSettings'])->name('admins.system.update');
+    Route::get('/reports/enrollment/{format}', [AdminController::class, 'exportEnrollment'])->name('admins.export.enrollment');
+    Route::get('/reports/grading/{format}', [AdminController::class, 'exportGrading'])->name('admins.export.grading');
+    Route::get('/reports/enrollment/pdf', [AdminController::class, 'exportEnrollmentPDF'])->name('admins.export.enrollment.pdf');
+    Route::get('/reports/grading/pdf', [AdminController::class, 'exportGradingPDF'])->name('admins.export.grading.pdf');
 });
 
 // -------------------- REGISTRAR ROUTES --------------------
@@ -109,8 +113,10 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
 
     Route::get('/schoolyear', [RegistrarController::class, 'schoolYear'])->name('registrars.schoolyear');
     Route::post('/schoolyear', [RegistrarController::class, 'storeSchoolYear'])->name('registrars.schoolyear.store');
-    Route::post('/schoolyear/{id}/close', [RegistrarController::class, 'closeSchoolYear'])->name('registrars.schoolyear.close');
+    Route::put('/schoolyear/{id}', [RegistrarController::class, 'updateSchoolYear'])->name('registrars.schoolyear.update');
     Route::delete('/schoolyear/{id}', [RegistrarController::class, 'destroySchoolYear'])->name('registrars.schoolyear.destroy');
+    Route::post('/schoolyear/{id}/close', [RegistrarController::class, 'closeSchoolYear'])->name('registrars.schoolyear.close');
+
 
     Route::get('/reports', [RegistrarController::class, 'reports'])->name('registrars.reports');
     Route::post('/reports', [RegistrarController::class, 'storeReport'])->name('registrars.reports.store');

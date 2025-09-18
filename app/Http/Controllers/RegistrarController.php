@@ -95,6 +95,16 @@ class RegistrarController extends Controller
         return view('registrars.students', compact('students', 'sections'));
     }
 
+    public function showStudent($id)
+    {
+        $student = User::with(['profile', 'student.section.gradeLevel'])
+                    ->where('role_id', 4)
+                    ->findOrFail($id);
+
+        return view('registrars.students.show', compact('student'));
+    }
+
+
     public function storeStudent(Request $request)
     {
         $request->validate([
@@ -205,12 +215,33 @@ class RegistrarController extends Controller
         $request->validate([
             'student_id' => 'required|exists:students,id',
             'section_id' => 'required|exists:sections,id',
-            'school_year_id' => 'required|exists:school_years,id',
         ]);
 
+        // check active school year
         $activeSY = SchoolYear::where('status', 'active')->first();
         if (!$activeSY) {
             return back()->withErrors(['school_year' => 'No active school year found.']);
+        }
+
+        // prevent duplicate enrollment
+        $exists = Enrollment::where('student_id', $request->student_id)
+            ->where('school_year_id', $activeSY->id)
+            ->exists();
+
+        if ($exists) {
+            return back()->withErrors(['student_id' => 'This student is already enrolled in the active school year.']);
+        }
+
+        // check section capacity (if applicable)
+        $section = Section::findOrFail($request->section_id);
+        if ($section->capacity) {
+            $count = Enrollment::where('section_id', $section->id)
+                ->where('school_year_id', $activeSY->id)
+                ->count();
+
+            if ($count >= $section->capacity) {
+                return back()->withErrors(['section_id' => 'This section has reached maximum capacity.']);
+            }
         }
 
         Enrollment::create([
@@ -238,9 +269,26 @@ class RegistrarController extends Controller
     /**
      * Sections
      */
-    public function sections()
+    public function sections(Request $request)
     {
-        $sections    = Section::with('gradeLevel', 'schoolYear')->paginate(10);
+        $query = Section::with('gradeLevel', 'schoolYear');
+
+        // 🔍 Search by section name
+        if ($request->filled('search')) {
+            $query->where('name', 'like', '%' . $request->search . '%');
+        }
+
+        // 🎓 Filter by grade level
+        if ($request->filled('gradelevel_id')) {
+            $query->where('gradelevel_id', $request->gradelevel_id);
+        }
+
+        // 🏫 Filter by school year
+        if ($request->filled('school_year_id')) {
+            $query->where('school_year_id', $request->school_year_id);
+        }
+
+        $sections    = $query->paginate(10)->withQueryString();
         $gradeLevels = GradeLevel::all();
         $schoolYears = SchoolYear::all();
 
@@ -251,20 +299,43 @@ class RegistrarController extends Controller
     {
         $request->validate([
             'name'           => 'required|string|max:100|unique:sections,name',
-            'grade_level_id' => 'required|exists:grade_levels,id',
+            'gradelevel_id'  => 'required|exists:grade_levels,id',
             'school_year_id' => 'required|exists:school_years,id',
         ]);
 
-        Section::create($request->only('name', 'grade_level_id', 'school_year_id'));
+        Section::create($request->only('name', 'gradelevel_id', 'school_year_id'));
 
         $this->logActivity('Add Section', "Added section {$request->name}");
 
         return back()->with('success', 'Section added.');
     }
 
+    public function updateSection(Request $request, $id)
+    {
+        $section = Section::findOrFail($id);
+
+        $request->validate([
+            'name'           => 'required|string|max:100|unique:sections,name,' . $section->id,
+            'gradelevel_id'  => 'required|exists:grade_levels,id',
+            'school_year_id' => 'required|exists:school_years,id',
+        ]);
+
+        $section->update($request->only('name', 'gradelevel_id', 'school_year_id'));
+
+        $this->logActivity('Update Section', "Updated section {$section->name}");
+
+        return back()->with('success', 'Section updated.');
+    }
+
     public function destroySection($id)
     {
         $section = Section::findOrFail($id);
+
+        // 🚫 Prevent deleting sections that already have enrollments
+        if ($section->enrollments()->exists()) {
+            return back()->withErrors(['msg' => 'Cannot delete section with enrolled students.']);
+        }
+
         $section->delete();
 
         $this->logActivity('Delete Section', "Deleted section {$section->name}");
@@ -325,82 +396,178 @@ class RegistrarController extends Controller
     /**
      * Teachers
      */
-    public function teachers()
+    public function teachers(Request $request)
     {
-        $teachers = User::where('role_id', 3)->with('profile')->paginate(10);
+        $search = $request->input('search');
+
+        $teachers = User::where('role_id', 3)
+            ->with('profile')
+            ->when($search, function ($query, $search) {
+                $query->whereHas('profile', function ($q) use ($search) {
+                    $q->where('first_name', 'like', "%$search%")
+                    ->orWhere('middle_name', 'like', "%$search%")
+                    ->orWhere('last_name', 'like', "%$search%");
+                })->orWhere('email', 'like', "%$search%");
+            })
+            ->paginate(10);
+
         return view('registrars.teachers', compact('teachers'));
     }
 
     public function storeTeacher(Request $request)
     {
         $request->validate([
-            'email'       => 'required|email|unique:users,email',
-            'first_name'  => 'required|string|max:50',
-            'middle_name' => 'nullable|string|max:50',
-            'last_name'   => 'required|string|max:50',
+            'first_name'     => 'required|string|max:50',
+            'middle_name'    => 'nullable|string|max:50',
+            'last_name'      => 'required|string|max:50',
+            'email'          => 'required|email|unique:users,email',
+            'contact_number' => 'nullable|string|max:20',
         ]);
 
-        DB::transaction(function () use ($request) {
-            $user = User::create([
-                'email'    => $request->email,
-                'password' => bcrypt('password123'),
-                'role_id'  => 3,
-            ]);
+        $teacher = User::create([
+            'name'     => $request->first_name . ' ' . $request->last_name,
+            'email'    => $request->email,
+            'password' => bcrypt('password123'),
+            'role_id'  => 3, 
+        ]);
 
-            $user->profile()->create([
-                'first_name'     => $request->first_name,
-                'middle_name'    => $request->middle_name ?? null,
-                'last_name'      => $request->last_name,
-                'contact_number' => $request->contact_number ?? null,
-            ]);
-        });
+        $teacher->profile()->create([
+            'first_name'     => $request->first_name,
+            'middle_name'    => $request->middle_name,
+            'last_name'      => $request->last_name,
+            'contact_number' => $request->contact_number,
+        ]);
 
-        $this->logActivity('Add Teacher', "Added teacher {$request->first_name} {$request->last_name}");
+        $this->logActivity('Add Teacher', "Added teacher {$teacher->name}");
 
         return back()->with('success', 'Teacher added successfully.');
     }
 
-    public function destroyTeacher($id)
+    public function updateTeacher(Request $request, $id)
     {
-        $teacher = User::findOrFail($id);
+        $teacher = User::where('role_id', 3)->findOrFail($id);
 
-        if ($teacher->role_id !== 3) {
-            return back()->withErrors(['error' => 'Not a teacher account.']);
+        $request->validate([
+            'first_name'     => 'required|string|max:50',
+            'middle_name'    => 'nullable|string|max:50',
+            'last_name'      => 'required|string|max:50',
+            'email'          => ['required', 'email', Rule::unique('users','email')->ignore($teacher->id)],
+            'contact_number' => 'nullable|string|max:20',
+        ]);
+
+        $teacher->update([
+            'name'  => $request->first_name . ' ' . $request->last_name,
+            'email' => $request->email,
+        ]);
+
+        if ($request->has('reset_password')) {
+            $teacher->update(['password' => bcrypt('password123')]);
         }
 
+        $teacher->profile()->updateOrCreate(
+            ['user_id' => $teacher->id],
+            [
+                'first_name'     => $request->first_name,
+                'middle_name'    => $request->middle_name,
+                'last_name'      => $request->last_name,
+                'contact_number' => $request->contact_number,
+            ]
+        );
+
+        $this->logActivity('Update Teacher', "Updated teacher {$teacher->name}");
+
+        return back()->with('success', 'Teacher updated successfully.');
+    }
+
+    public function destroyTeacher($id)
+    {
+        $teacher = User::where('role_id', 3)->findOrFail($id);
+
+        $teacherName = $teacher->name;
+
+        $teacher->profile()->delete();
         $teacher->delete();
 
-        $this->logActivity('Delete Teacher', "Deleted teacher {$teacher->email}");
+        $this->logActivity('Delete Teacher', "Deleted teacher {$teacherName}");
 
-        return back()->with('success', 'Teacher deleted.');
+        return back()->with('success', 'Teacher deleted successfully.');
+    }
+
+    public function showTeacher($id)
+    {
+        $teacher = User::where('role_id', 3)->with('profile')->findOrFail($id);
+        return response()->json($teacher);
     }
 
     /**
      * School Year
      */
-    public function schoolYear()
+    public function schoolYear(Request $request)
     {
-        $schoolYears = SchoolYear::latest()->paginate(10);
+        $search = $request->input('search');
+        $status = $request->input('status');
+
+        $schoolYears = SchoolYear::latest()
+            ->when($search, fn($q) => $q->where('name', 'like', "%$search%"))
+            ->when($status, fn($q) => $q->where('status', $status))
+            ->paginate(10);
+
         return view('registrars.schoolyear', compact('schoolYears'));
     }
 
     public function storeSchoolYear(Request $request)
     {
         $request->validate([
-            'name'   => 'required|string|max:100|unique:school_years,name',
-            'status' => 'required|in:active,closed',
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+            'name'       => 'nullable|string|max:100|unique:school_years,name',
         ]);
 
-        if ($request->status === 'active') {
-            SchoolYear::where('status', 'active')->update(['status' => 'closed']);
-        }
+        $name = $request->name ?? $request->start_date . ' - ' . $request->end_date;
 
-        SchoolYear::create($request->only('name', 'status'));
+        SchoolYear::create([
+            'name'       => $name,
+            'start_date' => $request->start_date,
+            'end_date'   => $request->end_date,
+            'status'     => 'inactive', 
+        ]);
 
-        $this->logActivity('Add School Year', "Added school year {$request->name}");
+        $this->logActivity('Add School Year', "Added school year {$name}");
 
         return back()->with('success', 'School year added.');
     }
+
+    public function updateSchoolYear(Request $request, $id)
+    {
+        $sy = SchoolYear::findOrFail($id);
+
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+        ]);
+
+        $sy->update([
+            'start_date' => $request->start_date,
+            'end_date'   => $request->end_date,
+            'name'       => $request->name ?? $request->start_date . ' - ' . $request->end_date,
+        ]);
+
+        $this->logActivity('Update School Year', "Updated school year {$sy->name}");
+
+        return back()->with('success', 'School year updated.');
+    }
+
+    public function destroySchoolYear($id)
+    {
+        $sy = SchoolYear::findOrFail($id);
+        $syName = $sy->name;
+        $sy->delete();
+
+        $this->logActivity('Delete School Year', "Deleted school year {$syName}");
+
+        return back()->with('success', 'School year deleted.');
+    }
+
 
     public function closeSchoolYear($id)
     {

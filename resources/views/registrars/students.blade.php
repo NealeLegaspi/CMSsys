@@ -23,12 +23,17 @@
               value="{{ request('search') }}">
       </div>
       <div class="col-md-4">
-        <select name="section_id" class="form-select">
+        <select name="section_id" id="sectionSelect" class="form-select">
           <option value="">-- All Sections --</option>
-          @foreach($sections as $sec)
-            <option value="{{ $sec->id }}" {{ request('section_id') == $sec->id ? 'selected' : '' }}>
-              {{ $sec->name }}
-            </option>
+          @foreach($sections->groupBy('gradelevel_id') as $gradeId => $gradeSections)
+            <optgroup label="{{ $gradeSections->first()->gradeLevel->name }}">
+              @foreach($gradeSections as $sec)
+                <option value="{{ $sec->id }}" 
+                  @if(request('section_id') == $sec->id) selected @endif>
+                  {{ $sec->name }}
+                </option>
+              @endforeach
+            </optgroup>
           @endforeach
         </select>
       </div>
@@ -54,7 +59,7 @@
             <th>Gender</th>
             <th>Contact</th>
             <th>Section</th>
-            <th width="150">Actions</th>
+            <th width="180">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -78,6 +83,13 @@
               <td>{{ optional($student->profile)->contact_number ?? 'N/A' }}</td>
               <td>{{ optional(optional($student->student)->section)->name ?? 'Not Enrolled' }}</td>
               <td>
+                <!-- View Button -->
+                <button class="btn btn-sm btn-info text-white" 
+                        data-bs-toggle="modal" 
+                        data-bs-target="#viewStudentModal{{ $student->id }}">
+                  <i class="bi bi-eye"></i>
+                </button>
+
                 <!-- Edit Button -->
                 <button class="btn btn-sm btn-warning" 
                         data-bs-toggle="modal" 
@@ -98,6 +110,39 @@
                 </form>
               </td>
             </tr>
+
+            <!-- View Student Modal -->
+            <div class="modal fade" id="viewStudentModal{{ $student->id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                  <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>View Student</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <dl class="row">
+                      <dt class="col-sm-3">LRN</dt>
+                      <dd class="col-sm-9">{{ optional($student->student)->student_number ?? 'N/A' }}</dd>
+
+                      <dt class="col-sm-3">Full Name</dt>
+                      <dd class="col-sm-9">{{ $fullName ?: 'N/A' }}</dd>
+
+                      <dt class="col-sm-3">Email</dt>
+                      <dd class="col-sm-9">{{ $student->email }}</dd>
+
+                      <dt class="col-sm-3">Gender</dt>
+                      <dd class="col-sm-9">{{ optional($student->profile)->sex ?? 'N/A' }}</dd>
+
+                      <dt class="col-sm-3">Contact</dt>
+                      <dd class="col-sm-9">{{ optional($student->profile)->contact_number ?? 'N/A' }}</dd>
+
+                      <dt class="col-sm-3">Section</dt>
+                      <dd class="col-sm-9">{{ optional(optional($student->student)->section)->name ?? 'Not Enrolled' }}</dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <!-- Edit Student Modal -->
             <div class="modal fade" id="editStudentModal{{ $student->id }}" tabindex="-1" aria-hidden="true">
@@ -127,10 +172,26 @@
                           <input type="text" name="last_name" class="form-control" 
                                  value="{{ old('last_name', optional($student->profile)->last_name) }}" required>
                         </div>
-                        <div class="col-md-12">
+                        <div class="col-md-6">
                           <label class="form-label">Email</label>
                           <input type="email" name="email" class="form-control" 
                                  value="{{ old('email', $student->email) }}" required>
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label">Section</label>
+                          <select name="section_id" class="form-select">
+                            <option value="">-- Select Section --</option>
+                            @foreach($sections->groupBy('gradelevel_id') as $gradeId => $gradeSections)
+                              <optgroup label="{{ $gradeSections->first()->gradeLevel->name }}">
+                                @foreach($gradeSections as $sec)
+                                  <option value="{{ $sec->id }}" 
+                                    @if(optional(optional($student->student)->section)->id == $sec->id) selected @endif>
+                                    {{ $sec->name }}
+                                  </option>
+                                @endforeach
+                              </optgroup>
+                            @endforeach
+                          </select>
                         </div>
                       </div>
                     </div>
@@ -183,9 +244,22 @@
               <label class="form-label">Last Name <span class="text-danger">*</span></label>
               <input type="text" name="last_name" class="form-control" required>
             </div>
-            <div class="col-md-12">
+            <div class="col-md-6">
               <label class="form-label">Email <span class="text-danger">*</span></label>
               <input type="email" name="email" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Section</label>
+              <select name="section_id" class="form-select">
+                <option value="">-- Select Section --</option>
+                @foreach($sections->groupBy('gradelevel_id') as $gradeId => $gradeSections)
+                  <optgroup label="{{ $gradeSections->first()->gradeLevel->name }}">
+                    @foreach($gradeSections as $sec)
+                      <option value="{{ $sec->id }}">{{ $sec->name }}</option>
+                    @endforeach
+                  </optgroup>
+                @endforeach
+              </select>
             </div>
             <div class="col-md-12">
               <small class="text-muted">

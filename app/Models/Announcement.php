@@ -6,7 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class Announcement extends Model
 {
-    protected $fillable = ['title', 'content', 'user_id', 'section_id'];
+    protected $fillable = ['title', 'content', 'user_id', 'section_id', 'expires_at'];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'expires_at' => 'datetime', 
+    ];
 
     public function user()
     {
@@ -21,5 +27,10 @@ class Announcement extends Model
     public function section()
     {
         return $this->belongsTo(Section::class, 'section_id');
+    }
+
+    public function isExpired()
+    {
+        return $this->expires_at && $this->expires_at->isPast();
     }
 }

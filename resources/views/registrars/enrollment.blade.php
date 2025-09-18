@@ -24,7 +24,7 @@
             <th>Student Name</th>
             <th>Section</th>
             <th>School Year</th>
-            <th width="100">Actions</th>
+            <th width="140">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -36,6 +36,12 @@
               <td>{{ $enrollment->section->name ?? 'N/A' }}</td>
               <td>{{ $enrollment->schoolYear->name ?? 'N/A' }}</td>
               <td>
+                <!-- Edit -->
+                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editEnrollmentModal{{ $enrollment->id }}">
+                  <i class="bi bi-pencil"></i>
+                </button>
+
+                <!-- Delete -->
                 <form action="{{ route('registrars.enrollment.destroy', $enrollment->id) }}" method="POST" class="d-inline">
                   @csrf @method('DELETE')
                   <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Remove this enrollment?')">
@@ -44,6 +50,54 @@
                 </form>
               </td>
             </tr>
+
+            <!-- Edit Modal -->
+            <div class="modal fade" id="editEnrollmentModal{{ $enrollment->id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog">
+                <form method="POST" action="{{ route('registrars.enrollment.update', $enrollment->id) }}">
+                  @csrf @method('PUT')
+                  <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                      <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i> Edit Enrollment</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      <p><strong>Student:</strong> {{ $enrollment->student->user->profile->first_name }} {{ $enrollment->student->user->profile->last_name }}</p>
+
+                      <div class="mb-3">
+                        <label class="form-label">Section</label>
+                        <select name="section_id" class="form-select" required>
+                          @foreach($sections->groupBy('gradelevel_id') as $gradeId => $gradeSections)
+                            <optgroup label="{{ $gradeSections->first()->gradeLevel->name }}">
+                              @foreach($gradeSections as $sec)
+                                <option value="{{ $sec->id }}" {{ $enrollment->section_id == $sec->id ? 'selected' : '' }}>
+                                  {{ $sec->name }}
+                                </option>
+                              @endforeach
+                            </optgroup>
+                          @endforeach
+                        </select>
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">School Year</label>
+                        <select name="school_year_id" class="form-select" required>
+                          @foreach($schoolYears as $sy)
+                            <option value="{{ $sy->id }}" {{ $enrollment->school_year_id == $sy->id ? 'selected' : '' }}>
+                              {{ $sy->name }}
+                            </option>
+                          @endforeach
+                        </select>
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      <button class="btn btn-warning">Update</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
           @empty
             <tr><td colspan="6" class="text-center text-muted">No enrollments yet.</td></tr>
           @endforelse
@@ -78,8 +132,21 @@
             <label class="form-label">Section</label>
             <select name="section_id" class="form-select" required>
               <option value="">-- Choose --</option>
-              @foreach($sections as $sec)
-                <option value="{{ $sec->id }}">{{ $sec->name }} ({{ $sec->gradeLevel->name }})</option>
+              @foreach($sections->groupBy('gradelevel_id') as $gradeId => $gradeSections)
+                <optgroup label="{{ $gradeSections->first()->gradeLevel->name }}">
+                  @foreach($gradeSections as $sec)
+                    <option value="{{ $sec->id }}">{{ $sec->name }}</option>
+                  @endforeach
+                </optgroup>
+              @endforeach
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">School Year</label>
+            <select name="school_year_id" class="form-select" required>
+              <option value="">-- Choose --</option>
+              @foreach($schoolYears as $sy)
+                <option value="{{ $sy->id }}">{{ $sy->name }}</option>
               @endforeach
             </select>
           </div>

@@ -39,8 +39,10 @@ class StudentController extends Controller
         $sectionIds = $user->enrollments->pluck('section_id')->toArray();
 
         $announcements = Announcement::with(['user', 'section'])
-            ->whereNull('section_id')
-            ->orWhereIn('section_id', $sectionIds)
+            ->where(function ($q) use ($sectionIds) {
+                $q->whereNull('section_id')
+                ->orWhereIn('section_id', $sectionIds);
+            })
             ->latest()
             ->get();
 

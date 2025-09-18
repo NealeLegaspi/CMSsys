@@ -10,6 +10,7 @@ return new class extends Migration {
             $table->id();
             $table->string('title');
             $table->text('content');
+            $table->dateTime('expires_at')->nullable()->after('content');
             $table->foreignId('user_id')->constrained()->onDelete('cascade'); // posted by
             $table->foreignId('section_id')->nullable()->constrained()->onDelete('set null'); // optional
             $table->timestamps();

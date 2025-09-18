@@ -19,6 +19,11 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\UsersExport;
 use App\Imports\UsersImport;
 use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\EnrollmentReportExport;
+use App\Exports\GradingReportExport;
+use App\Exports\PDF\EnrollmentReportPDF;
+use App\Exports\PDF\GradingReportPDF;
 
 class AdminController extends Controller
 {
@@ -31,7 +36,7 @@ class AdminController extends Controller
         $teacherCount   = User::whereHas('role', fn($q) => $q->where('name', 'Teacher'))->count();
         $studentCount   = User::whereHas('role', fn($q) => $q->where('name', 'Student'))->count();
         $registrarCount = User::whereHas('role', fn($q) => $q->where('name', 'Registrar'))->count();
-        $adminCount     = User::whereHas('role', fn($q) => $q->where('name', 'Administrator'))->count();
+        $adminCount     = User::whereHas('role', fn($q) => $q->where('name', 'Admin'))->count();
 
         $logs = ActivityLog::with('user')->latest()->take(5)->get();
 
@@ -69,19 +74,36 @@ class AdminController extends Controller
         $request->validate([
             'title'      => 'required|string|max:150',
             'content'    => 'required|string',
-            'section_id' => 'nullable|exists:sections,id',
+            'expires_at' => 'nullable|date|after:today',
         ]);
 
         Announcement::create([
             'user_id'    => Auth::id(),
             'title'      => $request->title,
             'content'    => $request->content,
-            'section_id' => $request->section_id,
+            'expires_at' => $request->expires_at,
         ]);
 
         $this->logActivity('Create Announcement', "Added announcement: {$request->title}");
 
         return back()->with('success','Announcement created successfully.');
+    }
+
+    public function updateAnnouncement(Request $request, $id)
+    {
+        $announcements = Announcement::findOrFail($id);
+
+        $request->validate([
+            'title'      => 'required|string|max:150',
+            'content'    => 'required|string',
+            'expires_at' => 'nullable|date|after:today',
+        ]);
+
+        $announcements->update($request->only('title','content','expires_at'));
+
+        $this->logActivity('Update Announcement', "Updated announcement: {$announcements->title}");
+
+        return back()->with('success','Announcement updated successfully.');
     }
 
     public function destroyAnnouncement($id)
@@ -98,28 +120,47 @@ class AdminController extends Controller
     /**
      * User Management
      */
-    public function users()
+    public function users(Request $request)
     {
-        $users = User::with('role', 'profile')->paginate(10);
+        $query = User::with('role','profile');
+
+        if ($request->filled('role_id')) {
+            $query->where('role_id', $request->role_id);
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('email','like',"%$search%")
+                ->orWhereHas('profile', function($q2) use ($search) {
+                    $q2->where('first_name','like',"%$search%")
+                        ->orWhere('last_name','like',"%$search%");
+                });
+            });
+        }
+
+        $users = $query->paginate(10)->withQueryString();
         $roles = Role::all();
-        return view('admins.users', compact('users', 'roles'));
+
+        return view('admins.users', compact('users','roles'));
     }
 
     public function storeUser(Request $request)
     {
         $request->validate([
-            'email'      => 'required|email|unique:users,email',
-            'role_id'    => 'required|exists:roles,id',
             'first_name' => 'required|string|max:50',
             'last_name'  => 'required|string|max:50',
+            'email'      => 'required|email|unique:users',
+            'password'   => 'required|min:8|confirmed',
+            'role_id'    => 'required|exists:roles,id',
         ]);
-
-        $tempPassword = Str::random(8);
 
         $user = User::create([
             'email'    => $request->email,
             'role_id'  => $request->role_id,
-            'password' => Hash::make($tempPassword),
+            'password' => Hash::make($request->password),
             'status'   => 'active',
         ]);
 
@@ -128,9 +169,9 @@ class AdminController extends Controller
             'last_name'  => $request->last_name,
         ]);
 
-        $this->logActivity('Create User', "Added user: {$user->email}");
+        $this->logActivity('Create User', "Created user: {$user->email}");
 
-        return back()->with('success', "User created successfully. Temporary Password: {$tempPassword}");
+        return back()->with('success', 'User created successfully.');
     }
 
     public function updateUser(Request $request, $id)
@@ -159,25 +200,28 @@ class AdminController extends Controller
         return back()->with('success', 'User updated successfully.');
     }
 
-    public function deactivateUser($id)
+    public function toggleUser($id)
     {
         $user = User::findOrFail($id);
-        $user->update(['status' => 'inactive']);
+        $user->status = $user->status === 'active' ? 'inactive' : 'active';
+        $user->save();
 
-        $this->logActivity('Deactivate User', "Deactivated user: {$user->email}");
+        $this->logActivity('Toggle User Status', "Changed status of {$user->email} to {$user->status}");
 
-        return back()->with('success', 'User deactivated successfully.');
+        return back()->with('success','User status updated.');
     }
 
     public function resetPassword($id)
     {
         $user = User::findOrFail($id);
         $tempPassword = Str::random(8);
-        $user->update(['password' => Hash::make($tempPassword)]);
 
-        $this->logActivity('Reset Password', "Reset password for user: {$user->email}");
+        $user->password = Hash::make($tempPassword);
+        $user->save();
 
-        return back()->with('success', "Password reset successfully. Temporary Password: {$tempPassword}");
+        $this->logActivity('Reset Password', "Reset password for {$user->email}");
+
+        return back()->with('success', "New password: {$tempPassword}");
     }
 
     public function destroyUser($id)
@@ -215,19 +259,87 @@ class AdminController extends Controller
     /**
      * Reports
      */
-    public function reports()
+    public function reports(Request $request)
     {
-        $students    = User::where('role_id', 4)->count();
-        $teachers    = User::where('role_id', 3)->count();
-        $registrars  = User::where('role_id', 2)->count();
-        $admins      = User::where('role_id', 1)->count();
-        $sections    = Section::count();
-        $subjects    = Subject::count();
-        $schoolYears = SchoolYear::count();
+        $schoolYears = SchoolYear::orderByDesc('start_date')->get();
+        $gradeLevels = \App\Models\GradeLevel::all();
+        $subjects    = Subject::all()->keyBy('id'); 
+
+        $sy = $request->school_year_id ?? $schoolYears->first()?->id;
+        $status = $request->status ?? 'all';
+
+        // Enrollment Data
+        $enrollments = Enrollment::with('section.gradeLevel','student.user.profile')
+            ->when($sy, fn($q) => $q->where('school_year_id',$sy))
+            ->when($status !== 'all', fn($q) => $q->where('status',$status))
+            ->get();
+
+        $enrollmentData = $enrollments
+            ->groupBy(fn($e) => $e->section->gradeLevel->name ?? 'Unknown')
+            ->map->count();
+
+        // Grading Data
+        $gradingData = \App\Models\Grade::selectRaw('subject_id, AVG(grade) as avg')
+            ->groupBy('subject_id')
+            ->pluck('avg','subject_id');
+
+        // Summary Cards
+        $totalStudents    = User::where('role_id',4)->count();
+        $totalTeachers    = User::where('role_id',3)->count();
+        $totalEnrollments = $enrollments->count();
+        $totalSections    = Section::count();
+        $totalSubjects    = Subject::count();
 
         return view('admins.reports', compact(
-            'students','teachers','registrars','admins','sections','subjects','schoolYears'
+            'schoolYears','gradeLevels','sy','status',
+            'enrollmentData','gradingData','enrollments',
+            'totalStudents','totalTeachers','totalEnrollments',
+            'totalSections','totalSubjects','subjects' 
         ));
+    }
+
+
+    public function exportReport($type, $format, Request $request)
+    {
+        $sy = $request->school_year_id;
+        $subjects = Subject::all()->keyBy('id'); // <--- fetch subjects once
+
+        // Excel / CSV
+        if (in_array($format, ['xlsx','csv'])) {
+            if ($type === 'enrollment') {
+                return Excel::download(new EnrollmentReportExport($sy), "enrollment_report.$format");
+            }
+            if ($type === 'grades') {
+                return Excel::download(new GradingReportExport($sy), "grading_report.$format");
+            }
+        }
+
+        // PDF
+        if ($format === 'pdf') {
+            if ($type === 'enrollment') {
+                $data = Enrollment::with('section.gradeLevel','student.user.profile')
+                    ->where('school_year_id',$sy)->get();
+
+                $pdf = Pdf::loadView('reports.enrollment_pdf', compact('data','sy'))
+                    ->setPaper('a4','portrait');
+
+                return $pdf->download("enrollment_report.pdf");
+            }
+
+            if ($type === 'grades') {
+                $data = \App\Models\Grade::selectRaw('subject_id, AVG(grade) as avg')
+                    ->where('school_year_id',$sy)
+                    ->groupBy('subject_id')
+                    ->pluck('avg','subject_id');
+
+                $pdf = Pdf::loadView('reports.grading_pdf', compact('data','sy','subjects'))
+                    ->setPaper('a4','landscape');
+
+                return $pdf->download("grading_report.pdf");
+            }
+        }
+
+        return back()->with('error','Invalid export request.');
     }
 
     /**
@@ -262,7 +374,7 @@ class AdminController extends Controller
     public function systemSettings()
     {
         $settings = Setting::pluck('value', 'key')->toArray();
-        return view('admins.system_settings', compact('settings'));
+        return view('admins.system', compact('settings'));
     }
 
     public function updateSystemSettings(Request $request)
@@ -388,5 +500,35 @@ class AdminController extends Controller
             'ip_address'  => request()->ip(),
             'user_agent'  => request()->header('User-Agent'),
         ]);
+    }
+
+    public function exportEnrollment(Request $request, $format)
+    {
+        $export = new EnrollmentReportExport($request->school_year_id, $request->status);
+
+        if ($format === 'csv') {
+            return Excel::download($export, 'enrollment_report.csv', \Maatwebsite\Excel\Excel::CSV);
+        }
+        return Excel::download($export, 'enrollment_report.xlsx');
+    }
+
+    public function exportGrading(Request $request, $format)
+    {
+        $export = new GradingReportExport($request->school_year_id);
+
+        if ($format === 'csv') {
+            return Excel::download($export, 'grading_report.csv', \Maatwebsite\Excel\Excel::CSV);
+        }
+        return Excel::download($export, 'grading_report.xlsx');
+    }
+    
+    public function exportEnrollmentPDF(Request $request)
+    {
+        return EnrollmentReportPDF::generate($request->school_year_id, $request->status);
+    }
+
+    public function exportGradingPDF(Request $request)
+    {
+        return GradingReportPDF::generate($request->school_year_id);
     }
 }
