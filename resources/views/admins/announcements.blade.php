@@ -12,12 +12,24 @@
         </button>
     </div>
     <div class="card-body">
-        @if(session('success'))
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                {{ session('success') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        {{-- Alerts --}}
+        @include('partials.alerts')
+
+        {{-- Search & Reset --}}
+        <form method="GET" action="{{ route('admins.announcements') }}" class="row g-2 mb-3">
+            <div class="col-md-6">
+                <input type="text" name="search" value="{{ request('search') }}" class="form-control"
+                    placeholder="Search by title or content">
             </div>
-        @endif
+            <div class="col-md-3 d-flex">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-search"></i>
+                </button>
+                <a href="{{ route('admins.announcements') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </a>
+            </div>
+        </form>
 
         <div class="table-responsive">
             <table class="table table-hover align-middle">
@@ -36,8 +48,13 @@
                     @forelse($announcements as $ann)
                         <tr>
                             <td>{{ $ann->title }}</td>
-                            <td>{{ Str::limit($ann->content, 50) }}</td>
-                            <td>{{ $ann->user?->profile?->first_name ?? 'N/A' }} {{ $ann->user?->profile?->last_name ?? '' }}</td>
+                            <td title="{{ $ann->content }}">
+                                {{ Str::limit($ann->content, 50) }}
+                            </td>
+                            <td>
+                                {{ $ann->user?->profile?->first_name ?? '' }}
+                                {{ $ann->user?->profile?->last_name ?? '' }}
+                            </td>
                             <td>{{ $ann->created_at->format('M d, Y h:i A') }}</td>
                             <td>
                                 {{ $ann->expires_at ? $ann->expires_at->format('M d, Y') : 'No Expiration' }}
@@ -51,18 +68,16 @@
                             </td>
                             <td class="text-center">
                                 <!-- Edit Button -->
-                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editAnnouncementModal{{ $ann->id }}">
+                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal"
+                                    data-bs-target="#editAnnouncementModal{{ $ann->id }}">
                                     <i class="bi bi-pencil"></i>
                                 </button>
+
                                 <!-- Delete -->
-                                <form action="{{ route('admins.announcements.destroy', $ann->id) }}" method="POST" class="d-inline"
-                                    onsubmit="return confirm('Are you sure you want to delete this announcement?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button class="btn btn-sm btn-danger">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <button class="btn btn-sm btn-danger" data-bs-toggle="modal"
+                                    data-bs-target="#deleteAnnouncementModal{{ $ann->id }}">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </td>
                         </tr>
 
@@ -80,7 +95,8 @@
                                         <div class="modal-body">
                                             <div class="mb-3">
                                                 <label class="form-label">Title</label>
-                                                <input type="text" name="title" class="form-control" value="{{ $ann->title }}" required>
+                                                <input type="text" name="title" class="form-control"
+                                                    value="{{ $ann->title }}" required>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">Content</label>
@@ -89,14 +105,42 @@
                                             <div class="mb-3">
                                                 <label class="form-label">Expiration Date</label>
                                                 <input type="date" name="expires_at" class="form-control"
-                                                       value="{{ $ann->expires_at?->format('Y-m-d') }}">
+                                                    value="{{ $ann->expires_at?->format('Y-m-d') }}">
                                             </div>
                                         </div>
                                         <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="button" class="btn btn-secondary"
+                                                data-bs-dismiss="modal">Cancel</button>
                                             <button type="submit" class="btn btn-success">Update</button>
                                         </div>
                                     </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delete Modal -->
+                        <div class="modal fade" id="deleteAnnouncementModal{{ $ann->id }}" tabindex="-1">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-danger text-white">
+                                        <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i> Confirm Delete</h5>
+                                        <button type="button" class="btn-close btn-close-white"
+                                            data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        Are you sure you want to delete
+                                        <strong>{{ $ann->title }}</strong>?
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Cancel</button>
+                                        <form action="{{ route('admins.announcements.destroy', $ann->id) }}" method="POST"
+                                            class="d-inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger">Delete</button>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -109,9 +153,11 @@
             </table>
         </div>
 
-        <div class="mt-3">
-            {{ $announcements->links() }}
+        @if($announcements->hasPages())
+        <div class="mt-3 d-flex justify-content-center">
+            {{ $announcements->onEachSide(1)->links('pagination::bootstrap-5') }}
         </div>
+        @endif
     </div>
 </div>
 

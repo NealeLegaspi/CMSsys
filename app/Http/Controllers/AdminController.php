@@ -11,6 +11,8 @@ use App\Models\Role;
 use App\Models\ActivityLog;
 use App\Models\Announcement;
 use App\Models\Setting;
+use App\Models\GradeLevel;
+use Illuminate\Validation\Rule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -63,10 +65,21 @@ class AdminController extends Controller
     /**
      * Announcements
      */
-    public function announcements()
+    public function announcements(Request $request)
     {
-        $announcements = Announcement::with('user')->latest()->paginate(10);
-        return view('admins.announcements', compact('announcements'));
+        $query = Announcement::with('user.profile');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                ->orWhere('content', 'like', "%{$search}%");
+            });
+        }
+
+    $announcements = $query->latest()->paginate(10)->withQueryString();
+
+    return view('admins.announcements', compact('announcements'));
     }
 
     public function storeAnnouncement(Request $request)
@@ -74,7 +87,7 @@ class AdminController extends Controller
         $request->validate([
             'title'      => 'required|string|max:150',
             'content'    => 'required|string',
-            'expires_at' => 'nullable|date|after:today',
+            'expires_at' => 'nullable|date|after_or_equal:today',
         ]);
 
         Announcement::create([
@@ -96,10 +109,14 @@ class AdminController extends Controller
         $request->validate([
             'title'      => 'required|string|max:150',
             'content'    => 'required|string',
-            'expires_at' => 'nullable|date|after:today',
+            'expires_at' => 'nullable|date|after_or_equal:today',
         ]);
 
-        $announcements->update($request->only('title','content','expires_at'));
+        $announcements->update([
+        'title'      => $request->title,
+        'content'    => $request->content,
+        'expires_at' => $request->expires_at,
+        ]);
 
         $this->logActivity('Update Announcement', "Updated announcement: {$announcements->title}");
 
@@ -109,10 +126,9 @@ class AdminController extends Controller
     public function destroyAnnouncement($id)
     {
         $announcement = Announcement::findOrFail($id);
-        $title = $announcement->title;
         $announcement->delete();
 
-        $this->logActivity('Delete Announcement', "Deleted announcement: {$title}");
+        $this->logActivity('Delete Announcement', "Deleted announcement: {$announcement->title}");
 
         return back()->with('success','Announcement deleted successfully.');
     }
@@ -122,29 +138,29 @@ class AdminController extends Controller
      */
     public function users(Request $request)
     {
-        $query = User::with('role','profile');
+    $query = User::with(['role', 'profile']);
 
-        if ($request->filled('role_id')) {
-            $query->where('role_id', $request->role_id);
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('email', 'like', "%{$search}%")
+              ->orWhereHas('profile', function ($q2) use ($search) {
+                  $q2->where('first_name', 'like', "%{$search}%")
+                     ->orWhere('last_name', 'like', "%{$search}%");
+              });
+        });
+    }
+    if ($request->filled('role_id')) {
+        $query->where('role_id', $request->role_id);
         }
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('email','like',"%$search%")
-                ->orWhereHas('profile', function($q2) use ($search) {
-                    $q2->where('first_name','like',"%$search%")
-                        ->orWhere('last_name','like',"%$search%");
-                });
-            });
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
         }
 
         $users = $query->paginate(10)->withQueryString();
         $roles = Role::all();
 
-        return view('admins.users', compact('users','roles'));
+        return view('admins.users', compact('users', 'roles'));
     }
 
     public function storeUser(Request $request)
@@ -152,19 +168,20 @@ class AdminController extends Controller
         $request->validate([
             'first_name' => 'required|string|max:50',
             'last_name'  => 'required|string|max:50',
-            'email'      => 'required|email|unique:users',
+            'email'      => 'required|email|unique:users,email',
             'password'   => 'required|min:8|confirmed',
             'role_id'    => 'required|exists:roles,id',
         ]);
 
         $user = User::create([
             'email'    => $request->email,
-            'role_id'  => $request->role_id,
             'password' => Hash::make($request->password),
+            'role_id'  => $request->role_id,
             'status'   => 'active',
         ]);
 
         $user->profile()->create([
+            'user_id' => $user->id,
             'first_name' => $request->first_name,
             'last_name'  => $request->last_name,
         ]);
@@ -176,7 +193,7 @@ class AdminController extends Controller
 
     public function updateUser(Request $request, $id)
     {
-        $user = User::findOrFail($id);
+        $user = User::with('profile')->findOrFail($id);
 
         $request->validate([
             'email'      => 'required|email|unique:users,email,' . $user->id,
@@ -190,10 +207,10 @@ class AdminController extends Controller
             'role_id' => $request->role_id,
         ]);
 
-        $profile = $user->profile ?? $user->profile()->create();
-        $profile->first_name = $request->first_name;
-        $profile->last_name  = $request->last_name;
-        $profile->save();
+        $user->profile->update([
+            'first_name' => $request->first_name,
+            'last_name'  => $request->last_name,
+        ]);
 
         $this->logActivity('Update User', "Updated user: {$user->email}");
 
@@ -262,7 +279,7 @@ class AdminController extends Controller
     public function reports(Request $request)
     {
         $schoolYears = SchoolYear::orderByDesc('start_date')->get();
-        $gradeLevels = \App\Models\GradeLevel::all();
+        $gradeLevels = GradeLevel::all();
         $subjects    = Subject::all()->keyBy('id'); 
 
         $sy = $request->school_year_id ?? $schoolYears->first()?->id;
@@ -272,7 +289,8 @@ class AdminController extends Controller
         $enrollments = Enrollment::with('section.gradeLevel','student.user.profile')
             ->when($sy, fn($q) => $q->where('school_year_id',$sy))
             ->when($status !== 'all', fn($q) => $q->where('status',$status))
-            ->get();
+            ->paginate(10);
+            
 
         $enrollmentData = $enrollments
             ->groupBy(fn($e) => $e->section->gradeLevel->name ?? 'Unknown')
@@ -281,8 +299,9 @@ class AdminController extends Controller
         // Grading Data
         $gradingData = \App\Models\Grade::selectRaw('subject_id, AVG(grade) as avg')
             ->groupBy('subject_id')
-            ->pluck('avg','subject_id');
+            ->paginate(10);
 
+            
         // Summary Cards
         $totalStudents    = User::where('role_id',4)->count();
         $totalTeachers    = User::where('role_id',3)->count();
@@ -340,6 +359,159 @@ class AdminController extends Controller
         }
 
         return back()->with('error','Invalid export request.');
+    }
+
+    /**
+     * School Year Management (Admin only)
+     */
+    public function schoolYears(Request $request)
+    {
+        $search = $request->input('search');
+        $status = $request->input('status');
+
+        $schoolYears = SchoolYear::latest()
+            ->when($search, fn($q) => $q->where('name', 'like', "%$search%"))
+            ->when($status, fn($q) => $q->where('status', $status))
+            ->paginate(10);
+
+        return view('admins.schoolyear', compact('schoolYears'));
+    }
+
+    public function storeSchoolYear(Request $request)
+    {
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+            'name'       => 'nullable|string|max:100|unique:school_years,name',
+        ]);
+
+        $name = $request->name ?? $request->start_date . ' - ' . $request->end_date;
+
+        if (SchoolYear::where('name', $name)->exists()) {
+            return back()->withErrors(['name' => 'School year already exists.']);
+        }
+
+        $status = $request->has('set_active') ? 'active' : 'closed';
+
+        if ($status === 'active') {
+            SchoolYear::where('status', 'active')->update(['status' => 'closed']);
+        }
+
+        SchoolYear::create([
+            'name'       => $name,
+            'start_date' => $request->start_date,
+            'end_date'   => $request->end_date,
+            'status'     => $status,
+        ]);
+
+        $this->logActivity('Add School Year', "Added school year {$name}");
+
+        return back()->with('success', 'School year added.');
+    }
+
+    public function activateSchoolYear($id)
+    {
+        $sy = SchoolYear::findOrFail($id);
+
+        SchoolYear::where('status', 'active')->update(['status' => 'closed']);
+
+        $sy->update(['status' => 'active']);
+
+        $this->logActivity('Activate School Year', "Activated school year {$sy->name}");
+
+        return back()->with('success', "School year {$sy->name} is now active.");
+    }
+
+    public function updateSchoolYear(Request $request, $id)
+    {
+        $sy = SchoolYear::findOrFail($id);
+
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+        ]);
+
+        $sy->update([
+            'start_date' => $request->start_date,
+            'end_date'   => $request->end_date,
+            'name'       => $request->name ?? $request->start_date . ' - ' . $request->end_date,
+        ]);
+
+        $this->logActivity('Update School Year', "Updated school year {$sy->name}");
+
+        return back()->with('success', 'School year updated.');
+    }
+
+    public function destroySchoolYear($id)
+    {
+        $sy = SchoolYear::findOrFail($id);
+        $syName = $sy->name;
+        $sy->delete();
+
+        $this->logActivity('Delete School Year', "Deleted school year {$syName}");
+
+        return back()->with('success', 'School year deleted.');
+    }
+
+    public function closeSchoolYear($id)
+    {
+        $sy = SchoolYear::findOrFail($id);
+        SchoolYear::where('status', 'active')->update(['status' => 'closed']);
+        $sy->update(['status' => 'active']);
+
+        $this->logActivity('Change Active School Year', "Changed active school year to {$sy->name}");
+
+        return back()->with('success', 'Active school year updated.');
+    }
+
+        /**
+     * Subjects
+     */
+    public function subjects()
+    {
+        $subjects    = Subject::with('gradeLevel')->paginate(10);
+        $gradeLevels = GradeLevel::all();
+        return view('admins.subjects', compact('subjects', 'gradeLevels'));
+    }
+
+    public function storeSubject(Request $request)
+    {
+        $request->validate([
+            'name'           => 'required|string|max:100|unique:subjects,name',
+            'grade_level_id' => 'required|exists:grade_levels,id',
+        ]);
+
+        Subject::create($request->only('name', 'grade_level_id'));
+
+        $this->logActivity('Add Subject', "Added subject {$request->name}");
+
+        return back()->with('success', 'Subject added.');
+    }
+
+    public function updateSubject(Request $request, $id)
+    {
+        $subject = Subject::findOrFail($id);
+
+        $request->validate([
+            'name'           => ['required', 'string', 'max:100', Rule::unique('subjects', 'name')->ignore($subject->id)],
+            'grade_level_id' => 'required|exists:grade_levels,id',
+        ]);
+
+        $subject->update($request->only('name', 'grade_level_id'));
+
+        $this->logActivity('Update Subject', "Updated subject {$subject->name}");
+
+        return back()->with('success', 'Subject updated.');
+    }
+
+    public function destroySubject($id)
+    {
+        $subject = Subject::findOrFail($id);
+        $subject->delete();
+
+        $this->logActivity('Delete Subject', "Deleted subject {$subject->name}");
+
+        return back()->with('success', 'Subject deleted.');
     }
 
     /**

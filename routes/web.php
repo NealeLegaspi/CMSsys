@@ -63,6 +63,18 @@ Route::prefix('admin')->middleware(['auth', 'role:Admin'])->group(function () {
     Route::get('/reports', [AdminController::class, 'reports'])->name('admins.reports');
     Route::get('/reports/export/{type}/{format}', [AdminController::class,'exportReport'])->name('admins.reports.export');
 
+    Route::get('/schoolyear', [AdminController::class, 'schoolYears'])->name('admins.schoolyear');
+    Route::post('/schoolyear', [AdminController::class, 'storeSchoolYear'])->name('admins.schoolyear.store');
+    Route::put('/schoolyear/{id}', [AdminController::class, 'updateSchoolYear'])->name('admins.schoolyear.update');
+    Route::delete('/schoolyear/{id}', [AdminController::class, 'destroySchoolYear'])->name('admins.schoolyear.destroy');
+    Route::post('/schoolyear/{id}/close', [AdminController::class, 'closeSchoolYear'])->name('admins.schoolyear.close');
+    Route::post('/schoolyears/{id}/activate', [AdminController::class, 'activateSchoolYear'])->name('admins.schoolyear.activate');
+
+    Route::get('/subjects', [AdminController::class, 'subjects'])->name('admins.subjects');
+    Route::post('/subjects', [AdminController::class, 'storeSubject'])->name('admins.subjects.store');
+    Route::get('/subjects/{id}', [AdminController::class, 'showSubject'])->name('admins.subjects.show');
+    Route::put('/subjects/{id}', [AdminController::class, 'updateSubject'])->name('admins.subjects.update');
+    Route::delete('/subjects/{id}', [AdminController::class, 'destroySubject'])->name('admins.subjects.destroy');
 
     // Settings
     Route::get('/settings', [AdminController::class, 'settings'])->name('admins.settings');
@@ -99,24 +111,13 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::put('/sections/{id}', [RegistrarController::class, 'updateSection'])->name('registrars.sections.update');
     Route::delete('/sections/{id}', [RegistrarController::class, 'destroySection'])->name('registrars.sections.destroy');
 
-    Route::get('/subjects', [RegistrarController::class, 'subjects'])->name('registrars.subjects');
-    Route::post('/subjects', [RegistrarController::class, 'storeSubject'])->name('registrars.subjects.store');
-    Route::get('/subjects/{id}', [RegistrarController::class, 'showSubject'])->name('registrars.subjects.show');
-    Route::put('/subjects/{id}', [RegistrarController::class, 'updateSubject'])->name('registrars.subjects.update');
-    Route::delete('/subjects/{id}', [RegistrarController::class, 'destroySubject'])->name('registrars.subjects.destroy');
-
     Route::get('/enrollment', [RegistrarController::class, 'enrollment'])->name('registrars.enrollment');
     Route::post('/enrollment', [RegistrarController::class, 'storeEnrollment'])->name('registrars.enrollment.store');
     Route::delete('/enrollment/{id}', [RegistrarController::class, 'destroyEnrollment'])->name('registrars.enrollment.destroy');
     Route::post('/enrollments/import', [RegistrarController::class, 'importEnrollments'])->name('registrars.enrollments.import');
     Route::get('/enrollments/export', [RegistrarController::class, 'exportEnrollments'])->name('registrars.enrollments.export');
-
-    Route::get('/schoolyear', [RegistrarController::class, 'schoolYear'])->name('registrars.schoolyear');
-    Route::post('/schoolyear', [RegistrarController::class, 'storeSchoolYear'])->name('registrars.schoolyear.store');
-    Route::put('/schoolyear/{id}', [RegistrarController::class, 'updateSchoolYear'])->name('registrars.schoolyear.update');
-    Route::delete('/schoolyear/{id}', [RegistrarController::class, 'destroySchoolYear'])->name('registrars.schoolyear.destroy');
-    Route::post('/schoolyear/{id}/close', [RegistrarController::class, 'closeSchoolYear'])->name('registrars.schoolyear.close');
-
+    Route::get('registrar/enrollment/export/csv', [RegistrarController::class, 'exportCsv'])->name('registrars.enrollment.export.csv');
+    Route::get('registrar/enrollment/export/pdf', [RegistrarController::class, 'exportPdf'])->name('registrars.enrollment.export.pdf');
 
     Route::get('/reports', [RegistrarController::class, 'reports'])->name('registrars.reports');
     Route::post('/reports', [RegistrarController::class, 'storeReport'])->name('registrars.reports.store');
@@ -170,7 +171,7 @@ Route::prefix('teacher')->middleware(['auth', 'role:Teacher'])->group(function (
     Route::get('/classlist/{section}', [TeacherController::class, 'viewClassList'])->name('teachers.viewClasslist');
     Route::post('/classlist/{section}/add', [TeacherController::class, 'addStudentToClass'])->name('teachers.classlist.addStudent');
     Route::delete('/classlist/{section}/remove/{student}', [TeacherController::class, 'removeStudentFromClass'])->name('teachers.classlist.removeStudent');
-    Route::get('/classlist/{section}/export', [TeacherController::class, 'exportClassList'])->name('teachers.classlist.export');
+    Route::get('/classlist/export', [TeacherController::class, 'exportClassList'])->name('teachers.classlist.export');
 });
 
 // -------------------- STUDENT ROUTES --------------------

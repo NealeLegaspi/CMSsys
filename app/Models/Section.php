@@ -34,4 +34,8 @@ class Section extends Model
                     ->withPivot('subject_id')
                     ->withTimestamps();
     }
+    public function enrollments()
+    {
+        return $this->hasMany(Enrollment::class);
+    }
 }

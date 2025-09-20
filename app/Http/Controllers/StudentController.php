@@ -19,15 +19,16 @@ class StudentController extends Controller
 
         $announcements = Announcement::with(['user', 'section'])
             ->where(function ($query) use ($user) {
+                $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
                 $query->whereNull('section_id')
-                      ->orWhereIn('section_id', $user->enrollments->pluck('section_id'));
+                    ->orWhereIn('section_id', $sectionIds);
             })
             ->latest()
             ->take(5)
             ->get();
 
         $grades = Grade::with('subject')
-            ->where('student_id', $user->id)
+            ->where('student_id', $user->student?->id)
             ->get();
 
         return view('students.dashboard', compact('announcements', 'grades'));
@@ -36,7 +37,7 @@ class StudentController extends Controller
     public function announcements()
     {
         $user = Auth::user();
-        $sectionIds = $user->enrollments->pluck('section_id')->toArray();
+        $sectionIds = $user->student?->enrollments?->pluck('section_id')->toArray() ?? [];
 
         $announcements = Announcement::with(['user', 'section'])
             ->where(function ($q) use ($sectionIds) {
@@ -52,7 +53,7 @@ class StudentController extends Controller
     public function assignments()
     {
         $user = Auth::user();
-        $sectionIds = $user->enrollments->pluck('section_id')->toArray();
+        $sectionIds = $user->student?->enrollments?->pluck('section_id')->toArray() ?? [];
 
         $assignments = Assignment::with(['subject', 'section'])
             ->whereIn('section_id', $sectionIds)
@@ -66,7 +67,7 @@ class StudentController extends Controller
     {
         $user = Auth::user();
         $grades = Grade::with('subject')
-            ->where('student_id', $user->id)
+            ->where('student_id', $user->student?->id)
             ->get()
             ->groupBy('subject.name');
 

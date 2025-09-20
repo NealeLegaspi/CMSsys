@@ -26,4 +26,15 @@ class Student extends Model
     {
         return $this->hasMany(Enrollment::class);
     }
+    public function profile()
+    {
+        return $this->hasOneThrough(
+            UserProfile::class,
+            User::class,
+            'id',        // Foreign key on users table
+            'user_id',   // Foreign key on user_profiles table
+            'user_id',   // Local key on students table
+            'id'         // Local key on users table
+        );
+    }
 }

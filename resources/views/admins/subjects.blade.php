@@ -1,4 +1,4 @@
-@extends('layouts.registrar')
+@extends('layouts.admin')
 
 @section('title','Subjects')
 @section('header','Subjects')
@@ -16,7 +16,7 @@
     @include('partials.alerts')
 
     <!-- Search & Filter -->
-    <form method="GET" action="{{ route('registrars.subjects') }}" class="row g-2 mb-3">
+    <form method="GET" action="{{ route('admins.subjects') }}" class="row g-2 mb-3">
       <div class="col-md-5">
         <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Search subject...">
       </div>
@@ -34,7 +34,7 @@
         <button type="submit" class="btn btn-primary me-2">
           <i class="bi bi-search"></i>
         </button>
-        <a href="{{ route('registrars.subjects') }}" class="btn btn-secondary">
+        <a href="{{ route('admins.subjects') }}" class="btn btn-secondary">
           <i class="bi bi-arrow-clockwise"></i>
         </a>
       </div>
@@ -65,7 +65,7 @@
             </button>
 
             <!-- Delete -->
-            <form action="{{ route('registrars.subjects.destroy',$subj->id) }}" method="POST" class="d-inline">
+            <form action="{{ route('admins.subjects.destroy',$subj->id) }}" method="POST" class="d-inline">
               @csrf @method('DELETE')
               <button class="btn btn-sm btn-danger" onclick="return confirm('Delete subject?')">
                 <i class="bi bi-trash"></i>
@@ -77,7 +77,7 @@
         <!-- Edit Modal -->
         <div class="modal fade" id="editSubjectModal{{ $subj->id }}" tabindex="-1">
           <div class="modal-dialog">
-            <form method="POST" action="{{ route('registrars.subjects.update',$subj->id) }}">
+            <form method="POST" action="{{ route('admins.subjects.update',$subj->id) }}">
               @csrf @method('PUT')
               <div class="modal-content">
                 <div class="modal-header bg-warning text-dark">
@@ -125,7 +125,7 @@
 <!-- Add Modal -->
 <div class="modal fade" id="addSubjectModal" tabindex="-1">
   <div class="modal-dialog">
-    <form method="POST" action="{{ route('registrars.subjects.store') }}">
+    <form method="POST" action="{{ route('admins.subjects.store') }}">
       @csrf
       <div class="modal-content">
         <div class="modal-header bg-primary text-white">

@@ -77,7 +77,7 @@
             <tbody>
               @foreach($students as $student)
               <tr>
-                <td>{{ $student->lrn }}</td>
+                <td>{{ $student->student_number }}</td>
                 <td>{{ $student->user->profile->last_name }}</td>
                 <td>{{ $student->user->profile->first_name }}</td>
                 <td>{{ $student->user->profile->middle_name }}</td>
@@ -85,7 +85,7 @@
                 <td>{{ $student->user->profile->birthdate }}</td>
                 <td>{{ \Carbon\Carbon::parse($student->user->profile->birthdate)->age }}</td>
                 <td>{{ $student->user->profile->contact }}</td>
-                <td>{{ $student->section->gradeLevel->name }} - {{ $student->section->name }}</td>
+                <td>{{ $student->section?->gradeLevel?->name ?? 'N/A' }} - {{ $student->section?->name ?? '' }}</td>
                 <td>{{ $student->status ?? 'Enrolled' }}</td>
               </tr>
               @endforeach

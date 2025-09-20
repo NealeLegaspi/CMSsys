@@ -1,4 +1,4 @@
-@extends('layouts.registrar')
+@extends('layouts.admin')
 
 @section('title','School Year')
 @section('header','School Year')
@@ -16,7 +16,7 @@
     @include('partials.alerts')
 
     <!-- Search & Filter -->
-    <form method="GET" action="{{ route('registrars.schoolyear') }}" class="row g-2 mb-3">
+    <form method="GET" action="{{ route('admins.schoolyear') }}" class="row g-2 mb-3">
       <div class="col-md-6">
         <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Search school year...">
       </div>
@@ -29,7 +29,7 @@
       </div>
       <div class="col-md-3 d-flex">
         <button type="submit" class="btn btn-primary me-2"><i class="bi bi-search"></i></button>
-        <a href="{{ route('registrars.schoolyear') }}" class="btn btn-secondary"><i class="bi bi-arrow-clockwise"></i></a>
+        <a href="{{ route('admins.schoolyear') }}" class="btn btn-secondary"><i class="bi bi-arrow-clockwise"></i></a>
       </div>
     </form>
 
@@ -53,28 +53,32 @@
           <td>{{ $sy->end_date }}</td>
           <td>
             <span class="badge bg-{{ $sy->status === 'active' ? 'success' : 'secondary' }}">
-              {{ ucfirst($sy->status) }}
+              {{ $sy->status === 'active' ? 'Active' : 'Closed' }}
             </span>
           </td>
           <td>
-            <!-- Edit Button -->
+            <!-- Edit -->
             <button class="btn btn-sm btn-warning me-1" data-bs-toggle="modal" data-bs-target="#editSchoolYearModal{{ $sy->id }}">
               <i class="bi bi-pencil"></i>
             </button>
 
-            <!-- Delete Button (only for inactive) -->
+            <!-- Delete (only closed) -->
             @if($sy->status !== 'active')
-            <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteSchoolYearModal{{ $sy->id }}">
+            <button class="btn btn-sm btn-danger me-1" data-bs-toggle="modal" data-bs-target="#deleteSchoolYearModal{{ $sy->id }}">
               <i class="bi bi-trash"></i>
             </button>
             @endif
 
-            <!-- Close Button (only for active) -->
-            @if($sy->status === 'active')
-            <form action="{{ route('registrars.schoolyear.close',$sy->id) }}" method="POST" class="d-inline">
-              @csrf
-              <button class="btn btn-sm btn-secondary" onclick="return confirm('Close this school year?')">Close</button>
-            </form>
+            <!-- Activate -->
+            @if($sy->status !== 'active')
+            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#activateSchoolYearModal{{ $sy->id }}">
+              <i class="bi bi-check-circle"></i>
+            </button>
+            @else
+            <!-- Close -->
+            <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#closeSchoolYearModal{{ $sy->id }}">
+              <i class="bi bi-x-circle"></i>
+            </button>
             @endif
           </td>
         </tr>
@@ -82,7 +86,7 @@
         <!-- Edit Modal -->
         <div class="modal fade" id="editSchoolYearModal{{ $sy->id }}" tabindex="-1">
           <div class="modal-dialog">
-            <form method="POST" action="{{ route('registrars.schoolyear.update',$sy->id) }}">
+            <form method="POST" action="{{ route('admins.schoolyear.update',$sy->id) }}">
               @csrf @method('PUT')
               <div class="modal-content">
                 <div class="modal-header bg-warning text-dark">
@@ -111,7 +115,7 @@
         <!-- Delete Modal -->
         <div class="modal fade" id="deleteSchoolYearModal{{ $sy->id }}" tabindex="-1">
           <div class="modal-dialog">
-            <form method="POST" action="{{ route('registrars.schoolyear.destroy',$sy->id) }}">
+            <form method="POST" action="{{ route('admins.schoolyear.destroy',$sy->id) }}">
               @csrf @method('DELETE')
               <div class="modal-content">
                 <div class="modal-header bg-danger text-white">
@@ -127,6 +131,53 @@
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+        <!-- Activate Modal -->
+        <div class="modal fade" id="activateSchoolYearModal{{ $sy->id }}" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-check-circle me-2"></i> Activate School Year</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                Are you sure you want to <strong>activate</strong> 
+                <span class="text-success">{{ $sy->name }}</span>?  
+                This will automatically close the currently active school year.
+              </div>
+              <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ route('admins.schoolyear.close',$sy->id) }}">
+                  @csrf
+                  <button class="btn btn-success">Activate</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Close Modal -->
+        <div class="modal fade" id="closeSchoolYearModal{{ $sy->id }}" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title"><i class="bi bi-x-circle me-2"></i> Close School Year</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                Are you sure you want to <strong>close</strong> 
+                <span class="text-danger">{{ $sy->name }}</span>?  
+                Students will no longer be able to enroll under this school year.
+              </div>
+              <div class="modal-footer">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ route('admins.schoolyear.close',$sy->id) }}">
+                  @csrf
+                  <button class="btn btn-secondary">Close</button>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -145,7 +196,7 @@
 <!-- Add School Year Modal -->
 <div class="modal fade" id="addSchoolYearModal" tabindex="-1">
   <div class="modal-dialog">
-    <form method="POST" action="{{ route('registrars.schoolyear.store') }}">
+    <form method="POST" action="{{ route('admins.schoolyear.store') }}">
       @csrf
       <div class="modal-content">
         <div class="modal-header bg-primary text-white">

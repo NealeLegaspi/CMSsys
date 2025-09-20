@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Exports;
 
 use App\Models\Enrollment;
@@ -10,22 +9,20 @@ class EnrollmentsExport implements FromCollection, WithHeadings
 {
     public function collection()
     {
-        return Enrollment::with(['student.user.profile','section','schoolYear'])
+        return Enrollment::with(['student.user.profile', 'section', 'schoolYear'])
             ->get()
-            ->map(function ($enrollment) {
+            ->map(function ($e) {
                 return [
-                    'Student Number' => $enrollment->student->student_number ?? '',
-                    'Student Name'   => optional($enrollment->student->user->profile)->first_name . ' ' .
-                                       optional($enrollment->student->user->profile)->last_name,
-                    'Section'        => $enrollment->section->name ?? '',
-                    'School Year'    => $enrollment->schoolYear->name ?? '',
-                    'Status'         => $enrollment->status,
+                    'LRN'         => $e->student->student_number,
+                    'Name'        => $e->student->user->profile->first_name . ' ' . $e->student->user->profile->last_name,
+                    'Section'     => $e->section->name ?? 'N/A',
+                    'School Year' => $e->schoolYear->name ?? 'N/A',
                 ];
             });
     }
 
     public function headings(): array
     {
-        return ['Student Number', 'Student Name', 'Section', 'School Year', 'Status'];
+        return ['LRN', 'Student Name', 'Section', 'School Year'];
     }
 }

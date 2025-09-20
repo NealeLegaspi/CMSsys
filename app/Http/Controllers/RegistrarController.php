@@ -19,6 +19,8 @@ use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\StudentsExport;
 use App\Imports\StudentsImport;
+use App\Exports\EnrollmentsExport;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class RegistrarController extends Controller
 {
@@ -42,7 +44,6 @@ class RegistrarController extends Controller
         $studentCount = User::where('role_id', 4)->count();
         $teacherCount = User::where('role_id', 3)->count();
         $sectionCount = Section::count();
-        $schoolYear   = SchoolYear::where('status', 'active')->latest()->first();
 
         // Students per Section (for bar chart)
         $sections = Section::pluck('name');
@@ -58,7 +59,7 @@ class RegistrarController extends Controller
         ];
 
         return view('registrars.dashboard', compact(
-            'studentCount', 'teacherCount', 'sectionCount', 'schoolYear',
+            'studentCount', 'teacherCount', 'sectionCount',
             'sections', 'totals', 'genderLabels', 'genderData'
         ));
     }
@@ -117,7 +118,7 @@ class RegistrarController extends Controller
         DB::transaction(function () use ($request, &$studentNumber) {
             $user = User::create([
                 'email'    => $request->email,
-                'password' => bcrypt('password123'), // TODO: Replace with reset system
+                'password' => bcrypt('password123'),
                 'role_id'  => 4,
             ]);
 
@@ -199,13 +200,31 @@ class RegistrarController extends Controller
     /**
      * Enrollment
      */
-    public function enrollment()
+    public function enrollment(Request $request)
     {
         $schoolYears = SchoolYear::all();
         $students    = Student::with('user.profile')->get();
         $sections    = Section::with('gradeLevel')->get();
-        $enrollments = Enrollment::with(['student.profile', 'section', 'schoolYear'])
-            ->latest()->paginate(10);
+
+        $query = Enrollment::with(['student.user.profile', 'section', 'schoolYear']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->whereHas('student.user.profile', function ($q) use ($search) {
+                $q->where('first_name', 'like', "%$search%")
+                ->orWhere('last_name', 'like', "%$search%");
+            })->orWhereHas('student', function ($q) use ($search) {
+                $q->where('student_number', 'like', "%$search%");
+            })->orWhereHas('section', function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%");
+            });
+        }
+
+        if ($request->filled('school_year_id')) {
+            $query->where('school_year_id', $request->school_year_id);
+        }
+
+        $enrollments = $query->latest()->paginate(10);
 
         return view('registrars.enrollment', compact('students', 'sections', 'schoolYears', 'enrollments'));
     }
@@ -217,13 +236,11 @@ class RegistrarController extends Controller
             'section_id' => 'required|exists:sections,id',
         ]);
 
-        // check active school year
         $activeSY = SchoolYear::where('status', 'active')->first();
         if (!$activeSY) {
             return back()->withErrors(['school_year' => 'No active school year found.']);
         }
 
-        // prevent duplicate enrollment
         $exists = Enrollment::where('student_id', $request->student_id)
             ->where('school_year_id', $activeSY->id)
             ->exists();
@@ -232,7 +249,6 @@ class RegistrarController extends Controller
             return back()->withErrors(['student_id' => 'This student is already enrolled in the active school year.']);
         }
 
-        // check section capacity (if applicable)
         $section = Section::findOrFail($request->section_id);
         if ($section->capacity) {
             $count = Enrollment::where('section_id', $section->id)
@@ -266,6 +282,20 @@ class RegistrarController extends Controller
         return back()->with('success', 'Enrollment record deleted.');
     }
 
+        public function exportCsv()
+    {
+        return Excel::download(new EnrollmentsExport, 'enrollments.csv');
+    }
+
+    public function exportPdf()
+    {
+        $enrollments = Enrollment::with(['student.user.profile', 'section', 'schoolYear'])->get();
+
+        $pdf = Pdf::loadView('exports.enrollment-pdf', compact('enrollments'))
+                  ->setPaper('a4', 'landscape');
+
+        return $pdf->download('enrollments.pdf');
+    }
     /**
      * Sections
      */
@@ -273,17 +303,14 @@ class RegistrarController extends Controller
     {
         $query = Section::with('gradeLevel', 'schoolYear');
 
-        // 🔍 Search by section name
         if ($request->filled('search')) {
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
-        // 🎓 Filter by grade level
         if ($request->filled('gradelevel_id')) {
             $query->where('gradelevel_id', $request->gradelevel_id);
         }
 
-        // 🏫 Filter by school year
         if ($request->filled('school_year_id')) {
             $query->where('school_year_id', $request->school_year_id);
         }
@@ -291,19 +318,22 @@ class RegistrarController extends Controller
         $sections    = $query->paginate(10)->withQueryString();
         $gradeLevels = GradeLevel::all();
         $schoolYears = SchoolYear::all();
+        $teachers    = User::where('role_id', 3)->with('profile')->get();
 
-        return view('registrars.sections', compact('sections', 'gradeLevels', 'schoolYears'));
+        return view('registrars.sections', compact('sections', 'gradeLevels', 'schoolYears', 'teachers'));
     }
 
     public function storeSection(Request $request)
     {
         $request->validate([
-            'name'           => 'required|string|max:100|unique:sections,name',
+            'name'           => 'required|string|max:100|unique:sections,name,' . ($section->id ?? 'NULL'),
             'gradelevel_id'  => 'required|exists:grade_levels,id',
             'school_year_id' => 'required|exists:school_years,id',
+            'adviser_id'     => 'nullable|exists:users,id',
+            'capacity'       => 'required|integer|min:10|max:100',
         ]);
 
-        Section::create($request->only('name', 'gradelevel_id', 'school_year_id'));
+        Section::create($request->only('name', 'gradelevel_id', 'school_year_id', 'adviser_id', 'capacity'));
 
         $this->logActivity('Add Section', "Added section {$request->name}");
 
@@ -315,12 +345,14 @@ class RegistrarController extends Controller
         $section = Section::findOrFail($id);
 
         $request->validate([
-            'name'           => 'required|string|max:100|unique:sections,name,' . $section->id,
+            'name'           => 'required|string|max:100|unique:sections,name,' . ($section->id ?? 'NULL'),
             'gradelevel_id'  => 'required|exists:grade_levels,id',
             'school_year_id' => 'required|exists:school_years,id',
+            'adviser_id'     => 'nullable|exists:users,id',
+            'capacity'       => 'required|integer|min:10|max:100',
         ]);
 
-        $section->update($request->only('name', 'gradelevel_id', 'school_year_id'));
+        Section::create($request->only('name', 'gradelevel_id', 'school_year_id', 'adviser_id', 'capacity'));
 
         $this->logActivity('Update Section', "Updated section {$section->name}");
 
@@ -331,7 +363,6 @@ class RegistrarController extends Controller
     {
         $section = Section::findOrFail($id);
 
-        // 🚫 Prevent deleting sections that already have enrollments
         if ($section->enrollments()->exists()) {
             return back()->withErrors(['msg' => 'Cannot delete section with enrolled students.']);
         }
@@ -341,56 +372,6 @@ class RegistrarController extends Controller
         $this->logActivity('Delete Section', "Deleted section {$section->name}");
 
         return back()->with('success', 'Section deleted.');
-    }
-
-    /**
-     * Subjects
-     */
-    public function subjects()
-    {
-        $subjects    = Subject::with('gradeLevel')->paginate(10);
-        $gradeLevels = GradeLevel::all();
-        return view('registrars.subjects', compact('subjects', 'gradeLevels'));
-    }
-
-    public function storeSubject(Request $request)
-    {
-        $request->validate([
-            'name'           => 'required|string|max:100|unique:subjects,name',
-            'grade_level_id' => 'required|exists:grade_levels,id',
-        ]);
-
-        Subject::create($request->only('name', 'grade_level_id'));
-
-        $this->logActivity('Add Subject', "Added subject {$request->name}");
-
-        return back()->with('success', 'Subject added.');
-    }
-
-    public function updateSubject(Request $request, $id)
-    {
-        $subject = Subject::findOrFail($id);
-
-        $request->validate([
-            'name'           => ['required', 'string', 'max:100', Rule::unique('subjects', 'name')->ignore($subject->id)],
-            'grade_level_id' => 'required|exists:grade_levels,id',
-        ]);
-
-        $subject->update($request->only('name', 'grade_level_id'));
-
-        $this->logActivity('Update Subject', "Updated subject {$subject->name}");
-
-        return back()->with('success', 'Subject updated.');
-    }
-
-    public function destroySubject($id)
-    {
-        $subject = Subject::findOrFail($id);
-        $subject->delete();
-
-        $this->logActivity('Delete Subject', "Deleted subject {$subject->name}");
-
-        return back()->with('success', 'Subject deleted.');
     }
 
     /**
@@ -497,87 +478,6 @@ class RegistrarController extends Controller
     {
         $teacher = User::where('role_id', 3)->with('profile')->findOrFail($id);
         return response()->json($teacher);
-    }
-
-    /**
-     * School Year
-     */
-    public function schoolYear(Request $request)
-    {
-        $search = $request->input('search');
-        $status = $request->input('status');
-
-        $schoolYears = SchoolYear::latest()
-            ->when($search, fn($q) => $q->where('name', 'like', "%$search%"))
-            ->when($status, fn($q) => $q->where('status', $status))
-            ->paginate(10);
-
-        return view('registrars.schoolyear', compact('schoolYears'));
-    }
-
-    public function storeSchoolYear(Request $request)
-    {
-        $request->validate([
-            'start_date' => 'required|date',
-            'end_date'   => 'required|date|after_or_equal:start_date',
-            'name'       => 'nullable|string|max:100|unique:school_years,name',
-        ]);
-
-        $name = $request->name ?? $request->start_date . ' - ' . $request->end_date;
-
-        SchoolYear::create([
-            'name'       => $name,
-            'start_date' => $request->start_date,
-            'end_date'   => $request->end_date,
-            'status'     => 'inactive', 
-        ]);
-
-        $this->logActivity('Add School Year', "Added school year {$name}");
-
-        return back()->with('success', 'School year added.');
-    }
-
-    public function updateSchoolYear(Request $request, $id)
-    {
-        $sy = SchoolYear::findOrFail($id);
-
-        $request->validate([
-            'start_date' => 'required|date',
-            'end_date'   => 'required|date|after_or_equal:start_date',
-        ]);
-
-        $sy->update([
-            'start_date' => $request->start_date,
-            'end_date'   => $request->end_date,
-            'name'       => $request->name ?? $request->start_date . ' - ' . $request->end_date,
-        ]);
-
-        $this->logActivity('Update School Year', "Updated school year {$sy->name}");
-
-        return back()->with('success', 'School year updated.');
-    }
-
-    public function destroySchoolYear($id)
-    {
-        $sy = SchoolYear::findOrFail($id);
-        $syName = $sy->name;
-        $sy->delete();
-
-        $this->logActivity('Delete School Year', "Deleted school year {$syName}");
-
-        return back()->with('success', 'School year deleted.');
-    }
-
-
-    public function closeSchoolYear($id)
-    {
-        $sy = SchoolYear::findOrFail($id);
-        SchoolYear::where('status', 'active')->update(['status' => 'closed']);
-        $sy->update(['status' => 'active']);
-
-        $this->logActivity('Change Active School Year', "Changed active school year to {$sy->name}");
-
-        return back()->with('success', 'Active school year updated.');
     }
 
     /**

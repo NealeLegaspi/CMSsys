@@ -45,6 +45,7 @@
       </div>
     </form>
 
+    <!-- 📋 Sections Table -->
     <table class="table table-bordered table-striped align-middle">
       <thead class="table-primary">
         <tr>
@@ -52,6 +53,8 @@
           <th>Name</th>
           <th>Grade Level</th>
           <th>School Year</th>
+          <th>Adviser</th>
+          <th>Capacity</th>
           <th width="140">Actions</th>
         </tr>
       </thead>
@@ -62,6 +65,8 @@
           <td>{{ $sec->name }}</td>
           <td>{{ $sec->gradeLevel->name ?? '-' }}</td>
           <td>{{ $sec->schoolYear->name ?? ($sec->schoolYear ? $sec->schoolYear->start_date.' - '.$sec->schoolYear->end_date : '-') }}</td>
+          <td>{{ optional($sec->adviser->profile)->first_name }} {{ optional($sec->adviser->profile)->last_name }}</td>
+          <td>{{ $sec->capacity ?? '∞' }}</td>
           <td class="d-flex gap-1">
             <!-- Edit Button -->
             <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editSectionModal{{ $sec->id }}">
@@ -94,7 +99,6 @@
                   <div class="mb-3">
                     <label class="form-label">Grade Level</label>
                     <select name="gradelevel_id" class="form-select" required>
-                      <option value="">-- Choose --</option>
                       @foreach($gradeLevels as $gl)
                         <option value="{{ $gl->id }}" {{ $gl->id==$sec->gradelevel_id ? 'selected' : '' }}>
                           {{ $gl->name }}
@@ -105,13 +109,27 @@
                   <div class="mb-3">
                     <label class="form-label">School Year</label>
                     <select name="school_year_id" class="form-select" required>
-                      <option value="">-- Choose --</option>
                       @foreach($schoolYears as $sy)
                         <option value="{{ $sy->id }}" {{ $sy->id==$sec->school_year_id ? 'selected' : '' }}>
                           {{ $sy->name ?? ($sy->start_date . ' - ' . $sy->end_date) }}
                         </option>
                       @endforeach
                     </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Adviser</label>
+                    <select name="adviser_id" class="form-select">
+                      <option value="">-- None --</option>
+                      @foreach($teachers as $teacher)
+                        <option value="{{ $teacher->id }}" {{ $teacher->id==$sec->adviser_id ? 'selected' : '' }}>
+                          {{ $teacher->profile->first_name }} {{ $teacher->profile->last_name }}
+                        </option>
+                      @endforeach
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Capacity</label>
+                    <input type="number" name="capacity" class="form-control" min="1" value="{{ old('capacity',$sec->capacity) }}">
                   </div>
                 </div>
                 <div class="modal-footer">
@@ -123,7 +141,7 @@
           </div>
         </div>
         @empty
-        <tr><td colspan="5" class="text-center text-muted">No sections yet.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted">No sections yet.</td></tr>
         @endforelse
       </tbody>
     </table>
@@ -144,7 +162,7 @@
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">Name</label>
-            <input type="text" class="form-control" name="name" value="{{ old('name') }}" required>
+            <input type="text" class="form-control" name="name" required>
           </div>
           <div class="mb-3">
             <label class="form-label">Grade Level</label>
@@ -163,6 +181,19 @@
                 <option value="{{ $sy->id }}">{{ $sy->name ?? ($sy->start_date . ' - ' . $sy->end_date) }}</option>
               @endforeach
             </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Adviser</label>
+            <select name="adviser_id" class="form-select">
+              <option value="">-- None --</option>
+              @foreach($teachers as $teacher)
+                <option value="{{ $teacher->id }}">{{ $teacher->profile->first_name }} {{ $teacher->profile->last_name }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Capacity</label>
+            <input type="number" name="capacity" class="form-control" min="1" placeholder="e.g. 40">
           </div>
         </div>
         <div class="modal-footer">

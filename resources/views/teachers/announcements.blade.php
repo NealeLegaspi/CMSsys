@@ -1,7 +1,7 @@
 @extends('layouts.teacher')
 
-@section('title','My Announcements')
-@section('header','My Announcements')
+@section('title','Announcements')
+@section('header','Announcements')
 
 @section('content')
 <div class="container my-4">
@@ -69,7 +69,6 @@
 
     <!-- My Announcements Tab -->
     <div class="tab-pane fade" id="my" role="tabpanel">
-
       <!-- Search + Filter -->
       <div class="card shadow-sm border-0 mb-3">
         <div class="card-body">
@@ -97,7 +96,7 @@
 
       @if($myAnnouncements->count() > 0)
         @foreach($myAnnouncements as $ann)
-          <div class="card shadow-sm border-0 rounded-3 mb-3" id="announcementCard{{ $ann->id }}">
+          <div class="card shadow-sm border-0 rounded-3 mb-3">
             <div class="card-header bg-light d-flex align-items-center">
               <i class="bi bi-megaphone text-primary fs-5 me-2"></i>
               <h6 class="fw-bold mb-0">{{ $ann->title }}</h6>
@@ -106,26 +105,15 @@
               <p class="mb-2">{{ $ann->content }}</p>
               <small class="text-secondary d-block">
                 <i class="bi bi-calendar-event"></i> {{ $ann->created_at->format('M d, Y h:i A') }}
-                @if($ann->section)
-                  | <i class="bi bi-people"></i> Section: {{ $ann->section->name }}
-                @else
-                  | <i class="bi bi-globe"></i> All Sections
-                @endif
+                | <i class="bi bi-people"></i> Section: {{ $ann->section->name ?? 'N/A' }}
               </small>
-
               <div class="mt-3 d-flex gap-2">
-                <!-- Edit Button -->
                 <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editModal{{ $ann->id }}">
                   <i class="bi bi-pencil"></i> Edit
                 </button>
-
-                <!-- Delete -->
-                <form action="{{ route('teachers.announcements.destroy',$ann) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this announcement?')">
-                  @csrf
-                  @method('DELETE')
-                 <!-- Delete Button -->
-                  <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ $ann->id }}"><i class="bi bi-trash"></i> Delete</button>
-                </form>
+                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ $ann->id }}">
+                  <i class="bi bi-trash"></i> Delete
+                </button>
               </div>
             </div>
           </div>
@@ -160,19 +148,18 @@
           </div>
 
           <!-- Delete Modal -->
-          <div class="modal fade" id="deleteModal{{ $ann->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $ann->id }}" aria-hidden="true">
+          <div class="modal fade" id="deleteModal{{ $ann->id }}" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
               <div class="modal-content">
                 <div class="modal-header bg-danger text-white">
-                  <h5 class="modal-title" id="deleteModalLabel{{ $ann->id }}"><i class="bi bi-exclamation-triangle"></i> Confirm Delete</h5>
+                  <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Delete</h5>
                   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                  Are you sure you want to delete the announcement?  
-                  This action cannot be undone.
+                  Are you sure you want to delete this announcement?
                 </div>
                 <div class="modal-footer">
-                  <form action="{{ route('teachers.announcements.destroy',$ann) }}" method="POST">
+                  <form method="POST" action="{{ route('teachers.announcements.destroy',$ann) }}">
                     @csrf
                     @method('DELETE')
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -184,11 +171,9 @@
           </div>
         @endforeach
 
-        <!-- Pagination -->
         <div class="mt-3">
           {{ $myAnnouncements->appends(request()->query())->links('pagination::bootstrap-5') }}
         </div>
-
       @else
         <div class="card shadow-sm border-0 text-center p-4">
           <p class="text-muted mb-0"><i class="bi bi-exclamation-circle"></i> No announcements found.</p>

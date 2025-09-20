@@ -47,6 +47,14 @@
        class="nav-link {{ request()->routeIs('admins.announcements*') ? 'active' : '' }}">
        <i class="bi bi-megaphone me-2"></i> Announcements
     </a>
+    <a href="{{ route('admins.schoolyear') }}" 
+       class="nav-link {{ request()->routeIs('admins.schoolyear') ? 'active' : '' }}">
+       <i class='bx bx-calendar me-2'></i> School Year
+    </a>
+    <a href="{{ route('admins.subjects') }}" 
+       class="nav-link {{ request()->routeIs('admins.subjects') ? 'active' : '' }}">
+       <i class='bx bx-book me-2'></i> Subjects
+    </a>
     <a href="{{ route('admins.users') }}" 
        class="nav-link {{ request()->routeIs('admins.users') ? 'active' : '' }}">
        <i class="bx bx-user me-2"></i> Users

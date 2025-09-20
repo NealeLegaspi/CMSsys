@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use App\Models\User;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -25,18 +26,25 @@ class AuthenticatedSessionController extends Controller
 
     public function store(LoginRequest $request)
     {
-        $request->authenticate();
+        $user = User::where('email', $request->email)->first();
 
+        if ($user && $user->status !== 'active') {
+            return back()->withErrors([
+                'email' => 'Your account has been deactivated. Please contact the administrator.',
+            ]);
+        }
+
+        $request->authenticate();
         $request->session()->regenerate();
 
         $user = Auth::user();
 
         return match ($user->role->name) {
-            'Admin' => redirect()->route('admins.dashboard'),
+            'Admin'     => redirect()->route('admins.dashboard'),
             'Registrar' => redirect()->route('registrars.dashboard'),
-            'Teacher' => redirect()->route('teachers.dashboard'),
-            'Student' => redirect()->route('students.dashboard'),
-            default => redirect()->route('dashboard'),
+            'Teacher'   => redirect()->route('teachers.dashboard'),
+            'Student'   => redirect()->route('students.dashboard'),
+            default     => redirect()->route('dashboard'),
         };
     }
 

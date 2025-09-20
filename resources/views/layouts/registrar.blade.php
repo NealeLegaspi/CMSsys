@@ -54,17 +54,9 @@
        class="nav-link {{ request()->routeIs('registrars.sections') ? 'active' : '' }}">
        <i class='bx bx-grid-alt me-2'></i> Sections
     </a>
-    <a href="{{ route('registrars.subjects') }}" 
-       class="nav-link {{ request()->routeIs('registrars.subjects') ? 'active' : '' }}">
-       <i class='bx bx-book me-2'></i> Subjects
-    </a>
     <a href="{{ route('registrars.teachers') }}" 
        class="nav-link {{ request()->routeIs('registrars.teachers') ? 'active' : '' }}">
        <i class='bx bx-chalkboard me-2'></i> Teachers
-    </a>
-    <a href="{{ route('registrars.schoolyear') }}" 
-       class="nav-link {{ request()->routeIs('registrars.schoolyear') ? 'active' : '' }}">
-       <i class='bx bx-calendar me-2'></i> School Year
     </a>
     <a href="{{ route('registrars.reports') }}" 
        class="nav-link {{ request()->routeIs('registrars.reports') ? 'active' : '' }}">

@@ -34,7 +34,7 @@
                 Total Students: <span class="fw-semibold">{{ count($studentsMale ?? []) + count($studentsFemale ?? []) }}</span>
               </p>
             </div>
-            <a href="{{ route('teacher.classlist.export') }}" class="btn btn-sm btn-outline-primary">
+            <a href="{{ route('teachers.classlist.export') }}" class="btn btn-sm btn-outline-primary">
               <i class="bi bi-file-earmark-pdf"></i> Export to PDF
             </a>
           </div>

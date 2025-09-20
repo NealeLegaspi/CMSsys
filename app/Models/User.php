@@ -47,11 +47,6 @@ class User extends Authenticatable
         });
     }
 
-    public function enrollments()
-    {
-        return $this->hasMany(Enrollment::class, 'student_id');
-    }
-
     public function announcements()
     {
         return $this->hasMany(Announcement::class, 'posted_by');
@@ -71,12 +66,18 @@ class User extends Authenticatable
                     ->withPivot('section_id')
                     ->withTimestamps();
     }
-    public function section()
-    {
-        return $this->belongsTo(Section::class, 'section_id');
-    }
+
     public function student()
     {
         return $this->hasOne(Student::class, 'user_id');
+    }
+
+    public function getFullNameAttribute()
+    {
+        if ($this->profile) {
+            return trim("{$this->profile->first_name} {$this->profile->last_name}");
+        }
+
+        return $this->email ?? 'Unknown User';
     }
 }
