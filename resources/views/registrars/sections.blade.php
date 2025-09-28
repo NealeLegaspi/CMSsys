@@ -5,12 +5,14 @@
 
 @section('content')
 <div class="card card-custom shadow-sm border-0">
+  <!-- Header -->
   <div class="card-header d-flex justify-content-between align-items-center bg-light">
     <h6 class="fw-bold mb-0">📚 Sections</h6>
     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSectionModal">
       <i class="bi bi-plus-circle me-1"></i> Add Section
     </button>
   </div>
+
   <div class="card-body">
     @include('partials.alerts')
 
@@ -55,7 +57,7 @@
           <th>School Year</th>
           <th>Adviser</th>
           <th>Capacity</th>
-          <th width="140">Actions</th>
+          <th width="200">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -63,12 +65,17 @@
         <tr>
           <td>{{ $i+1 }}</td>
           <td>{{ $sec->name }}</td>
-          <td>{{ $sec->gradeLevel->name ?? '-' }}</td>
-          <td>{{ $sec->schoolYear->name ?? ($sec->schoolYear ? $sec->schoolYear->start_date.' - '.$sec->schoolYear->end_date : '-') }}</td>
+          <td>{{ optional($sec->gradeLevel)->name ?? '-' }}</td>
+          <td>{{ optional($sec->schoolYear)->name ?? (optional($sec->schoolYear)->start_date.' - '.optional($sec->schoolYear)->end_date) }}</td>
           <td>{{ optional($sec->adviser->profile)->first_name }} {{ optional($sec->adviser->profile)->last_name }}</td>
           <td>{{ $sec->capacity ?? '∞' }}</td>
           <td class="d-flex gap-1">
-            <!-- Edit Button -->
+            <!-- Assign Subjects -->
+            <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#assignSubjectModal{{ $sec->id }}">
+              <i class="bi bi-book"></i>
+            </button>
+
+            <!-- Edit -->
             <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editSectionModal{{ $sec->id }}">
               <i class="bi bi-pencil-square"></i>
             </button>
@@ -140,11 +147,78 @@
             </form>
           </div>
         </div>
+
+        <!-- Assign Subject Modal -->
+        <div class="modal fade" id="assignSubjectModal{{ $sec->id }}" tabindex="-1">
+          <div class="modal-dialog">
+            <form method="POST" action="{{ route('registrars.sections.assign',$sec->id) }}">
+              @csrf
+              <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                  <h5 class="modal-title"><i class="bi bi-book me-2"></i> Assign Subject to Teacher</h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="mb-3">
+                    <label class="form-label">Teacher</label>
+                    <select name="teacher_id" class="form-select" required>
+                      <option value="">-- Select Teacher --</option>
+                      @foreach($teachers as $teacher)
+                        <option value="{{ $teacher->id }}">
+                          {{ $teacher->profile->first_name }} {{ $teacher->profile->last_name }}
+                        </option>
+                      @endforeach
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Subject</label>
+                    <select name="subject_id" class="form-select" required>
+                      <option value="">-- Select Subject --</option>
+                      @foreach($subjects as $subj)
+                        <option value="{{ $subj->id }}">{{ $subj->name }}</option>
+                      @endforeach
+                    </select>
+                  </div>
+
+                  <!-- Already Assigned -->
+                  <h6 class="mt-4">Already Assigned</h6>
+                  <table class="table table-sm table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Subject</th>
+                        <th>Teacher</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @forelse($sec->teachers as $t)
+                        @php
+                          $subj = $subjects->firstWhere('id',$t->pivot->subject_id);
+                        @endphp
+                        <tr>
+                          <td>{{ $subj->name ?? '-' }}</td>
+                          <td>{{ $t->profile->first_name }} {{ $t->profile->last_name }}</td>
+                        </tr>
+                      @empty
+                        <tr><td colspan="2" class="text-center text-muted">No subjects assigned yet.</td></tr>
+                      @endforelse
+                    </tbody>
+                  </table>
+                </div>
+                <div class="modal-footer">
+                  <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <button class="btn btn-info text-white">Assign</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
         @empty
         <tr><td colspan="7" class="text-center text-muted">No sections yet.</td></tr>
         @endforelse
       </tbody>
     </table>
+
+    <!-- Pagination -->
     <div class="mt-3">{{ $sections->appends(request()->query())->links('pagination::bootstrap-5') }}</div>
   </div>
 </div>

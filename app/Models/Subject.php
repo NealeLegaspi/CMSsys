@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -19,8 +18,15 @@ class Subject extends Model
 
     public function teachers()
     {
-        return $this->belongsToMany(User::class, 'subject_teacher')
+        return $this->belongsToMany(User::class, 'subject_teacher', 'subject_id', 'teacher_id')
                     ->withPivot('section_id')
+                    ->withTimestamps();
+    }
+
+    public function sections()
+    {
+        return $this->belongsToMany(Section::class, 'subject_teacher')
+                    ->withPivot('teacher_id')
                     ->withTimestamps();
     }
 

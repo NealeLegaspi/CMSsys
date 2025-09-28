@@ -32,6 +32,16 @@
       <a href="{{ route('registrars.sections') }}" class="text-decoration-none">Manage Sections →</a>
     </div>
   </div>
+
+  <div class="col-md-3">
+    <div class="card card-custom shadow-sm border-0 p-3 text-center">
+      <h6 class="fw-bold text-muted">📅 Active S.Y.</h6>
+      <p class="fs-6 fw-bold text-danger mb-1">
+        {{ $activeSY->name ?? 'None' }}
+      </p>
+      <small>Current School Year</small>
+    </div>
+  </div>
 </div>
 
 <!-- Charts -->

@@ -44,6 +44,7 @@ class RegistrarController extends Controller
         $studentCount = User::where('role_id', 4)->count();
         $teacherCount = User::where('role_id', 3)->count();
         $sectionCount = Section::count();
+        $activeSY = SchoolYear::where('status', 'active')->first();
 
         // Students per Section (for bar chart)
         $sections = Section::pluck('name');
@@ -60,7 +61,7 @@ class RegistrarController extends Controller
 
         return view('registrars.dashboard', compact(
             'studentCount', 'teacherCount', 'sectionCount',
-            'sections', 'totals', 'genderLabels', 'genderData'
+            'sections', 'totals', 'genderLabels', 'genderData', 'activeSY'
         ));
     }
 
@@ -272,6 +273,46 @@ class RegistrarController extends Controller
         return back()->with('success', 'Student enrolled successfully!');
     }
 
+    public function updateEnrollment(Request $request, $id)
+    {
+        $enrollment = Enrollment::findOrFail($id);
+
+        $request->validate([
+            'section_id' => 'required|exists:sections,id',
+            'school_year_id' => 'required|exists:school_years,id',
+        ]);
+
+        $exists = Enrollment::where('student_id', $enrollment->student_id)
+            ->where('school_year_id', $request->school_year_id)
+            ->where('id', '!=', $id)
+            ->exists();
+
+        if ($exists) {
+            return back()->withErrors(['student_id' => 'This student is already enrolled in the selected school year.']);
+        }
+
+        $section = Section::findOrFail($request->section_id);
+        if ($section->capacity) {
+            $count = Enrollment::where('section_id', $section->id)
+                ->where('school_year_id', $request->school_year_id)
+                ->count();
+
+            if ($count >= $section->capacity && $enrollment->section_id != $section->id) {
+                return back()->withErrors(['section_id' => 'This section has reached maximum capacity.']);
+            }
+        }
+
+        $enrollment->update([
+            'section_id'     => $request->section_id,
+            'school_year_id' => $request->school_year_id,
+        ]);
+
+        $this->logActivity('Update Enrollment', "Updated enrollment ID {$id}");
+
+        return back()->with('success', 'Enrollment updated successfully!');
+    }
+
+
     public function destroyEnrollment($id)
     {
         $enrollment = Enrollment::findOrFail($id);
@@ -301,7 +342,7 @@ class RegistrarController extends Controller
      */
     public function sections(Request $request)
     {
-        $query = Section::with('gradeLevel', 'schoolYear');
+        $query = Section::with(['gradeLevel', 'schoolYear', 'adviser.profile']);
 
         if ($request->filled('search')) {
             $query->where('name', 'like', '%' . $request->search . '%');
@@ -320,13 +361,15 @@ class RegistrarController extends Controller
         $schoolYears = SchoolYear::all();
         $teachers    = User::where('role_id', 3)->with('profile')->get();
 
-        return view('registrars.sections', compact('sections', 'gradeLevels', 'schoolYears', 'teachers'));
+        $subjects = Subject::with('gradeLevel')->orderBy('grade_level_id')->orderBy('name')->get();
+
+        return view('registrars.sections', compact('sections', 'gradeLevels', 'schoolYears', 'teachers', 'subjects'));
     }
 
     public function storeSection(Request $request)
     {
         $request->validate([
-            'name'           => 'required|string|max:100|unique:sections,name,' . ($section->id ?? 'NULL'),
+            'name'           => 'required|string|max:100|unique:sections,name',
             'gradelevel_id'  => 'required|exists:grade_levels,id',
             'school_year_id' => 'required|exists:school_years,id',
             'adviser_id'     => 'nullable|exists:users,id',
@@ -337,7 +380,7 @@ class RegistrarController extends Controller
 
         $this->logActivity('Add Section', "Added section {$request->name}");
 
-        return back()->with('success', 'Section added.');
+        return back()->with('success', 'Section added successfully.');
     }
 
     public function updateSection(Request $request, $id)
@@ -345,18 +388,18 @@ class RegistrarController extends Controller
         $section = Section::findOrFail($id);
 
         $request->validate([
-            'name'           => 'required|string|max:100|unique:sections,name,' . ($section->id ?? 'NULL'),
+            'name'           => 'required|string|max:100|unique:sections,name,' . $section->id,
             'gradelevel_id'  => 'required|exists:grade_levels,id',
             'school_year_id' => 'required|exists:school_years,id',
             'adviser_id'     => 'nullable|exists:users,id',
             'capacity'       => 'required|integer|min:10|max:100',
         ]);
 
-        Section::create($request->only('name', 'gradelevel_id', 'school_year_id', 'adviser_id', 'capacity'));
+        $section->update($request->only('name', 'gradelevel_id', 'school_year_id', 'adviser_id', 'capacity'));
 
         $this->logActivity('Update Section', "Updated section {$section->name}");
 
-        return back()->with('success', 'Section updated.');
+        return back()->with('success', 'Section updated successfully.');
     }
 
     public function destroySection($id)
@@ -364,14 +407,18 @@ class RegistrarController extends Controller
         $section = Section::findOrFail($id);
 
         if ($section->enrollments()->exists()) {
-            return back()->withErrors(['msg' => 'Cannot delete section with enrolled students.']);
+            return back()->withErrors(['msg' => '❌ Cannot delete section with enrolled students.']);
         }
 
+        $section->adviser_id = null;
+        $section->save();
+
+        $name = $section->name;
         $section->delete();
 
-        $this->logActivity('Delete Section', "Deleted section {$section->name}");
+        $this->logActivity('Delete Section', "Deleted section {$name}");
 
-        return back()->with('success', 'Section deleted.');
+        return back()->with('success', '✅ Section deleted successfully.');
     }
 
     /**
@@ -480,6 +527,37 @@ class RegistrarController extends Controller
         return response()->json($teacher);
     }
 
+    public function assignSubject(Request $request, Section $section)
+    {
+        $request->validate([
+            'subject_id' => 'required|exists:subjects,id',
+            'teacher_id' => 'required|exists:users,id',
+        ]);
+
+        $teacher = User::findOrFail($request->teacher_id);
+
+        // extra safety: ensure selected user is actually a teacher role
+        if ($teacher->role_id != 3) {
+            return back()->withErrors(['teacher_id' => 'Selected user is not a teacher.']);
+        }
+
+        \DB::table('subject_teacher')->updateOrInsert(
+            [
+                'section_id' => $section->id,
+                'subject_id' => $request->subject_id,
+            ],
+            [
+                'teacher_id' => $request->teacher_id,
+                'updated_at' => now(),
+                'created_at' => now(), 
+            ]
+        );
+
+        $this->logActivity('Assign Subject', "Assigned subject ID {$request->subject_id} to teacher ID {$request->teacher_id} for section {$section->id}");
+
+        return back()->with('success', 'Subject assigned to teacher successfully.');
+    }
+
     /**
      * Reports
      */
@@ -488,9 +566,47 @@ class RegistrarController extends Controller
         $students = User::where('role_id', 4)->count();
         $teachers = User::where('role_id', 3)->count();
         $sections = Section::count();
-        $activeSY = SchoolYear::where('status', 'active')->count();
+        $activeSY = SchoolYear::where('status', 'active')->first();
 
-        return view('registrars.reports', compact('students', 'teachers', 'sections', 'activeSY'));
+        $enrollments = Enrollment::with('schoolYear')->get();
+
+        return view('registrars.reports', compact(
+            'students',
+            'teachers',
+            'sections',
+            'activeSY',
+            'enrollments'
+        ));
+    }
+
+    public function masterlist()
+    {
+        $students = User::with('profile')
+            ->where('role_id', 4)
+            ->orderBy('id','asc')
+            ->get();
+
+        $pdf = PDF::loadView('reports.masterlist', compact('students'));
+        return $pdf->download('masterlist.pdf');
+    }
+
+    public function enrollmentSummary()
+    {
+        $enrollments = Enrollment::with(['student.user.profile','section','schoolYear'])
+            ->orderBy('school_year_id','desc')
+            ->get();
+
+        $pdf = PDF::loadView('reports.enrollment-summary', compact('enrollments'));
+        return $pdf->download('enrollment-summary.pdf');
+    }
+    public function gradeLogs()
+    {
+        $logs = ActivityLog::where('action','like','%Grade%')
+            ->orderBy('created_at','desc')
+            ->get();
+
+        $pdf = PDF::loadView('reports.grade-logs', compact('logs'));
+        return $pdf->download('grade-validation-logs.pdf');
     }
 
     /**

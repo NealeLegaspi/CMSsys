@@ -7,24 +7,23 @@
 <div class="container my-4">
 
   <!-- Alerts -->
-  <div id="alert-container">
-    @if(session('success'))
-      <div class="alert alert-success alert-dismissible fade show" role="alert">
-        {{ session('success') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    @endif
-    @if($errors->any())
-      <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <ul class="mb-0">
-          @foreach($errors->all() as $err)
-            <li>{{ $err }}</li>
-          @endforeach
-        </ul>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-    @endif
-  </div>
+  @if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      {{ session('success') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  @endif
+
+  @if($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <ul class="mb-0">
+        @foreach($errors->all() as $err)
+          <li>{{ $err }}</li>
+        @endforeach
+      </ul>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  @endif
 
   <!-- Tabs -->
   <ul class="nav nav-tabs mb-3" id="assignmentTabs" role="tablist">
@@ -41,6 +40,7 @@
   </ul>
 
   <div class="tab-content" id="assignmentTabsContent">
+
     <!-- Create Assignment -->
     <div class="tab-pane fade show active" id="create" role="tabpanel">
       <div class="card card-custom shadow-sm">
@@ -61,14 +61,12 @@
             </div>
             <div class="mb-3">
               <label class="form-label fw-bold">Section <span class="text-danger">*</span></label>
-              <select name="section_id" id="sectionSelect" class="form-select" required>
+              <select name="section_id" class="form-select" required>
                 <option value="">-- Select Section --</option>
                 @foreach($sections->groupBy('gradelevel_id') as $gradeId => $gradeSections)
                   <optgroup label="{{ $gradeSections->first()->gradeLevel->name }}">
                     @foreach($gradeSections as $sec)
-                      <option value="{{ $sec->id }}" data-grade="{{ $sec->gradelevel_id }}">
-                        {{ $sec->name }}
-                      </option>
+                      <option value="{{ $sec->id }}">{{ $sec->name }}</option>
                     @endforeach
                   </optgroup>
                 @endforeach
@@ -76,8 +74,11 @@
             </div>
             <div class="mb-3">
               <label class="form-label fw-bold">Subject <span class="text-danger">*</span></label>
-              <select name="subject_id" id="subjectSelect" class="form-select" required>
+              <select name="subject_id" class="form-select" required>
                 <option value="">-- Select Subject --</option>
+                @foreach($subjects as $sub)
+                  <option value="{{ $sub->id }}">{{ $sub->name }}</option>
+                @endforeach
               </select>
             </div>
             <div class="text-end">
@@ -100,7 +101,6 @@
                 <thead class="table-light">
                   <tr>
                     <th>Title</th>
-                    <th>Instructions</th>
                     <th>Section</th>
                     <th>Subject</th>
                     <th>Due Date</th>
@@ -109,9 +109,8 @@
                 </thead>
                 <tbody>
                   @foreach($assignments as $a)
-                    <tr id="assignmentRow{{ $a->id }}">
+                    <tr>
                       <td class="fw-semibold">{{ $a->title }}</td>
-                      <td>{{ $a->instructions }}</td>
                       <td><span class="badge bg-primary">{{ $a->section->name ?? 'N/A' }}</span></td>
                       <td><span class="badge bg-secondary">{{ $a->subject->name ?? 'N/A' }}</span></td>
                       <td>
@@ -124,9 +123,11 @@
                         @endif
                       </td>
                       <td>
+                        <!-- Edit -->
                         <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ $a->id }}">
                           <i class="bi bi-pencil"></i>
                         </button>
+                        <!-- Delete -->
                         <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ $a->id }}">
                           <i class="bi bi-trash"></i>
                         </button>
@@ -174,7 +175,7 @@
                               <div class="mb-3">
                                 <label class="form-label fw-bold">Subject</label>
                                 <select name="subject_id" class="form-select" required>
-                                  @foreach($subjects[$a->section->gradelevel_id] ?? [] as $sub)
+                                  @foreach($subjects as $sub)
                                     <option value="{{ $sub->id }}" {{ $a->subject_id == $sub->id ? 'selected' : '' }}>
                                       {{ $sub->name }}
                                     </option>
@@ -232,25 +233,4 @@
     </div>
   </div>
 </div>
-
-<script>
-  const subjectsByGrade = @json($subjects);
-
-  const sectionSelect = document.getElementById('sectionSelect');
-  const subjectSelect = document.getElementById('subjectSelect');
-  if(sectionSelect){
-    sectionSelect.addEventListener('change', function () {
-      const gradeId = this.options[this.selectedIndex].dataset.grade;
-      subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
-      if (subjectsByGrade[gradeId]) {
-        subjectsByGrade[gradeId].forEach(sub => {
-          const opt = document.createElement('option');
-          opt.value = sub.id;
-          opt.textContent = sub.name;
-          subjectSelect.appendChild(opt);
-        });
-      }
-    });
-  }
-</script>
 @endsection

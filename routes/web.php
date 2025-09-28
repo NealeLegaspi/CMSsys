@@ -114,11 +114,14 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
 
     Route::get('/enrollment', [RegistrarController::class, 'enrollment'])->name('registrars.enrollment');
     Route::post('/enrollment', [RegistrarController::class, 'storeEnrollment'])->name('registrars.enrollment.store');
+    Route::put('/enrollment/{id}/update', [RegistrarController::class, 'updateEnrollment'])->name('registrars.enrollment.update');
     Route::delete('/enrollment/{id}', [RegistrarController::class, 'destroyEnrollment'])->name('registrars.enrollment.destroy');
     Route::post('/enrollments/import', [RegistrarController::class, 'importEnrollments'])->name('registrars.enrollments.import');
     Route::get('/enrollments/export', [RegistrarController::class, 'exportEnrollments'])->name('registrars.enrollments.export');
     Route::get('registrar/enrollment/export/csv', [RegistrarController::class, 'exportCsv'])->name('registrars.enrollment.export.csv');
     Route::get('registrar/enrollment/export/pdf', [RegistrarController::class, 'exportPdf'])->name('registrars.enrollment.export.pdf');
+
+    Route::post('/registrar/sections/{section}/assign-subject', [RegistrarController::class, 'assignSubject'])->name('registrars.sections.assign');
 
     Route::get('/reports', [RegistrarController::class, 'reports'])->name('registrars.reports');
     Route::post('/reports', [RegistrarController::class, 'storeReport'])->name('registrars.reports.store');
@@ -128,6 +131,9 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::post('/reports/filter', [RegistrarController::class, 'filterReports'])->name('registrars.filterReports');
     Route::get('/reports/{report}/download', [RegistrarController::class, 'downloadReport'])->name('registrars.reports.download');
     Route::post('/reports/export', [RegistrarController::class, 'exportReportsPDF'])->name('registrars.reports.export.pdf');
+    Route::get('/reports/masterlist', [RegistrarController::class, 'masterlist'])->name('registrars.reports.masterlist');
+    Route::get('/reports/enrollment-summary', [RegistrarController::class, 'enrollmentSummary'])->name('registrars.reports.enrollment.summary');
+    Route::get('/reports/grade-logs', [RegistrarController::class, 'gradeLogs'])->name('registrars.reports.grade.logs');
 
     Route::get('/settings', [RegistrarController::class, 'settings'])->name('registrars.settings');
     Route::put('/settings', [RegistrarController::class, 'updateSettings'])->name('registrars.updateSettings');
@@ -180,6 +186,7 @@ Route::prefix('student')->middleware(['auth', 'role:Student'])->group(function (
     Route::get('/dashboard', [StudentController::class, 'dashboard'])->name('students.dashboard');
     Route::get('/announcements', [StudentController::class, 'announcements'])->name('students.announcements');
     Route::get('/assignments', [StudentController::class, 'assignments'])->name('students.assignments');
+        Route::get('/assignments/{id}', [StudentController::class, 'showAssignment'])->name('student.assignments.show');
     Route::get('/grades', [StudentController::class, 'grades'])->name('students.grades');
 
     Route::get('/settings', [StudentController::class, 'settings'])->name('students.settings');

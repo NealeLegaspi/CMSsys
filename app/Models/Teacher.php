@@ -15,6 +15,20 @@ class Teacher extends Model
 
     public function subjects()
     {
-        return $this->belongsToMany(Subject::class, 'assignments');
+        return $this->belongsToMany(Subject::class, 'subject_teacher', 'teacher_id', 'subject_id')
+                    ->withPivot('section_id')
+                    ->withTimestamps();
+    }
+
+    public function sections()
+    {
+        return $this->belongsToMany(Section::class, 'subject_teacher', 'teacher_id', 'section_id')
+                    ->withPivot('subject_id')
+                    ->withTimestamps();
+    }
+
+    public function assignments()
+    {
+        return $this->hasMany(Assignment::class, 'teacher_id', 'user_id');
     }
 }

@@ -63,6 +63,12 @@ class StudentController extends Controller
         return view('students.assignments', compact('assignments'));
     }
 
+    public function showAssignment($id)
+    {
+        $assignment = Assignment::with(['subject', 'section', 'teacher.profile'])->findOrFail($id);
+        return view('students.assignment-show', compact('assignment'));
+    }
+
     public function grades()
     {
         $user = Auth::user();

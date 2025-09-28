@@ -140,7 +140,8 @@ class TeacherController extends Controller
     }
 
     // ---------------- ASSIGNMENTS ----------------
-    public function assignments() {
+    public function assignments()
+    {
         $teacher = Auth::user();
 
         $assignments = Assignment::with(['section.gradeLevel', 'subject'])
@@ -149,21 +150,28 @@ class TeacherController extends Controller
             ->get();
 
         $sections = Section::with('gradeLevel')->get();
-        $subjects = Subject::all();
+        //$sections = Section::whereHas('teachers', function ($q) use ($teacher) {
+          //  $q->where('users.id', $teacher->id);
+        //})->with('gradeLevel')->get();
+
+        $subjects = Subject::whereHas('teachers', function ($q) use ($teacher) {
+            $q->where('users.id', $teacher->id);
+        })->get();
 
         return view('teachers.assignments', compact('teacher', 'assignments', 'sections', 'subjects'));
     }
 
-    public function storeAssignment(Request $request) {
+    public function storeAssignment(Request $request)
+    {
         $request->validate([
-            'title' => 'required|string|max:255',
-            'instructions' => 'nullable|string',
-            'due_date' => 'nullable|date',
-            'section_id' => 'nullable|exists:sections,id',
-            'subject_id' => 'required|exists:subjects,id',
+            'title'       => 'required|string|max:255',
+            'instructions'=> 'nullable|string',
+            'due_date'    => 'nullable|date',
+            'section_id'  => 'required|exists:sections,id',
+            'subject_id'  => 'required|exists:subjects,id',
         ]);
 
-        Assignment::create([
+        $assignment = Assignment::create([
             'title'       => $request->title,
             'instructions'=> $request->instructions,
             'due_date'    => $request->due_date,
@@ -172,49 +180,71 @@ class TeacherController extends Controller
             'teacher_id'  => Auth::id(),
         ]);
 
-        $this->logActivity('Create Assignment', "Created assignment {$request->title}");
+        $this->logActivity('Create Assignment', "Created assignment: {$assignment->title}");
 
-        return redirect()->route('teachers.assignments')->with('success', 'Assignment created.');
+        return redirect()->route('teachers.assignments')
+            ->with('success', 'Assignment created successfully.');
     }
 
-    public function updateAssignment(Request $request, Assignment $assignment) {
+    public function editAssignment(Assignment $assignment) 
+    {
+        if ($assignment->teacher_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $sections = Section::whereHas('teachers', function ($q) {
+            $q->where('users.id', Auth::id());
+        })->with('gradeLevel')->get();
+
+        $subjects = Subject::whereHas('teachers', function ($q) {
+            $q->where('users.id', Auth::id());
+        })->get();
+
+        return view('teachers.assignments-edit', compact('assignment', 'sections', 'subjects'));
+    }
+
+    public function updateAssignment(Request $request, Assignment $assignment)
+    {
         if ($assignment->teacher_id !== Auth::id()) {
             abort(403, 'Unauthorized action.');
         }
 
         $request->validate([
-            'title' => 'required|string|max:255',
-            'instructions' => 'nullable|string',
-            'due_date' => 'nullable|date',
-            'section_id' => 'nullable|exists:sections,id',
-            'subject_id' => 'required|exists:subjects,id',
+            'title'       => 'required|string|max:255',
+            'instructions'=> 'nullable|string',
+            'due_date'    => 'nullable|date',
+            'section_id'  => 'required|exists:sections,id',
+            'subject_id'  => 'required|exists:subjects,id',
         ]);
 
         $assignment->update([
-            'title' => $request->title,
-            'instructions' => $request->instructions,
-            'due_date' => $request->due_date,
-            'section_id' => $request->section_id,
-            'subject_id' => $request->subject_id,
+            'title'       => $request->title,
+            'instructions'=> $request->instructions,
+            'due_date'    => $request->due_date,
+            'section_id'  => $request->section_id,
+            'subject_id'  => $request->subject_id,
         ]);
 
-        $this->logActivity('Update Assignment', "Updated assignment {$assignment->id}");
+        $this->logActivity('Update Assignment', "Updated assignment: {$assignment->title}");
 
-        return redirect()->route('teachers.assignments')->with('success', 'Assignment updated.');
+        return redirect()->route('teachers.assignments')
+            ->with('success', 'Assignment updated successfully.');
     }
 
-    public function destroyAssignment(Assignment $assignment) {
+    public function destroyAssignment(Assignment $assignment)
+    {
         if ($assignment->teacher_id !== Auth::id()) {
             abort(403, 'Unauthorized action.');
         }
 
+        $title = $assignment->title;
         $assignment->delete();
 
-        $this->logActivity('Delete Assignment', "Deleted assignment {$assignment->id}");
+        $this->logActivity('Delete Assignment', "Deleted assignment: {$title}");
 
-        return redirect()->route('teachers.assignments')->with('success', 'Assignment deleted.');
+        return redirect()->route('teachers.assignments')
+            ->with('success', 'Assignment deleted successfully.');
     }
-
 
     // ---------------- CLASS LIST ----------------
     public function classlist()
