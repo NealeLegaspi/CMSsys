@@ -26,6 +26,11 @@
         <i class="bi bi-megaphone"></i> My Announcements
       </button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="global-tab" data-bs-toggle="tab" data-bs-target="#global" type="button" role="tab">
+        <i class="bi bi-broadcast"></i> Global Announcements
+      </button>
+    </li>
   </ul>
 
   <div class="tab-content mt-3">
@@ -177,6 +182,37 @@
       @else
         <div class="card shadow-sm border-0 text-center p-4">
           <p class="text-muted mb-0"><i class="bi bi-exclamation-circle"></i> No announcements found.</p>
+        </div>
+      @endif
+    </div>
+
+    <!-- Global Announcements Tab -->
+    <div class="tab-pane fade" id="global" role="tabpanel">
+      @if($globalAnnouncements->count() > 0)
+        @foreach($globalAnnouncements as $ann)
+          <div class="card shadow-sm border-0 rounded-3 mb-3">
+            <div class="card-header bg-light d-flex align-items-center">
+              <i class="bi bi-broadcast text-danger fs-5 me-2"></i>
+              <h6 class="fw-bold mb-0">{{ $ann->title }}</h6>
+            </div>
+            <div class="card-body">
+              <p class="mb-2">{{ $ann->content }}</p>
+              <small class="text-secondary d-block">
+                <i class="bi bi-calendar-event"></i> {{ $ann->created_at->format('M d, Y h:i A') }}
+                | <i class="bi bi-person-badge"></i> Posted by:
+                {{ $ann->user?->profile?->first_name ?? $ann->user?->name ?? 'Admin' }}
+                {{ $ann->user?->profile?->last_name ?? '' }}
+              </small>
+            </div>
+          </div>
+        @endforeach
+
+        <div class="mt-3">
+          {{ $globalAnnouncements->appends(request()->query())->links('pagination::bootstrap-5') }}
+        </div>
+      @else
+        <div class="card shadow-sm border-0 text-center p-4">
+          <p class="text-muted mb-0"><i class="bi bi-exclamation-circle"></i> No global announcements found.</p>
         </div>
       @endif
     </div>

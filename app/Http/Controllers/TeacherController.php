@@ -73,9 +73,14 @@ class TeacherController extends Controller
             ->latest()
             ->paginate(10);
 
+        $globalAnnouncements = Announcement::with('user')
+            ->whereNull('section_id')
+            ->latest()
+            ->paginate(10);
+
         $sections = Section::with('gradeLevel')->get();
 
-        return view('teachers.announcements', compact('teacher', 'myAnnouncements', 'sections'));
+        return view('teachers.announcements', compact('teacher', 'myAnnouncements', 'globalAnnouncements', 'sections'));
     }
 
     public function storeAnnouncement(Request $request)

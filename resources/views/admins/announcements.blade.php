@@ -52,12 +52,11 @@
                                 {{ Str::limit($ann->content, 50) }}
                             </td>
                             <td>
-                                {{ $ann->user?->profile?->first_name ?? '' }}
-                                {{ $ann->user?->profile?->last_name ?? '' }}
+                                {{ $ann->user?->name ?? 'Administrator' }}
                             </td>
                             <td>{{ $ann->created_at->format('M d, Y h:i A') }}</td>
                             <td>
-                                {{ $ann->expires_at ? $ann->expires_at->format('M d, Y') : 'No Expiration' }}
+                                {{ $ann->expires_at ? $ann->expires_at->format('M d, Y h:i A') : 'No Expiration' }}
                             </td>
                             <td>
                                 @if($ann->is_expired)
@@ -103,9 +102,10 @@
                                                 <textarea name="content" class="form-control" rows="3" required>{{ $ann->content }}</textarea>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">Expiration Date</label>
-                                                <input type="date" name="expires_at" class="form-control"
-                                                    value="{{ $ann->expires_at?->format('Y-m-d') }}">
+                                                <label class="form-label">Expiration Date & Time</label>
+                                                <input type="datetime-local" name="expires_at" class="form-control"
+                                                    value="{{ $ann->expires_at?->format('Y-m-d\TH:i') }}">
+                                                <small class="text-muted">Leave blank if no expiration</small>
                                             </div>
                                         </div>
                                         <div class="modal-footer">
@@ -181,8 +181,9 @@
                         <textarea name="content" class="form-control" rows="3" required></textarea>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Expiration Date</label>
-                        <input type="date" name="expires_at" class="form-control">
+                        <label class="form-label">Expiration Date & Time</label>
+                        <input type="datetime-local" name="expires_at" class="form-control">
+                        <small class="text-muted">Leave blank if no expiration</small>
                     </div>
                 </div>
                 <div class="modal-footer">

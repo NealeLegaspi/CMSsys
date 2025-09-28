@@ -24,7 +24,7 @@
         <select name="status" class="form-select">
           <option value="">All Statuses</option>
           <option value="active" {{ request('status')=='active' ? 'selected' : '' }}>Active</option>
-          <option value="inactive" {{ request('status')=='inactive' ? 'selected' : '' }}>Inactive</option>
+          <option value="closed" {{ request('status')=='closed' ? 'selected' : '' }}>Closed</option>
         </select>
       </div>
       <div class="col-md-3 d-flex">
@@ -41,7 +41,7 @@
           <th>Start</th>
           <th>End</th>
           <th>Status</th>
-          <th style="width:140px;">Actions</th>
+          <th style="width:160px;">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -133,6 +133,7 @@
             </form>
           </div>
         </div>
+
         <!-- Activate Modal -->
         <div class="modal fade" id="activateSchoolYearModal{{ $sy->id }}" tabindex="-1">
           <div class="modal-dialog modal-dialog-centered">
@@ -148,7 +149,7 @@
               </div>
               <div class="modal-footer">
                 <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form method="POST" action="{{ route('admins.schoolyear.close',$sy->id) }}">
+                <form method="POST" action="{{ route('admins.schoolyear.activate',$sy->id) }}">
                   @csrf
                   <button class="btn btn-success">Activate</button>
                 </form>
@@ -211,6 +212,10 @@
           <div class="mb-3">
             <label class="form-label">End Date</label>
             <input type="date" name="end_date" class="form-control" required>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" name="set_active" id="set_active" class="form-check-input">
+            <label for="set_active" class="form-check-label">Set as Active</label>
           </div>
         </div>
         <div class="modal-footer">

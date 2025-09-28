@@ -67,7 +67,11 @@ class AdminController extends Controller
      */
     public function announcements(Request $request)
     {
-        $query = Announcement::with('user.profile');
+        $query = Announcement::with('user.profile')
+            ->where(function($q) {
+            $q->whereNull('expires_at')
+              ->orWhere('expires_at', '>', now()); 
+        });
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -138,23 +142,25 @@ class AdminController extends Controller
      */
     public function users(Request $request)
     {
-    $query = User::with(['role', 'profile']);
+        $query = User::with(['role', 'profile']);
 
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $query->where(function ($q) use ($search) {
-            $q->where('email', 'like', "%{$search}%")
-              ->orWhereHas('profile', function ($q2) use ($search) {
-                  $q2->where('first_name', 'like', "%{$search}%")
-                     ->orWhere('last_name', 'like', "%{$search}%");
-              });
-        });
-    }
-    if ($request->filled('role_id')) {
-        $query->where('role_id', $request->role_id);
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('email', 'like', "%{$search}%")
+                  ->orWhereHas('profile', function ($q2) use ($search) {
+                      $q2->where('first_name', 'like', "%{$search}%")
+                         ->orWhere('last_name', 'like', "%{$search}%");
+                  });
+            });
         }
-    if ($request->filled('status')) {
-        $query->where('status', $request->status);
+
+        if ($request->filled('role_id')) {
+            $query->where('role_id', $request->role_id);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
         }
 
         $users = $query->paginate(10)->withQueryString();
@@ -166,11 +172,17 @@ class AdminController extends Controller
     public function storeUser(Request $request)
     {
         $request->validate([
-            'first_name' => 'required|string|max:50',
-            'last_name'  => 'required|string|max:50',
-            'email'      => 'required|email|unique:users,email',
-            'password'   => 'required|min:8|confirmed',
-            'role_id'    => 'required|exists:roles,id',
+            'first_name'      => 'required|string|max:50',
+            'middle_name'     => 'nullable|string|max:50',
+            'last_name'       => 'required|string|max:50',
+            'sex'             => 'nullable|in:Male,Female',
+            'birthdate'       => 'nullable|date',
+            'address'         => 'nullable|string|max:255',
+            'contact_number'  => 'nullable|string|max:20',
+            'profile_picture' => 'nullable|image|max:2048',
+            'email'           => 'required|email|unique:users,email',
+            'password'        => 'required|min:8|confirmed',
+            'role_id'         => 'required|exists:roles,id',
         ]);
 
         $user = User::create([
@@ -180,10 +192,22 @@ class AdminController extends Controller
             'status'   => 'active',
         ]);
 
+
+        if ($request->hasFile('profile_picture')) {
+            $path = $request->file('profile_picture')->store('profiles', 'public');
+        } else {
+            $path = 'images/default.png';
+        }
+
         $user->profile()->create([
-            'user_id' => $user->id,
-            'first_name' => $request->first_name,
-            'last_name'  => $request->last_name,
+            'first_name'=>$request->first_name,
+            'middle_name'=>$request->middle_name,
+            'last_name'=>$request->last_name,
+            'sex'=>$request->sex,
+            'birthdate'=>$request->birthdate,
+            'address'=>$request->address,
+            'contact_number'=>$request->contact_number,
+            'profile_picture'=>$path
         ]);
 
         $this->logActivity('Create User', "Created user: {$user->email}");
@@ -196,10 +220,16 @@ class AdminController extends Controller
         $user = User::with('profile')->findOrFail($id);
 
         $request->validate([
-            'email'      => 'required|email|unique:users,email,' . $user->id,
-            'role_id'    => 'required|exists:roles,id',
-            'first_name' => 'required|string|max:50',
-            'last_name'  => 'required|string|max:50',
+            'email'           => 'required|email|unique:users,email,' . $user->id,
+            'role_id'         => 'required|exists:roles,id',
+            'first_name'      => 'required|string|max:50',
+            'middle_name'     => 'nullable|string|max:50',
+            'last_name'       => 'required|string|max:50',
+            'sex'             => 'nullable|in:Male,Female',
+            'birthdate'       => 'nullable|date',
+            'address'         => 'nullable|string|max:255',
+            'contact_number'  => 'nullable|string|max:20',
+            'profile_picture' => 'nullable|image|max:2048',
         ]);
 
         $user->update([
@@ -207,10 +237,26 @@ class AdminController extends Controller
             'role_id' => $request->role_id,
         ]);
 
-        $user->profile->update([
-            'first_name' => $request->first_name,
-            'last_name'  => $request->last_name,
-        ]);
+     
+        if ($request->hasFile('profile_picture')) {
+            $path = $request->file('profile_picture')->store('profiles', 'public');
+        } else {
+            $path = 'images/default.png';
+        }
+
+        $user->profile()->updateOrCreate(
+            ['user_id'=>$user->id],
+            [
+                'first_name'=>$request->first_name,
+                'middle_name'=>$request->middle_name,
+                'last_name'=>$request->last_name,
+                'sex'=>$request->sex,
+                'birthdate'=>$request->birthdate,
+                'address'=>$request->address,
+                'contact_number'=>$request->contact_number,
+                'profile_picture'=>$path
+            ]
+        );
 
         $this->logActivity('Update User', "Updated user: {$user->email}");
 
@@ -244,6 +290,13 @@ class AdminController extends Controller
     public function destroyUser($id)
     {
         $user = User::findOrFail($id);
+
+        if ($user->profile && $user->profile->profile_picture) {
+            if (Storage::disk('public')->exists($user->profile->profile_picture)) {
+                Storage::disk('public')->delete($user->profile->profile_picture);
+            }
+        }
+
         $email = $user->email;
         $user->delete();
 
@@ -467,17 +520,34 @@ class AdminController extends Controller
         /**
      * Subjects
      */
-    public function subjects()
+    public function subjects(Request $request)
     {
-        $subjects    = Subject::with('gradeLevel')->paginate(10);
+        $subjects = Subject::with('gradeLevel')
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%');
+            })
+            ->when($request->filled('grade_level_id'), function ($q) use ($request) {
+                $q->where('grade_level_id', $request->grade_level_id);
+            })
+            ->orderBy('grade_level_id')
+            ->paginate(10);
+
         $gradeLevels = GradeLevel::all();
+
         return view('admins.subjects', compact('subjects', 'gradeLevels'));
     }
 
     public function storeSubject(Request $request)
     {
         $request->validate([
-            'name'           => 'required|string|max:100|unique:subjects,name',
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('subjects')->where(function ($q) use ($request) {
+                    return $q->where('grade_level_id', $request->grade_level_id);
+                }),
+            ],
             'grade_level_id' => 'required|exists:grade_levels,id',
         ]);
 
@@ -493,7 +563,14 @@ class AdminController extends Controller
         $subject = Subject::findOrFail($id);
 
         $request->validate([
-            'name'           => ['required', 'string', 'max:100', Rule::unique('subjects', 'name')->ignore($subject->id)],
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('subjects')->where(function ($q) use ($request) {
+                    return $q->where('grade_level_id', $request->grade_level_id);
+                })->ignore($subject->id),
+            ],
             'grade_level_id' => 'required|exists:grade_levels,id',
         ]);
 
@@ -519,25 +596,45 @@ class AdminController extends Controller
      */
     public function logs(Request $request)
     {
-        $query = ActivityLog::with('user')->latest();
+        $baseQuery = ActivityLog::with('user')->latest();
 
         if ($request->filled('user_id')) {
-            $query->where('user_id', $request->user_id);
+            $baseQuery->where('user_id', $request->user_id);
         }
         if ($request->filled('action')) {
-            $query->where('action', 'like', '%' . $request->action . '%');
+            $baseQuery->where('action', 'like', '%' . $request->action . '%');
         }
         if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
+            $baseQuery->whereDate('created_at', '>=', $request->date_from);
         }
         if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
+            $baseQuery->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $logs = $query->paginate(20);
+        $activeLogs = (clone $baseQuery)
+            ->where('is_archived', false)
+            ->paginate(20, ['*'], 'active_page')
+            ->appends($request->query());
+
+        $archivedLogs = (clone $baseQuery)
+            ->where('is_archived', true)
+            ->paginate(20, ['*'], 'archived_page')
+            ->appends($request->query());
+
         $users = User::orderBy('email')->get();
 
-        return view('admins.logs', compact('logs', 'users'));
+        return view('admins.logs', compact('activeLogs', 'archivedLogs', 'users'));
+    }
+
+    public function archive($id)
+    {
+        $log = ActivityLog::findOrFail($id);
+
+        $log->update([
+            'is_archived' => !$log->is_archived 
+        ]);
+
+        return back()->with('success', $log->archived ? 'Log archived successfully!' : 'Log unarchived successfully!');
     }
 
     /**

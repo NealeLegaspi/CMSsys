@@ -13,7 +13,8 @@ class User extends Authenticatable
     protected $fillable = [
         'email',
         'password',
-        'role_id'
+        'role_id',
+        'status',
     ];
 
     protected $hidden = [
@@ -33,7 +34,7 @@ class User extends Authenticatable
 
     public function profile()
     {
-        return $this->hasOne(UserProfile::class, 'user_id');
+        return $this->hasOne(UserProfile::class);
     }
 
     protected static function booted()

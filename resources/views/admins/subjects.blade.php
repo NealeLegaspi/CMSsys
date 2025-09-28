@@ -21,7 +21,7 @@
         <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Search subject...">
       </div>
       <div class="col-md-4">
-        <select name="grade_level_id" class="form-select">
+        <select name="grade_level_id" class="form-select" onchange="this.form.submit()">
           <option value="">All Grade Levels</option>
           @foreach($gradeLevels as $gl)
             <option value="{{ $gl->id }}" {{ request('grade_level_id') == $gl->id ? 'selected' : '' }}>

@@ -58,6 +58,7 @@ Route::prefix('admin')->middleware(['auth', 'role:Admin'])->group(function () {
 
     // Activity Logs
     Route::get('/logs', [AdminController::class, 'logs'])->name('admins.logs');
+    Route::patch('/logs/{id}/archive', [AdminController::class, 'archive'])->name('admins.logs.archive');
 
     // Reports
     Route::get('/reports', [AdminController::class, 'reports'])->name('admins.reports');

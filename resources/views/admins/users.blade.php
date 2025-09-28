@@ -4,7 +4,34 @@
 @section('header','User Management')
 
 @section('content')
-<div class="card shadow-sm"> <div class="card-header d-flex justify-content-between align-items-center"> <h6 class="fw-bold mb-0">👥 Users</h6> <div class="d-flex"> <!-- Filter Form --> <form method="GET" class="d-flex me-2"> <input type="text" name="search" class="form-control form-control-sm me-2" placeholder="Search name/email..." value="{{ request('search') }}"> <select name="role_id" class="form-select form-select-sm me-2"> <option value="">All Roles</option> @foreach($roles as $r) <option value="{{ $r->id }}" {{ request('role_id')==$r->id?'selected':'' }}>{{ $r->name }}</option> @endforeach </select> <select name="status" class="form-select form-select-sm me-2"> <option value="">All Status</option> <option value="active" {{ request('status')=='active'?'selected':'' }}>Active</option> <option value="inactive" {{ request('status')=='inactive'?'selected':'' }}>Inactive</option> </select> <button class="btn btn-sm btn-outline-primary me-2">Filter</button> <a href="{{ route('admins.users') }}" class="btn btn-sm btn-outline-secondary">Clear</a> </form> <!-- Add User Button --> <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal"> <i class="bi bi-plus-lg"></i> Add User </button> </div> </div>
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6 class="fw-bold mb-0">👥 Users</h6>
+    <div class="d-flex">
+      <!-- Filter Form -->
+      <form method="GET" class="d-flex me-2">
+        <input type="text" name="search" class="form-control form-control-sm me-2" placeholder="Search name/email..." value="{{ request('search') }}">
+        <select name="role_id" class="form-select form-select-sm me-2">
+          <option value="">All Roles</option>
+          @foreach($roles as $r)
+            <option value="{{ $r->id }}" {{ request('role_id')==$r->id?'selected':'' }}>{{ $r->name }}</option>
+          @endforeach
+        </select>
+        <select name="status" class="form-select form-select-sm me-2">
+          <option value="">All Status</option>
+          <option value="active" {{ request('status')=='active'?'selected':'' }}>Active</option>
+          <option value="inactive" {{ request('status')=='inactive'?'selected':'' }}>Inactive</option>
+        </select>
+        <button class="btn btn-sm btn-outline-primary me-2">Filter</button>
+        <a href="{{ route('admins.users') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+      </form>
+
+      <!-- Add User Button -->
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+        <i class="bi bi-plus-lg"></i> Add User
+      </button>
+    </div>
+  </div>
   <div class="card-body">
     @include('partials.alerts')
 
@@ -22,7 +49,15 @@
       <tbody>
         @forelse($users as $u)
         <tr>
-          <td>{{ $u->profile->first_name ?? '' }} {{ $u->profile->last_name ?? '' }}</td>
+          <td>
+            @if($u->profile)
+              {{ $u->profile->last_name }},
+              {{ $u->profile->first_name }}
+              {{ $u->profile->middle_name ? substr($u->profile->middle_name,0,1).'.' : '' }}
+            @else
+              N/A
+            @endif
+          </td>
           <td>{{ $u->email }}</td>
           <td>{{ $u->role->name ?? '-' }}</td>
           <td>
@@ -62,23 +97,48 @@
 
         <!-- Edit Modal -->
         <div class="modal fade" id="editUserModal{{ $u->id }}" tabindex="-1">
-          <div class="modal-dialog">
-            <form method="POST" action="{{ route('admins.users.update',$u->id) }}">
+          <div class="modal-dialog modal-lg">
+            <form method="POST" action="{{ route('admins.users.update',$u->id) }}" enctype="multipart/form-data">
               @csrf @method('PUT')
               <div class="modal-content">
                 <div class="modal-header bg-warning">
                   <h5 class="modal-title">Edit User</h5>
                   <button class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                  <input type="text" name="first_name" value="{{ $u->profile->first_name ?? '' }}" class="form-control mb-2" required>
-                  <input type="text" name="last_name" value="{{ $u->profile->last_name ?? '' }}" class="form-control mb-2" required>
-                  <input type="email" name="email" value="{{ $u->email }}" class="form-control mb-2" required>
-                  <select name="role_id" class="form-select mb-2" required>
-                    @foreach($roles as $r)
-                      <option value="{{ $r->id }}" {{ $u->role_id==$r->id?'selected':'' }}>{{ $r->name }}</option>
-                    @endforeach
-                  </select>
+                <div class="modal-body row g-3">
+                  <!-- Left Column -->
+                  <div class="col-md-6">
+                    <input type="text" name="first_name" value="{{ $u->profile->first_name ?? '' }}" class="form-control mb-2" required>
+                    <input type="text" name="middle_name" value="{{ $u->profile->middle_name ?? '' }}" class="form-control mb-2">
+                    <input type="text" name="last_name" value="{{ $u->profile->last_name ?? '' }}" class="form-control mb-2" required>
+                    <select name="sex" class="form-select mb-2">
+                      <option value="">-- Select Sex --</option>
+                      <option value="Male" {{ ($u->profile->sex ?? '')=='Male'?'selected':'' }}>Male</option>
+                      <option value="Female" {{ ($u->profile->sex ?? '')=='Female'?'selected':'' }}>Female</option>
+                    </select>
+                    <input type="date" name="birthdate" value="{{ $u->profile->birthdate ?? '' }}" class="form-control mb-2">
+                  </div>
+
+                  <!-- Right Column -->
+                  <div class="col-md-6">
+                    <input type="text" name="address" value="{{ $u->profile->address ?? '' }}" class="form-control mb-2">
+                    <input type="text" name="contact_number" value="{{ $u->profile->contact_number ?? '' }}" class="form-control mb-2">
+                    <input type="email" name="email" value="{{ $u->email }}" class="form-control mb-2" required>
+                    <select name="role_id" class="form-select mb-2" required>
+                      @foreach($roles as $r)
+                        <option value="{{ $r->id }}" {{ $u->role_id==$r->id?'selected':'' }}>{{ $r->name }}</option>
+                      @endforeach
+                    </select>
+
+                    <!-- Profile Picture -->
+                    <div class="mb-2">
+                      <label class="form-label">Profile Picture</label>
+                      <input type="file" name="profile_picture" class="form-control">
+                      @if($u->profile && $u->profile->profile_picture)
+                        <img src="{{ asset('storage/'.$u->profile->profile_picture) }}" alt="Profile" class="img-thumbnail mt-2" width="100">
+                      @endif
+                    </div>
+                  </div>
                 </div>
                 <div class="modal-footer">
                   <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -123,26 +183,43 @@
 
 <!-- Add User Modal -->
 <div class="modal fade" id="addUserModal" tabindex="-1">
-  <div class="modal-dialog">
-    <form method="POST" action="{{ route('admins.users.store') }}">
+  <div class="modal-dialog modal-lg">
+    <form method="POST" action="{{ route('admins.users.store') }}" enctype="multipart/form-data">
       @csrf
       <div class="modal-content">
         <div class="modal-header bg-success text-white">
           <h5 class="modal-title">Add User</h5>
           <button class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body">
-          <input type="text" name="first_name" placeholder="First Name" class="form-control mb-2" required>
-          <input type="text" name="last_name" placeholder="Last Name" class="form-control mb-2" required>
-          <input type="email" name="email" placeholder="Email" class="form-control mb-2" required>
-          <input type="password" name="password" placeholder="Password" class="form-control mb-2" required>
-          <input type="password" name="password_confirmation" placeholder="Confirm Password" class="form-control mb-2" required>
-          <select name="role_id" class="form-select mb-2" required>
-            <option value="">-- Select Role --</option>
-            @foreach($roles as $r)
-              <option value="{{ $r->id }}">{{ $r->name }}</option>
-            @endforeach
-          </select>
+        <div class="modal-body row g-3">
+          <!-- Left Column -->
+          <div class="col-md-6">
+            <input type="text" name="first_name" placeholder="First Name" class="form-control mb-2" required>
+            <input type="text" name="middle_name" placeholder="Middle Name" class="form-control mb-2">
+            <input type="text" name="last_name" placeholder="Last Name" class="form-control mb-2" required>
+            <select name="sex" class="form-select mb-2">
+              <option value="">-- Select Sex --</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+            <input type="date" name="birthdate" class="form-control mb-2" placeholder="Birthdate">
+          </div>
+
+          <!-- Right Column -->
+          <div class="col-md-6">
+            <input type="text" name="address" placeholder="Address" class="form-control mb-2">
+            <input type="text" name="contact_number" placeholder="Contact Number" class="form-control mb-2">
+            <input type="email" name="email" placeholder="Email" class="form-control mb-2" required>
+            <input type="password" name="password" placeholder="Password" class="form-control mb-2" required>
+            <input type="password" name="password_confirmation" placeholder="Confirm Password" class="form-control mb-2" required>
+            <select name="role_id" class="form-select mb-2" required>
+              <option value="">-- Select Role --</option>
+              @foreach($roles as $r)
+                <option value="{{ $r->id }}">{{ $r->name }}</option>
+              @endforeach
+            </select>
+            <input type="file" name="profile_picture" class="form-control mb-2">
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
