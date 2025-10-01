@@ -99,13 +99,10 @@
               <td>{{ $log->action }}</td>
               <td>{{ $log->created_at->format('M d, Y h:i A') }}</td>
               <td>
-                <form action="{{ route('admins.logs.archive', $log->id) }}" method="POST" class="d-inline">
+                <form action="{{ route('admins.logs.unarchive', $log->id) }}" method="POST" class="d-inline">
                   @csrf
                   @method('PATCH')
-                    <button type="submit" 
-                            class="btn btn-sm {{ $log->is_archived ? 'btn-success' : 'btn-warning' }}">
-                      {{ $log->is_archived ? 'Unarchive' : 'Archive' }}
-                    </button>
+                  <button type="submit" class="btn btn-sm btn-success">Unarchive</button>
                 </form>
               </td>
             </tr>

@@ -185,7 +185,7 @@ class AdminController extends Controller
             'role_id'         => 'required|exists:roles,id',
         ]);
 
-        $user = User::create([
+        $users = User::create([
             'email'    => $request->email,
             'password' => Hash::make($request->password),
             'role_id'  => $request->role_id,
@@ -199,7 +199,7 @@ class AdminController extends Controller
             $path = 'images/default.png';
         }
 
-        $user->profile()->create([
+        $users->profile()->create([
             'first_name'=>$request->first_name,
             'middle_name'=>$request->middle_name,
             'last_name'=>$request->last_name,
@@ -210,17 +210,17 @@ class AdminController extends Controller
             'profile_picture'=>$path
         ]);
 
-        $this->logActivity('Create User', "Created user: {$user->email}");
+        $this->logActivity('Create User', "Created user: {$users->email}");
 
         return back()->with('success', 'User created successfully.');
     }
 
     public function updateUser(Request $request, $id)
     {
-        $user = User::with('profile')->findOrFail($id);
+        $users = User::with('profile')->findOrFail($id);
 
         $request->validate([
-            'email'           => 'required|email|unique:users,email,' . $user->id,
+            'email'           => 'required|email|unique:users,email,' . $users->id,
             'role_id'         => 'required|exists:roles,id',
             'first_name'      => 'required|string|max:50',
             'middle_name'     => 'nullable|string|max:50',
@@ -232,7 +232,7 @@ class AdminController extends Controller
             'profile_picture' => 'nullable|image|max:2048',
         ]);
 
-        $user->update([
+        $users->update([
             'email'   => $request->email,
             'role_id' => $request->role_id,
         ]);
@@ -244,8 +244,8 @@ class AdminController extends Controller
             $path = 'images/default.png';
         }
 
-        $user->profile()->updateOrCreate(
-            ['user_id'=>$user->id],
+        $users->profile()->updateOrCreate(
+            ['user_id'=>$users->id],
             [
                 'first_name'=>$request->first_name,
                 'middle_name'=>$request->middle_name,
@@ -258,7 +258,7 @@ class AdminController extends Controller
             ]
         );
 
-        $this->logActivity('Update User', "Updated user: {$user->email}");
+        $this->logActivity('Update User', "Updated user: {$users->email}");
 
         return back()->with('success', 'User updated successfully.');
     }
@@ -626,15 +626,22 @@ class AdminController extends Controller
         return view('admins.logs', compact('activeLogs', 'archivedLogs', 'users'));
     }
 
-    public function archive($id)
+    public function archiveLog($id)
     {
         $log = ActivityLog::findOrFail($id);
+        $log->is_archived = true;
+        $log->save();
 
-        $log->update([
-            'is_archived' => !$log->is_archived 
-        ]);
+        return back()->with('success', 'Log archived successfully!');
+    }
 
-        return back()->with('success', $log->archived ? 'Log archived successfully!' : 'Log unarchived successfully!');
+    public function unarchiveLog($id)
+    {
+        $log = ActivityLog::findOrFail($id);
+        $log->is_archived = false;
+        $log->save();
+
+        return back()->with('success', 'Log restored to active successfully!');
     }
 
     /**
