@@ -70,20 +70,24 @@ class RegistrarController extends Controller
      */
     public function students(Request $request)
     {
-        $query = User::where('role_id', 4)->with(['profile', 'student.section']);
+        $query = User::where('role_id', 4)
+            ->whereHas('student.enrollments', function ($q) {
+                $q->where('status', 'enrolled');
+            })
+            ->with(['profile', 'student.section']);
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('email', 'like', "%{$search}%")
-                  ->orWhereHas('profile', function ($sub) use ($search) {
-                      $sub->where('first_name', 'like', "%{$search}%")
-                          ->orWhere('middle_name', 'like', "%{$search}%")
-                          ->orWhere('last_name', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('student', function ($sub) use ($search) {
-                      $sub->where('student_number', 'like', "%{$search}%");
-                  });
+                ->orWhereHas('profile', function ($sub) use ($search) {
+                    $sub->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('middle_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%");
+                })
+                ->orWhereHas('student', function ($sub) use ($search) {
+                    $sub->where('student_number', 'like', "%{$search}%");
+                });
             });
         }
 
@@ -96,6 +100,7 @@ class RegistrarController extends Controller
 
         return view('registrars.students', compact('students', 'sections'));
     }
+
 
     public function showStudent($id)
     {

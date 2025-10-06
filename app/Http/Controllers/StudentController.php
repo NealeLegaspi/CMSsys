@@ -12,16 +12,23 @@ use App\Models\Assignment;
 
 class StudentController extends Controller
 {
-
     public function dashboard()
     {
         $user = Auth::user();
 
-        $announcements = Announcement::with(['user', 'section'])
-            ->where(function ($query) use ($user) {
-                $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
-                $query->whereNull('section_id')
-                    ->orWhereIn('section_id', $sectionIds);
+        $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
+
+        $announcements = Announcement::with(['user', 'section', 'teacher.user'])
+            ->where(function ($query) use ($sectionIds, $user) {
+                $query->where('target_type', 'Global')
+                    ->orWhere(function ($q) use ($sectionIds) {
+                        $q->where('target_type', 'Section')
+                        ->whereIn('target_id', $sectionIds);
+                    })
+                    ->orWhere(function ($q) use ($user) {
+                        $q->where('target_type', 'Teacher')
+                        ->where('target_id', $user->id); // ensures only for specific teacher if logged as teacher
+                    });
             })
             ->latest()
             ->take(5)
@@ -37,12 +44,19 @@ class StudentController extends Controller
     public function announcements()
     {
         $user = Auth::user();
-        $sectionIds = $user->student?->enrollments?->pluck('section_id')->toArray() ?? [];
+        $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
 
-        $announcements = Announcement::with(['user', 'section'])
-            ->where(function ($q) use ($sectionIds) {
-                $q->whereNull('section_id')
-                ->orWhereIn('section_id', $sectionIds);
+        $announcements = Announcement::with(['user', 'section', 'teacher.user'])
+            ->where(function ($q) use ($sectionIds, $user) {
+                $q->where('target_type', 'Global')
+                ->orWhere(function ($sub) use ($sectionIds) {
+                    $sub->where('target_type', 'Section')
+                        ->whereIn('target_id', $sectionIds);
+                })
+                ->orWhere(function ($sub) use ($user) {
+                    $sub->where('target_type', 'Teacher')
+                        ->where('target_id', $user->id);
+                });
             })
             ->latest()
             ->get();

@@ -79,6 +79,8 @@ Route::prefix('admin')->middleware(['auth', 'role:Admin'])->group(function () {
     Route::put('/subjects/{id}', [AdminController::class, 'updateSubject'])->name('admins.subjects.update');
     Route::delete('/subjects/{id}', [AdminController::class, 'destroySubject'])->name('admins.subjects.destroy');
 
+    Route::get('/student-records', [AdminController::class, 'studentRecords'])->name('admins.student-records');
+
     // Settings
     Route::get('/settings', [AdminController::class, 'settings'])->name('admins.settings');
     Route::put('/settings', [AdminController::class, 'updateSettings'])->name('admins.updateSettings');
@@ -188,7 +190,7 @@ Route::prefix('student')->middleware(['auth', 'role:Student'])->group(function (
     Route::get('/dashboard', [StudentController::class, 'dashboard'])->name('students.dashboard');
     Route::get('/announcements', [StudentController::class, 'announcements'])->name('students.announcements');
     Route::get('/assignments', [StudentController::class, 'assignments'])->name('students.assignments');
-        Route::get('/assignments/{id}', [StudentController::class, 'showAssignment'])->name('student.assignments.show');
+    Route::get('/assignments/{id}', [StudentController::class, 'showAssignment'])->name('student.assignments.show');
     Route::get('/grades', [StudentController::class, 'grades'])->name('students.grades');
 
     Route::get('/settings', [StudentController::class, 'settings'])->name('students.settings');

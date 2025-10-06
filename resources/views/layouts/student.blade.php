@@ -43,9 +43,9 @@
     <a href="{{ route('students.announcements') }}" class="nav-link {{ request()->routeIs('students.announcements') ? 'active' : '' }}">
         <i class='bx bx-bell me-2'></i> Announcements
     </a>
-    <a href="{{ route('students.assignments') }}" class="nav-link {{ request()->routeIs('students.assignments') ? 'active' : '' }}">
+    <!----<a href="{{ route('students.assignments') }}" class="nav-link {{ request()->routeIs('students.assignments') ? 'active' : '' }}">
         <i class='bx bx-book me-2'></i> Assignments
-    </a>
+    </a>---->
     <a href="{{ route('students.grades') }}" class="nav-link {{ request()->routeIs('students.grades') ? 'active' : '' }}">
         <i class='bx bx-edit me-2'></i> Grades
     </a>

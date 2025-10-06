@@ -21,11 +21,11 @@
                         <select name="subject_id" class="form-select" required>
                             <option value="">-- Select Subject --</option>
                             @foreach($subjects as $subj)
-                                <option value="{{ $subj->id }}" 
-                                    {{ (isset($selectedSubject) && $selectedSubject->id == $subj->id) ? 'selected' : '' }}>
-                                    {{ $subj->name }} - 
-                                    {{ $subj->section->gradeLevel->name ?? 'No Grade Level' }} 
-                                    {{ $subj->section->name ?? 'No Section' }}
+                                <option value="{{ $subj->subject_id }}"
+                                    {{ $selectedSubject && $selectedSubject->id == $subj->subject_id ? 'selected' : '' }}>
+                                    {{ $subj->subject_name }} - 
+                                    {{ $subj->gradelevel ?? 'No Grade Level' }} 
+                                    {{ $subj->section_name ?? 'No Section' }}
                                 </option>
                             @endforeach
                         </select>

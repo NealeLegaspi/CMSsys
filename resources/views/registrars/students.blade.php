@@ -6,14 +6,24 @@
 @section('content')
 <div class="card card-custom shadow-sm border-0">
   <div class="card-header d-flex justify-content-between align-items-center bg-light">
-    <h6 class="fw-bold mb-0">📘 Student List</h6>
+    <h6 class="fw-bold mb-0">📘 Enrolled Students</h6>
+    {{-- Optional: Uncomment if you still want to manually add students --}}
+    {{-- 
     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addStudentModal">
-      <i class="bi bi-plus-circle me-1"></i> Add Student
+      <i class="bi bi-plus-circle me-1"></i> Register New Student
     </button>
+    --}}
   </div>
 
   <div class="card-body">
     @include('partials.alerts')
+
+    @if(isset($activeSY))
+      <div class="alert alert-info mb-3">
+        Showing students enrolled in 
+        <strong>{{ $activeSY->name ?? 'N/A' }}</strong> school year.
+      </div>
+    @endif
 
     <!-- Filters -->
     <form method="GET" action="{{ route('registrars.students') }}" class="row g-2 mb-3">
@@ -67,21 +77,21 @@
             <tr>
               <td>{{ $students->firstItem() + $index }}</td>
               <td class="fw-bold text-primary">
-                {{ optional($student->student)->student_number ?? 'N/A' }}
+                {{ $student->student->student_number ?? 'N/A' }}
               </td>
               <td>
                 @php
-                  $fname = optional($student->profile)->first_name;
-                  $mname = optional($student->profile)->middle_name;
-                  $lname = optional($student->profile)->last_name;
+                  $fname = $student->profile->first_name ?? '';
+                  $mname = $student->profile->middle_name ?? '';
+                  $lname = $student->profile->last_name ?? '';
                   $fullName = trim($fname . ' ' . ($mname ? substr($mname,0,1).'. ' : '') . $lname);
                 @endphp
                 {{ $fullName ?: 'N/A' }}
               </td>
               <td>{{ $student->email }}</td>
-              <td>{{ optional($student->profile)->sex ?? 'N/A' }}</td>
-              <td>{{ optional($student->profile)->contact_number ?? 'N/A' }}</td>
-              <td>{{ optional(optional($student->student)->section)->name ?? 'Not Enrolled' }}</td>
+              <td>{{ $student->profile->sex ?? 'N/A' }}</td>
+              <td>{{ $student->profile->contact_number ?? 'N/A' }}</td>
+              <td>{{ $student->student->section->name ?? 'N/A' }}</td>
               <td>
                 <!-- View Button -->
                 <button class="btn btn-sm btn-info text-white" 
@@ -122,7 +132,7 @@
                   <div class="modal-body">
                     <dl class="row">
                       <dt class="col-sm-3">LRN</dt>
-                      <dd class="col-sm-9">{{ optional($student->student)->student_number ?? 'N/A' }}</dd>
+                      <dd class="col-sm-9">{{ $student->student->student_number ?? 'N/A' }}</dd>
 
                       <dt class="col-sm-3">Full Name</dt>
                       <dd class="col-sm-9">{{ $fullName ?: 'N/A' }}</dd>
@@ -131,13 +141,13 @@
                       <dd class="col-sm-9">{{ $student->email }}</dd>
 
                       <dt class="col-sm-3">Gender</dt>
-                      <dd class="col-sm-9">{{ optional($student->profile)->sex ?? 'N/A' }}</dd>
+                      <dd class="col-sm-9">{{ $student->profile->sex ?? 'N/A' }}</dd>
 
                       <dt class="col-sm-3">Contact</dt>
-                      <dd class="col-sm-9">{{ optional($student->profile)->contact_number ?? 'N/A' }}</dd>
+                      <dd class="col-sm-9">{{ $student->profile->contact_number ?? 'N/A' }}</dd>
 
                       <dt class="col-sm-3">Section</dt>
-                      <dd class="col-sm-9">{{ optional(optional($student->student)->section)->name ?? 'Not Enrolled' }}</dd>
+                      <dd class="col-sm-9">{{ $student->student->section->name ?? 'N/A' }}</dd>
                     </dl>
                   </div>
                 </div>
@@ -160,38 +170,22 @@
                         <div class="col-md-4">
                           <label class="form-label">First Name</label>
                           <input type="text" name="first_name" class="form-control" 
-                                 value="{{ old('first_name', optional($student->profile)->first_name) }}" required>
+                                 value="{{ old('first_name', $student->profile->first_name) }}" required>
                         </div>
                         <div class="col-md-4">
                           <label class="form-label">Middle Name</label>
                           <input type="text" name="middle_name" class="form-control" 
-                                 value="{{ old('middle_name', optional($student->profile)->middle_name) }}">
+                                 value="{{ old('middle_name', $student->profile->middle_name) }}">
                         </div>
                         <div class="col-md-4">
                           <label class="form-label">Last Name</label>
                           <input type="text" name="last_name" class="form-control" 
-                                 value="{{ old('last_name', optional($student->profile)->last_name) }}" required>
+                                 value="{{ old('last_name', $student->profile->last_name) }}" required>
                         </div>
                         <div class="col-md-6">
                           <label class="form-label">Email</label>
                           <input type="email" name="email" class="form-control" 
                                  value="{{ old('email', $student->email) }}" required>
-                        </div>
-                        <div class="col-md-6">
-                          <label class="form-label">Section</label>
-                          <select name="section_id" class="form-select">
-                            <option value="">-- Select Section --</option>
-                            @foreach($sections->groupBy('gradelevel_id') as $gradeId => $gradeSections)
-                              <optgroup label="{{ $gradeSections->first()->gradeLevel->name }}">
-                                @foreach($gradeSections as $sec)
-                                  <option value="{{ $sec->id }}" 
-                                    @if(optional(optional($student->student)->section)->id == $sec->id) selected @endif>
-                                    {{ $sec->name }}
-                                  </option>
-                                @endforeach
-                              </optgroup>
-                            @endforeach
-                          </select>
                         </div>
                       </div>
                     </div>
@@ -206,7 +200,10 @@
 
           @empty
             <tr>
-              <td colspan="8" class="text-center text-muted">No students found.</td>
+              <td colspan="8" class="text-center text-muted">
+                No enrolled students found. <br>
+                <small>Students will appear here once they’ve been officially enrolled.</small>
+              </td>
             </tr>
           @endforelse
         </tbody>
@@ -217,63 +214,6 @@
     <div class="mt-3">
       {{ $students->links('pagination::bootstrap-5') }}
     </div>
-  </div>
-</div>
-
-<!-- Add Student Modal -->
-<div class="modal fade" id="addStudentModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <form method="POST" action="{{ route('registrars.students.store') }}">
-      @csrf
-      <div class="modal-content">
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i> Add New Student</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-md-4">
-              <label class="form-label">First Name <span class="text-danger">*</span></label>
-              <input type="text" name="first_name" class="form-control" required>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Middle Name</label>
-              <input type="text" name="middle_name" class="form-control">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Last Name <span class="text-danger">*</span></label>
-              <input type="text" name="last_name" class="form-control" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Email <span class="text-danger">*</span></label>
-              <input type="email" name="email" class="form-control" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Section</label>
-              <select name="section_id" class="form-select">
-                <option value="">-- Select Section --</option>
-                @foreach($sections->groupBy('gradelevel_id') as $gradeId => $gradeSections)
-                  <optgroup label="{{ $gradeSections->first()->gradeLevel->name }}">
-                    @foreach($gradeSections as $sec)
-                      <option value="{{ $sec->id }}">{{ $sec->name }}</option>
-                    @endforeach
-                  </optgroup>
-                @endforeach
-              </select>
-            </div>
-            <div class="col-md-12">
-              <small class="text-muted">
-                🔑 LRN will be <strong>auto-generated</strong> once the student is saved.
-              </small>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Student</button>
-        </div>
-      </div>
-    </form>
   </div>
 </div>
 @endsection

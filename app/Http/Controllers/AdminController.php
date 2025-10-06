@@ -69,9 +69,9 @@ class AdminController extends Controller
     {
         $query = Announcement::with('user.profile')
             ->where(function($q) {
-            $q->whereNull('expires_at')
-              ->orWhere('expires_at', '>', now()); 
-        });
+                $q->whereNull('expires_at')
+                ->orWhere('expires_at', '>', now());
+            });
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -81,50 +81,66 @@ class AdminController extends Controller
             });
         }
 
-    $announcements = $query->latest()->paginate(10)->withQueryString();
+        if ($request->filled('target_type') && $request->target_type != 'All') {
+            $query->where('target_type', $request->target_type);
+        }
 
-    return view('admins.announcements', compact('announcements'));
+        $announcements = $query->latest()->paginate(10)->withQueryString();
+
+        $teachers = User::where('role_id', 3)->get();
+        $students = User::where('role_id', 4)->get();
+
+        return view('admins.announcements', compact('announcements', 'teachers', 'students'));
     }
+
 
     public function storeAnnouncement(Request $request)
     {
         $request->validate([
-            'title'      => 'required|string|max:150',
-            'content'    => 'required|string',
-            'expires_at' => 'nullable|date|after_or_equal:today',
+            'title'       => 'required|string|max:150',
+            'content'     => 'required|string',
+            'target_type' => 'required|in:Global,Teacher,Student',
+            'target_id'   => 'nullable|exists:users,id',
+            'expires_at'  => 'nullable|date|after_or_equal:today',
         ]);
 
         Announcement::create([
-            'user_id'    => Auth::id(),
-            'title'      => $request->title,
-            'content'    => $request->content,
-            'expires_at' => $request->expires_at,
+            'user_id'     => Auth::id(),
+            'title'       => $request->title,
+            'content'     => $request->content,
+            'target_type' => $request->target_type,
+            'target_id'   => $request->target_id,
+            'expires_at'  => $request->expires_at,
         ]);
 
-        $this->logActivity('Create Announcement', "Added announcement: {$request->title}");
+        $this->logActivity('Create Announcement', "Added {$request->target_type} announcement: {$request->title}");
 
-        return back()->with('success','Announcement created successfully.');
+        return back()->with('success', 'Announcement created successfully.');
     }
 
     public function updateAnnouncement(Request $request, $id)
     {
-        $announcements = Announcement::findOrFail($id);
+        $announcement = Announcement::findOrFail($id);
 
         $request->validate([
-            'title'      => 'required|string|max:150',
-            'content'    => 'required|string',
-            'expires_at' => 'nullable|date|after_or_equal:today',
+            'title'       => 'required|string|max:150',
+            'content'     => 'required|string',
+            'target_type' => 'required|in:Global,Teacher,Student',
+            'target_id'   => 'nullable|exists:users,id',
+            'expires_at'  => 'nullable|date|after_or_equal:today',
         ]);
 
-        $announcements->update([
-        'title'      => $request->title,
-        'content'    => $request->content,
-        'expires_at' => $request->expires_at,
+        $announcement->update([
+            'title'       => $request->title,
+            'content'     => $request->content,
+            'target_type' => $request->target_type,
+            'target_id'   => $request->target_id,
+            'expires_at'  => $request->expires_at,
         ]);
 
-        $this->logActivity('Update Announcement', "Updated announcement: {$announcements->title}");
+        $this->logActivity('Update Announcement', "Updated {$announcement->target_type} announcement: {$announcement->title}");
 
-        return back()->with('success','Announcement updated successfully.');
+        return back()->with('success', 'Announcement updated successfully.');
     }
 
     public function destroyAnnouncement($id)
@@ -135,6 +151,44 @@ class AdminController extends Controller
         $this->logActivity('Delete Announcement', "Deleted announcement: {$announcement->title}");
 
         return back()->with('success','Announcement deleted successfully.');
+    }
+
+    public function studentRecords(Request $request)
+    {
+        $query = Enrollment::with(['student.user.profile', 'section.gradeLevel', 'schoolYear']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->whereHas('student.user.profile', function ($q) use ($search) {
+                $q->where('first_name', 'like', "%$search%")
+                ->orWhere('last_name', 'like', "%$search%");
+            })->orWhereHas('section', function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%");
+            });
+        }
+
+        if ($request->filled('grade_level')) {
+            $query->whereHas('section.gradeLevel', function ($q) use ($request) {
+                $q->where('name', $request->grade_level);
+            });
+        }
+
+        if ($request->filled('school_year')) {
+            $query->whereHas('schoolYear', function ($q) use ($request) {
+                $q->where('name', $request->school_year);
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $records = $query->paginate(10)->withQueryString();
+
+        $gradeLevels = GradeLevel::pluck('name');
+        $schoolYears = SchoolYear::pluck('name');
+
+        return view('admins.student-records', compact('records', 'gradeLevels', 'schoolYears'));
     }
 
     /**
