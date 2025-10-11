@@ -81,6 +81,12 @@ Route::prefix('admin')->middleware(['auth', 'role:Admin'])->group(function () {
 
     Route::get('/student-records', [AdminController::class, 'studentRecords'])->name('admins.student-records');
 
+    // Admin Student Records Export
+    Route::get('/admin/student-records/export/{format}', [AdminController::class, 'exportStudentRecords'])
+    ->name('admins.exportStudents')
+    ->where('format', 'csv|pdf');
+
+
     // Settings
     Route::get('/settings', [AdminController::class, 'settings'])->name('admins.settings');
     Route::put('/settings', [AdminController::class, 'updateSettings'])->name('admins.updateSettings');
@@ -116,6 +122,10 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::put('/sections/{id}', [RegistrarController::class, 'updateSection'])->name('registrars.sections.update');
     Route::delete('/sections/{id}', [RegistrarController::class, 'destroySection'])->name('registrars.sections.destroy');
 
+    Route::get('/sections/{id}/classlist', [App\Http\Controllers\RegistrarController::class, 'classList'])->name('registrars.classlist');
+    Route::get('/sections/{id}/classlist/pdf', [App\Http\Controllers\RegistrarController::class, 'exportClassListPDF'])->name('registrars.classlist.pdf');
+
+
     Route::get('/enrollment', [RegistrarController::class, 'enrollment'])->name('registrars.enrollment');
     Route::post('/enrollment', [RegistrarController::class, 'storeEnrollment'])->name('registrars.enrollment.store');
     Route::put('/enrollment/{id}/update', [RegistrarController::class, 'updateEnrollment'])->name('registrars.enrollment.update');
@@ -125,19 +135,46 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::get('registrar/enrollment/export/csv', [RegistrarController::class, 'exportCsv'])->name('registrars.enrollment.export.csv');
     Route::get('registrar/enrollment/export/pdf', [RegistrarController::class, 'exportPdf'])->name('registrars.enrollment.export.pdf');
 
+    // Enrollment Verification
+    Route::post('/enrollment/{id}/verify', [RegistrarController::class, 'verifyEnrollment'])->name('registrars.enrollment.verify');
+
+    Route::get('/documents', [App\Http\Controllers\RegistrarController::class, 'allDocuments'])
+        ->name('registrars.documents.all');
+
+    Route::get('/students/{student}/documents', [App\Http\Controllers\RegistrarController::class, 'viewDocuments'])
+        ->name('registrars.documents');
+
+    Route::post('/students/{student}/documents', [App\Http\Controllers\RegistrarController::class, 'storeDocument'])
+        ->name('registrars.documents.store');
+
+    Route::put('/documents/{id}/verify', [App\Http\Controllers\RegistrarController::class, 'verifyDocument'])
+        ->name('registrars.documents.verify');
+
+    Route::delete('/documents/{id}', [App\Http\Controllers\RegistrarController::class, 'destroyDocument'])
+        ->name('registrars.documents.destroy');
+
+    // Student Record Management
+    Route::get('/students/{id}/record', [App\Http\Controllers\RegistrarController::class, 'viewStudentRecord'])
+        ->name('registrars.student.record');
+
+    Route::get('/students/{id}/record/pdf', [App\Http\Controllers\RegistrarController::class, 'exportStudentRecordPDF'])
+        ->name('registrars.student.record.pdf');
+    
+
     Route::post('/registrar/sections/{section}/assign-subject', [RegistrarController::class, 'assignSubject'])->name('registrars.sections.assign');
 
-    Route::get('/reports', [RegistrarController::class, 'reports'])->name('registrars.reports');
-    Route::post('/reports', [RegistrarController::class, 'storeReport'])->name('registrars.reports.store');
-    Route::get('/reports/{report}/edit', [RegistrarController::class, 'editReport'])->name('registrars.reports.edit');
-    Route::put('/reports/{report}', [RegistrarController::class, 'updateReport'])->name('registrars.reports.update');
-    Route::delete('/reports/{report}', [RegistrarController::class, 'destroyReport'])->name('registrars.reports.destroy');
-    Route::post('/reports/filter', [RegistrarController::class, 'filterReports'])->name('registrars.filterReports');
-    Route::get('/reports/{report}/download', [RegistrarController::class, 'downloadReport'])->name('registrars.reports.download');
-    Route::post('/reports/export', [RegistrarController::class, 'exportReportsPDF'])->name('registrars.reports.export.pdf');
-    Route::get('/reports/masterlist', [RegistrarController::class, 'masterlist'])->name('registrars.reports.masterlist');
-    Route::get('/reports/enrollment-summary', [RegistrarController::class, 'enrollmentSummary'])->name('registrars.reports.enrollment.summary');
-    Route::get('/reports/grade-logs', [RegistrarController::class, 'gradeLogs'])->name('registrars.reports.grade.logs');
+    Route::get('/reports', [App\Http\Controllers\RegistrarController::class, 'reports'])
+        ->name('registrars.reports');
+
+    Route::get('/reports/pdf', [App\Http\Controllers\RegistrarController::class, 'exportReportsPDF'])
+        ->name('registrars.reports.pdf');
+
+    Route::get('/certificates', [App\Http\Controllers\RegistrarController::class, 'certificates'])->name('registrars.certificates');
+    Route::post('/certificates', [App\Http\Controllers\RegistrarController::class, 'storeCertificate'])->name('registrars.certificates.store');
+    Route::get('/certificates/{id}/pdf', [App\Http\Controllers\RegistrarController::class, 'generateCertificatePDF'])->name('registrars.certificates.pdf');
+    Route::delete('/certificates/{id}', [App\Http\Controllers\RegistrarController::class, 'destroyCertificate'])->name('registrars.certificates.destroy');
+
+
 
     Route::get('/settings', [RegistrarController::class, 'settings'])->name('registrars.settings');
     Route::put('/settings', [RegistrarController::class, 'updateSettings'])->name('registrars.updateSettings');

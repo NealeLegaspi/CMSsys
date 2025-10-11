@@ -4,195 +4,227 @@
 @section('header','User Management')
 
 @section('content')
-<div class="card shadow-sm">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <h6 class="fw-bold mb-0">👥 Users</h6>
-    <div class="d-flex">
-      <!-- Filter Form -->
-      <form method="GET" class="d-flex me-2">
-        <input type="text" name="search" class="form-control form-control-sm me-2" placeholder="Search name/email..." value="{{ request('search') }}">
-        <select name="role_id" class="form-select form-select-sm me-2">
-          <option value="">All Roles</option>
-          @foreach($roles as $r)
-            <option value="{{ $r->id }}" {{ request('role_id')==$r->id?'selected':'' }}>{{ $r->name }}</option>
-          @endforeach
-        </select>
-        <select name="status" class="form-select form-select-sm me-2">
-          <option value="">All Status</option>
-          <option value="active" {{ request('status')=='active'?'selected':'' }}>Active</option>
-          <option value="inactive" {{ request('status')=='inactive'?'selected':'' }}>Inactive</option>
-        </select>
-        <button class="btn btn-sm btn-outline-primary me-2">Filter</button>
-        <a href="{{ route('admins.users') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
-      </form>
+<div class="container-fluid my-4">
+  <div class="card shadow-sm border-0">
 
-      <!-- Add User Button -->
+    {{-- Header --}}
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <h6 class="fw-bold mb-0">
+        <i class="bi bi-people"></i> User Management
+      </h6>
       <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
-        <i class="bi bi-plus-lg"></i> Add User
+        <i class="bi bi-plus-circle"></i> Add User
       </button>
     </div>
-  </div>
-  <div class="card-body">
-    @include('partials.alerts')
 
-    <table class="table table-bordered table-striped align-middle">
-      <thead class="table-primary">
-        <tr>
-          <th>Name</th>
-          <th>Email</th>
-          <th>Role</th>
-          <th>Status</th>
-          <th>Last Login</th>
-          <th width="260">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        @forelse($users as $u)
-        <tr>
-          <td>
-            @if($u->profile)
-              {{ $u->profile->last_name }},
-              {{ $u->profile->first_name }}
-              {{ $u->profile->middle_name ? substr($u->profile->middle_name,0,1).'.' : '' }}
-            @else
-              N/A
-            @endif
-          </td>
-          <td>{{ $u->email }}</td>
-          <td>{{ $u->role->name ?? '-' }}</td>
-          <td>
-            <span class="badge bg-{{ $u->status=='active'?'success':'secondary' }}">
-              {{ ucfirst($u->status) }}
-            </span>
-          </td>
-          <td>{{ $u->last_login_at ? $u->last_login_at->format('M d, Y H:i') : '-' }}</td>
-          <td>
-            <!-- Edit -->
-            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editUserModal{{ $u->id }}">
-              <i class="bi bi-pencil"></i>
-            </button>
+    {{-- Body --}}
+    <div class="card-body">
 
-            <!-- Toggle Status -->
-            <form action="{{ route('admins.users.toggle',$u->id) }}" method="POST" class="d-inline">
-              @csrf
-              <button class="btn btn-sm btn-{{ $u->status=='active'?'secondary':'success' }}">
-                {{ $u->status=='active'?'Deactivate':'Activate' }}
-              </button>
-            </form>
+      {{-- 🔍 Filters --}}
+      <form method="GET" class="row g-2 align-items-end mb-3">
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Search</label>
+          <input type="text" name="search" class="form-control" placeholder="Search name or email..." value="{{ request('search') }}">
+        </div>
 
-            <!-- Reset Password -->
-            <form action="{{ route('admins.users.reset',$u->id) }}" method="POST" class="d-inline">
-              @csrf
-              <button class="btn btn-sm btn-info">
-                <i class="bi bi-key"></i> Reset
-              </button>
-            </form>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold">Role</label>
+          <select name="role_id" class="form-select">
+            <option value="">All</option>
+            @foreach($roles as $r)
+              <option value="{{ $r->id }}" {{ request('role_id')==$r->id?'selected':'' }}>
+                {{ $r->name }}
+              </option>
+            @endforeach
+          </select>
+        </div>
 
-            <!-- Delete -->
-            <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal{{ $u->id }}">
-              <i class="bi bi-trash"></i>
-            </button>
-          </td>
-        </tr>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold">Status</label>
+          <select name="status" class="form-select">
+            <option value="">All</option>
+            <option value="active" {{ request('status')=='active'?'selected':'' }}>Active</option>
+            <option value="inactive" {{ request('status')=='inactive'?'selected':'' }}>Inactive</option>
+          </select>
+        </div>
 
-        <!-- Edit Modal -->
-        <div class="modal fade" id="editUserModal{{ $u->id }}" tabindex="-1">
-          <div class="modal-dialog modal-lg">
-            <form method="POST" action="{{ route('admins.users.update',$u->id) }}" enctype="multipart/form-data">
-              @csrf @method('PUT')
-              <div class="modal-content">
-                <div class="modal-header bg-warning">
-                  <h5 class="modal-title">Edit User</h5>
-                  <button class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body row g-3">
-                  <!-- Left Column -->
-                  <div class="col-md-6">
-                    <input type="text" name="first_name" value="{{ $u->profile->first_name ?? '' }}" class="form-control mb-2" required>
-                    <input type="text" name="middle_name" value="{{ $u->profile->middle_name ?? '' }}" class="form-control mb-2">
-                    <input type="text" name="last_name" value="{{ $u->profile->last_name ?? '' }}" class="form-control mb-2" required>
-                    <select name="sex" class="form-select mb-2">
-                      <option value="">-- Select Sex --</option>
-                      <option value="Male" {{ ($u->profile->sex ?? '')=='Male'?'selected':'' }}>Male</option>
-                      <option value="Female" {{ ($u->profile->sex ?? '')=='Female'?'selected':'' }}>Female</option>
-                    </select>
-                    <input type="date" name="birthdate" value="{{ $u->profile->birthdate ?? '' }}" class="form-control mb-2">
+        <div class="col-md-3 d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-search"></i> Filter
+          </button>
+          <a href="{{ route('admins.users') }}" class="btn btn-outline-secondary flex-fill">
+            <i class="bi bi-x-circle"></i> Clear
+          </a>
+        </div>
+      </form>
+
+      {{-- Alerts --}}
+      @include('partials.alerts')
+
+      {{-- 📋 User Table --}}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle text-center">
+          <thead class="table-primary">
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Last Login</th>
+              <th width="250">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($users as $u)
+              <tr>
+                <td class="text-start">
+                  @if($u->profile)
+                    {{ $u->profile->last_name }}, {{ $u->profile->first_name }}
+                    {{ $u->profile->middle_name ? substr($u->profile->middle_name,0,1).'.' : '' }}
+                  @else
+                    <em class="text-muted">N/A</em>
+                  @endif
+                </td>
+                <td>{{ $u->email }}</td>
+                <td>{{ $u->role->name ?? '-' }}</td>
+                <td>
+                  <span class="badge bg-{{ $u->status=='active'?'success':'secondary' }}">
+                    {{ ucfirst($u->status) }}
+                  </span>
+                </td>
+                <td>{{ $u->last_login_at ? $u->last_login_at->format('M d, Y h:i A') : '-' }}</td>
+                <td>
+                  <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    {{-- Edit --}}
+                    <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editUserModal{{ $u->id }}">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+
+                    {{-- Activate/Deactivate --}}
+                    <form action="{{ route('admins.users.toggle',$u->id) }}" method="POST" class="d-inline">
+                      @csrf
+                      <button class="btn btn-sm btn-{{ $u->status=='active'?'secondary':'success' }}">
+                        {{ $u->status=='active'?'Deactivate':'Activate' }}
+                      </button>
+                    </form>
+
+                    {{-- Reset Password --}}
+                    <form action="{{ route('admins.users.reset',$u->id) }}" method="POST" class="d-inline">
+                      @csrf
+                      <button class="btn btn-sm btn-info">
+                        <i class="bi bi-key"></i>
+                      </button>
+                    </form>
+
+                    {{-- Delete --}}
+                    <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal{{ $u->id }}">
+                      <i class="bi bi-trash"></i>
+                    </button>
                   </div>
+                </td>
+              </tr>
 
-                  <!-- Right Column -->
-                  <div class="col-md-6">
-                    <input type="text" name="address" value="{{ $u->profile->address ?? '' }}" class="form-control mb-2">
-                    <input type="text" name="contact_number" value="{{ $u->profile->contact_number ?? '' }}" class="form-control mb-2">
-                    <input type="email" name="email" value="{{ $u->email }}" class="form-control mb-2" required>
-                    <select name="role_id" class="form-select mb-2" required>
-                      @foreach($roles as $r)
-                        <option value="{{ $r->id }}" {{ $u->role_id==$r->id?'selected':'' }}>{{ $r->name }}</option>
-                      @endforeach
-                    </select>
+              {{-- ✏️ Edit User Modal --}}
+              <div class="modal fade" id="editUserModal{{ $u->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                  <form method="POST" action="{{ route('admins.users.update',$u->id) }}" enctype="multipart/form-data">
+                    @csrf @method('PUT')
+                    <div class="modal-content">
+                      <div class="modal-header bg-warning text-white">
+                        <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit User</h5>
+                        <button class="btn-close" data-bs-dismiss="modal"></button>
+                      </div>
+                      <div class="modal-body row g-3">
+                        <div class="col-md-6">
+                          <input type="text" name="first_name" value="{{ $u->profile->first_name ?? '' }}" placeholder="First Name" class="form-control mb-2" required>
+                          <input type="text" name="middle_name" value="{{ $u->profile->middle_name ?? '' }}" placeholder="Middle Name" class="form-control mb-2">
+                          <input type="text" name="last_name" value="{{ $u->profile->last_name ?? '' }}" placeholder="Last Name" class="form-control mb-2" required>
+                          <select name="sex" class="form-select mb-2">
+                            <option value="">-- Select Sex --</option>
+                            <option value="Male" {{ ($u->profile->sex ?? '')=='Male'?'selected':'' }}>Male</option>
+                            <option value="Female" {{ ($u->profile->sex ?? '')=='Female'?'selected':'' }}>Female</option>
+                          </select>
+                          <input type="date" name="birthdate" value="{{ $u->profile->birthdate ?? '' }}" class="form-control mb-2">
+                        </div>
+                        <div class="col-md-6">
+                          <input type="text" name="address" value="{{ $u->profile->address ?? '' }}" placeholder="Address" class="form-control mb-2">
+                          <input type="text" name="contact_number" value="{{ $u->profile->contact_number ?? '' }}" placeholder="Contact Number" class="form-control mb-2">
+                          <input type="email" name="email" value="{{ $u->email }}" class="form-control mb-2" required>
+                          <select name="role_id" class="form-select mb-2" required>
+                            @foreach($roles as $r)
+                              <option value="{{ $r->id }}" {{ $u->role_id==$r->id?'selected':'' }}>
+                                {{ $r->name }}
+                              </option>
+                            @endforeach
+                          </select>
 
-                    <!-- Profile Picture -->
-                    <div class="mb-2">
-                      <label class="form-label">Profile Picture</label>
-                      <input type="file" name="profile_picture" class="form-control">
-                      @if($u->profile && $u->profile->profile_picture)
-                        <img src="{{ asset('storage/'.$u->profile->profile_picture) }}" alt="Profile" class="img-thumbnail mt-2" width="100">
-                      @endif
+                          <div class="mb-2">
+                            <label class="form-label">Profile Picture</label>
+                            <input type="file" name="profile_picture" class="form-control">
+                            @if($u->profile && $u->profile->profile_picture)
+                              <img src="{{ asset('storage/'.$u->profile->profile_picture) }}" alt="Profile" class="img-thumbnail mt-2" width="100">
+                            @endif
+                          </div>
+                        </div>
+                      </div>
+                      <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-warning">Update</button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              {{-- 🗑️ Delete User Modal --}}
+              <div class="modal fade" id="deleteUserModal{{ $u->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                  <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                      <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Delete</h5>
+                      <button class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      <p>Are you sure you want to delete user <strong>{{ $u->email }}</strong>? This action cannot be undone.</p>
+                    </div>
+                    <div class="modal-footer">
+                      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      <form method="POST" action="{{ route('admins.users.destroy',$u->id) }}">
+                        @csrf @method('DELETE')
+                        <button class="btn btn-danger">Delete</button>
+                      </form>
                     </div>
                   </div>
                 </div>
-                <div class="modal-footer">
-                  <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                  <button class="btn btn-warning">Update</button>
-                </div>
               </div>
-            </form>
-          </div>
-        </div>
+            @empty
+              <tr><td colspan="6" class="text-center text-muted py-4">
+                <i class="bi bi-info-circle"></i> No users found.
+              </td></tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
 
-        <!-- Delete Modal -->
-        <div class="modal fade" id="deleteUserModal{{ $u->id }}" tabindex="-1">
-          <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-              <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">Delete User</h5>
-                <button class="btn-close" data-bs-dismiss="modal"></button>
-              </div>
-              <div class="modal-body">
-                <p>Are you sure you want to delete <strong>{{ $u->email }}</strong>? This action cannot be undone.</p>
-              </div>
-              <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form action="{{ route('admins.users.destroy',$u->id) }}" method="POST">
-                  @csrf @method('DELETE')
-                  <button class="btn btn-danger">Delete</button>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        @empty
-        <tr><td colspan="6" class="text-center text-muted">No users found.</td></tr>
-        @endforelse
-      </tbody>
-    </table>
-
-    <div class="mt-3">{{ $users->appends(request()->query())->links('pagination::bootstrap-5') }}</div>
+      {{-- Pagination --}}
+      <div class="d-flex justify-content-end mt-3">
+        {{ $users->appends(request()->query())->links('pagination::bootstrap-5') }}
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- Add User Modal -->
-<div class="modal fade" id="addUserModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
+{{-- ➕ Add User Modal --}}
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
     <form method="POST" action="{{ route('admins.users.store') }}" enctype="multipart/form-data">
       @csrf
       <div class="modal-content">
         <div class="modal-header bg-success text-white">
-          <h5 class="modal-title">Add User</h5>
+          <h5 class="modal-title"><i class="bi bi-person-plus"></i> Add User</h5>
           <button class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body row g-3">
-          <!-- Left Column -->
           <div class="col-md-6">
             <input type="text" name="first_name" placeholder="First Name" class="form-control mb-2" required>
             <input type="text" name="middle_name" placeholder="Middle Name" class="form-control mb-2">
@@ -202,10 +234,8 @@
               <option value="Male">Male</option>
               <option value="Female">Female</option>
             </select>
-            <input type="date" name="birthdate" class="form-control mb-2" placeholder="Birthdate">
+            <input type="date" name="birthdate" class="form-control mb-2">
           </div>
-
-          <!-- Right Column -->
           <div class="col-md-6">
             <input type="text" name="address" placeholder="Address" class="form-control mb-2">
             <input type="text" name="contact_number" placeholder="Contact Number" class="form-control mb-2">

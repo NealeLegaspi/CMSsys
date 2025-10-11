@@ -64,25 +64,6 @@ class StudentController extends Controller
         return view('students.announcements', compact('announcements'));
     }
 
-    public function assignments()
-    {
-        $user = Auth::user();
-        $sectionIds = $user->student?->enrollments?->pluck('section_id')->toArray() ?? [];
-
-        $assignments = Assignment::with(['subject', 'section'])
-            ->whereIn('section_id', $sectionIds)
-            ->latest()
-            ->get();
-
-        return view('students.assignments', compact('assignments'));
-    }
-
-    public function showAssignment($id)
-    {
-        $assignment = Assignment::with(['subject', 'section', 'teacher.profile'])->findOrFail($id);
-        return view('students.assignment-show', compact('assignment'));
-    }
-
     public function grades()
     {
         $user = Auth::user();

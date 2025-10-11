@@ -1,18 +1,82 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>Student Reports</title>
   <style>
-    body { font-family: DejaVu Sans, sans-serif; font-size: 12px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #000; padding: 5px; text-align: center; }
-    th { background: #f2f2f2; }
-    h2 { text-align: center; }
+    body {
+      font-family: DejaVu Sans, sans-serif;
+      font-size: 12px;
+      margin: 30px;
+      color: #333;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 15px;
+      position: relative;
+    }
+    .logo {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 70px;
+      height: 70px;
+    }
+    h2 {
+      font-size: 20px;
+      text-transform: uppercase;
+      color: black;
+      margin: 0;
+    }
+    h4 {
+      font-size: 13px;
+      color: #555;
+      margin-top: 3px;
+      font-weight: normal;
+    }
+    hr {
+      border: none;
+      height: 1px;
+      background: #1a237e;
+      margin: 10px 0 15px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      page-break-inside: auto;
+    }
+    th, td {
+      border: 1px solid #444;
+      padding: 6px 5px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    th {
+      background-color: #e3f2fd;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    tr:nth-child(even) {
+      background-color: #fafafa;
+    }
+    .footer {
+      margin-top: 40px;
+      font-size: 11px;
+      text-align: right;
+      color: #777;
+    }
   </style>
 </head>
 <body>
-  <h2>Student Reports</h2>
+
+  <div class="header">
+    <img src="{{ public_path('Mindware.png') }}" class="logo" alt="School Logo">
+    <h2>Children’s Mindware School Inc.</h2>
+    <h4>Teacher’s Student Report</h4>
+  </div>
+  <hr>
+
   <table>
     <thead>
       <tr>
@@ -24,30 +88,41 @@
         <th>Birthdate</th>
         <th>Age</th>
         <th>Contact</th>
-        <th>Grade/Section</th>
+        <th>Grade / Section</th>
         <th>Status</th>
       </tr>
     </thead>
     <tbody>
       @forelse($students as $student)
-      <tr>
-        <td>{{ $student->lrn }}</td>
-        <td>{{ $student->user->profile->last_name }}</td>
-        <td>{{ $student->user->profile->first_name }}</td>
-        <td>{{ $student->user->profile->middle_name }}</td>
-        <td>{{ $student->user->profile->address }}</td>
-        <td>{{ $student->user->profile->birthdate }}</td>
-        <td>{{ \Carbon\Carbon::parse($student->user->profile->birthdate)->age }}</td>
-        <td>{{ $student->user->profile->contact }}</td>
-        <td>{{ $student->section->gradeLevel->name }} - {{ $student->section->name }}</td>
-        <td>{{ $student->status ?? 'Enrolled' }}</td>
-      </tr>
+        @php
+          $profile = $student->user->profile ?? null;
+        @endphp
+        <tr>
+          <td>{{ $student->student_number ?? '—' }}</td>
+          <td>{{ $profile->last_name ?? '—' }}</td>
+          <td>{{ $profile->first_name ?? '—' }}</td>
+          <td>{{ $profile->middle_name ?? '—' }}</td>
+          <td>{{ $profile->address ?? '—' }}</td>
+          <td>{{ $profile->birthdate ? \Carbon\Carbon::parse($profile->birthdate)->format('M d, Y') : '—' }}</td>
+          <td>{{ $profile->birthdate ? \Carbon\Carbon::parse($profile->birthdate)->age : '—' }}</td>
+          <td>{{ $profile->contact ?? '—' }}</td>
+          <td>
+            {{ $student->section?->gradeLevel?->name ?? 'N/A' }} -
+            {{ $student->section?->name ?? 'N/A' }}
+          </td>
+          <td>{{ $student->status ?? 'Enrolled' }}</td>
+        </tr>
       @empty
-      <tr>
-        <td colspan="10">No students found</td>
-      </tr>
+        <tr>
+          <td colspan="10">No students found</td>
+        </tr>
       @endforelse
     </tbody>
   </table>
+
+  <div class="footer">
+    Generated on {{ \Carbon\Carbon::now()->format('F d, Y h:i A') }}
+  </div>
+
 </body>
 </html>

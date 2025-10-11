@@ -93,13 +93,11 @@
               <td>{{ $student->profile->contact_number ?? 'N/A' }}</td>
               <td>{{ $student->student->section->name ?? 'N/A' }}</td>
               <td>
-                <!-- View Button -->
-                <button class="btn btn-sm btn-info text-white" 
-                        data-bs-toggle="modal" 
-                        data-bs-target="#viewStudentModal{{ $student->id }}">
+                <!-- View Record Button -->
+                <a href="{{ route('registrars.student.record', $student->student->id) }}" 
+                  class="btn btn-sm btn-info text-white">
                   <i class="bi bi-eye"></i>
-                </button>
-
+                </a>
                 <!-- Edit Button -->
                 <button class="btn btn-sm btn-warning" 
                         data-bs-toggle="modal" 

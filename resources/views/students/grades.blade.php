@@ -1,48 +1,66 @@
 @extends('layouts.student')
 
-@section('title','My Grades')
-@section('header','Grades')
+@section('title', 'My Grades')
+@section('header', 'Grades')
 
 @section('content')
-<div class="row g-3">
-  <div class="col-md-12">
-    <div class="card card-custom p-4 shadow-sm">
-      <h4 class="fw-bold mb-4">
-        <i class='bx bx-award'></i> My Grades
-      </h4>
-
-      @if($grades->count())
-        <div class="table-responsive">
-          <table class="table table-bordered table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>Subject</th>
-                <th>Quarter</th>
-                <th>Grade</th>
-              </tr>
-            </thead>
-            <tbody>
-              @foreach($grades as $g)
-              <tr>
-                <td>{{ e($g->subject?->name ?? 'N/A') }}</td>
-                <td>{{ e($g->quarter ?? '-') }}</td>
-                <td>
-                  <span class="badge bg-{{ ($g->grade && $g->grade >= 75) ? 'success' : 'danger' }}">
-                    {{ e($g->grade ?? '-') }}
-                  </span>
-                </td>
-              </tr>
-              @endforeach
-            </tbody>
-          </table>
-        </div>
-      @else
-        <div class="alert alert-info text-center m-3">
-          <i class='bx bx-info-circle'></i> No grades available yet.
-        </div>
-      @endif
-
+<div class="container my-4">
+  <div class="card border-0 shadow-sm p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-bold mb-0">
+        <i class="bi bi-award me-2"></i> My Grades
+      </h5>
     </div>
+
+    @if($grades->count())
+      @foreach($grades as $subject => $records)
+        <div class="card mb-4 border-0 shadow-sm">
+          <div class="card-header bg-light fw-bold">
+            <i class="bi bi-book"></i> {{ e($subject) }}
+          </div>
+          <div class="card-body table-responsive">
+            <table class="table table-bordered align-middle mb-0">
+              <thead class="table-light text-center">
+                <tr>
+                  <th>Quarter</th>
+                  <th>Grade</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody class="text-center">
+                @php
+                  $final = $records->avg('grade');
+                  $remarks = $final >= 75 ? 'PASSED' : 'FAILED';
+                @endphp
+                @foreach($records as $g)
+                <tr>
+                  <td>{{ e($g->quarter ?? '-') }}</td>
+                  <td>
+                    <span class="fw-semibold {{ $g->grade < 75 ? 'text-danger' : 'text-success' }}">
+                      {{ e($g->grade ?? '-') }}
+                    </span>
+                  </td>
+                  <td>
+                    {{ $g->grade >= 75 ? 'PASSED' : 'FAILED' }}
+                  </td>
+                </tr>
+                @endforeach
+                <tr class="fw-bold table-light">
+                  <td colspan="1" class="text-end">Final Average:</td>
+                  <td>{{ number_format($final, 2) }}</td>
+                  <td class="{{ $remarks === 'PASSED' ? 'text-success' : 'text-danger' }}">{{ $remarks }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      @endforeach
+    @else
+      <div class="alert alert-info text-center py-4">
+        <i class="bi bi-info-circle fs-4"></i>
+        <p class="mt-2 mb-0">No grades available yet.</p>
+      </div>
+    @endif
   </div>
 </div>
 @endsection

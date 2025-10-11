@@ -9,12 +9,16 @@ use App\Models\Enrollment;
 use App\Models\SchoolYear;
 use App\Models\Student;
 use App\Models\GradeLevel;
+use App\Models\Grade;
 use App\Models\UserProfile;
 use App\Models\ActivityLog;
+use App\Models\StudentDocument; 
+use App\Models\StudentCertificate; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\StudentsExport;
@@ -203,6 +207,42 @@ class RegistrarController extends Controller
         return back()->with('success','Students imported successfully.');
     }
 
+    public function viewStudentRecord($id)
+    {
+        $student = Student::with([
+            'user.profile',
+            'enrollments.section.gradeLevel',
+            'enrollments.schoolYear',
+        ])->findOrFail($id);
+
+        $documents = StudentDocument::where('student_id', $id)->get();
+
+        $grades = Grade::with(['subject', 'enrollment.section.gradeLevel'])
+            ->where('student_id', $id)
+            ->get();
+
+        return view('registrars.student-record', compact('student', 'documents', 'grades'));
+    }
+
+    public function exportStudentRecordPDF($id)
+    {
+        $student = Student::with([
+            'user.profile',
+            'enrollments.section.gradeLevel',
+            'enrollments.schoolYear',
+        ])->findOrFail($id);
+
+        $documents = StudentDocument::where('student_id', $id)->get();
+
+        $grades = Grade::with(['subject', 'enrollment.section.gradeLevel'])
+            ->where('student_id', $id)
+            ->get();
+
+        $pdf = Pdf::loadView('exports.student-record-pdf', compact('student', 'documents', 'grades'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('Student_Record_' . ($student->user->profile->last_name ?? 'Student') . '.pdf');
+    }
     /**
      * Enrollment
      */
@@ -342,6 +382,89 @@ class RegistrarController extends Controller
 
         return $pdf->download('enrollments.pdf');
     }
+
+     public function verifyEnrollment($id)
+    {
+        $enrollment = Enrollment::with('student.documents')->findOrFail($id);
+
+        $hasIncompleteDocs = $enrollment->student->documents()->where('status', '!=', 'Verified')->exists();
+        if ($hasIncompleteDocs) {
+            return back()->withErrors(['error' => 'All documents must be verified before approving enrollment.']);
+        }
+
+        $enrollment->update(['status' => 'Enrolled']);
+        return back()->with('success', 'Enrollment marked as Enrolled.');
+    }
+
+    public function allDocuments(Request $request)
+    {
+        $query = StudentDocument::with(['student.user.profile'])
+            ->latest();
+
+        // 🔍 Search filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->whereHas('student.user.profile', function ($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                ->orWhere('last_name', 'like', "%{$search}%");
+            });
+        }
+
+        $documents = $query->paginate(10)->withQueryString();
+
+        return view('registrars.documents-all', compact('documents'));
+    }
+
+    // ✅ Upload student document
+    public function storeDocument(Request $request, $studentId)
+    {
+        $request->validate([
+            'type' => 'required|string|max:100',
+            'file' => 'required|mimes:pdf,jpg,jpeg,png|max:2048',
+        ]);
+
+        $student = Student::findOrFail($studentId);
+        $path = $request->file('file')->store('student_documents', 'public');
+
+        StudentDocument::create([
+            'student_id' => $student->id,
+            'type' => $request->type,
+            'file_path' => $path,
+            'status' => 'Pending',
+        ]);
+
+        return back()->with('success', 'Document uploaded successfully.');
+    }
+
+    // ✅ View per-student documents
+    public function viewDocuments($studentId)
+    {
+        $student = Student::with('user.profile')->findOrFail($studentId);
+        $documents = StudentDocument::where('student_id', $studentId)->get();
+
+        return view('registrars.documents', compact('student', 'documents'));
+    }
+
+    // ✅ Verify document
+    public function verifyDocument($id)
+    {
+        $doc = StudentDocument::findOrFail($id);
+        $doc->update(['status' => 'Verified']);
+        return back()->with('success', 'Document marked as verified.');
+    }
+
+    // ✅ Delete document
+    public function destroyDocument($id)
+    {
+        $doc = StudentDocument::findOrFail($id);
+
+        if ($doc->file_path && Storage::disk('public')->exists($doc->file_path)) {
+            Storage::disk('public')->delete($doc->file_path);
+        }
+
+        $doc->delete();
+        return back()->with('success', 'Document deleted successfully.');
+    }
     /**
      * Sections
      */
@@ -425,6 +548,92 @@ class RegistrarController extends Controller
 
         return back()->with('success', '✅ Section deleted successfully.');
     }
+
+    public function classList($id)
+    {
+        $section = Section::with(['gradeLevel', 'adviser.profile', 'enrollments.student.user.profile'])->findOrFail($id);
+        $students = $section->enrollments->map(fn($enr) => $enr->student->user);
+
+        return view('registrars.classlist', compact('section', 'students'));
+    }
+
+    public function exportClassListPDF($id)
+    {
+        $section = Section::with([
+            'gradeLevel',
+            'adviser.profile',
+            'enrollments.student.user.profile'
+        ])->findOrFail($id);
+
+        $schoolName = \App\Models\Setting::where('key', 'school_name')->value('value') ?? "Children's Mindware School Inc.";
+        $schoolAddress = \App\Models\Setting::where('key', 'school_address')->value('value') ?? "Mindware Campus";
+        $students = $section->enrollments->map(fn($e) => $e->student->user);
+
+        $pdf = Pdf::loadView('exports.classlist-pdf', compact('section', 'students', 'schoolName', 'schoolAddress'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download("ClassList_{$section->name}.pdf");
+    }
+
+    public function certificates()
+    {
+        $students = Student::with('user.profile')->get();
+        $certificates = StudentCertificate::with(['student.user.profile'])
+            ->latest()
+            ->paginate(10);
+
+        return view('registrars.certificates', compact('students', 'certificates'));
+    }
+
+// 📄 Store and generate certificate
+public function storeCertificate(Request $request)
+{
+    $request->validate([
+        'student_id' => 'required|exists:students,id',
+        'type' => 'required|string|max:100',
+        'remarks' => 'nullable|string|max:255',
+    ]);
+
+    $student = Student::with('user.profile')->findOrFail($request->student_id);
+
+    $certificate = StudentCertificate::create([
+        'student_id' => $student->id,
+        'type' => $request->type,
+        'remarks' => $request->remarks,
+        'issued_by' => Auth::id(),
+    ]);
+
+    // Generate the PDF certificate
+    $pdf = PDF::loadView('exports.certificates.template', [
+        'student' => $student,
+        'certificate' => $certificate,
+        'schoolName' => 'Children\'s Mindware School Inc.',
+        'schoolAddress' => 'Balagtas, Bulacan',
+    ])->setPaper('a4', 'portrait');
+
+    $path = "certificates/{$certificate->id}.pdf";
+    Storage::disk('public')->put($path, $pdf->output());
+
+    $certificate->update(['file_path' => $path]);
+
+    return back()->with('success', 'Certificate issued successfully.');
+}
+
+// 📄 View or regenerate PDF
+public function generatePDF($id)
+{
+    $certificate = StudentCertificate::with('student.user.profile')->findOrFail($id);
+    $student = $certificate->student;
+
+    $pdf = PDF::loadView('exports.certificates.template', [
+        'student' => $student,
+        'certificate' => $certificate,
+        'schoolName' => 'Children\'s Mindware School Inc.',
+        'schoolAddress' => 'Balagtas, Bulacan',
+    ])->setPaper('a4', 'portrait');
+
+    return $pdf->download("{$certificate->type}-{$student->user->profile->last_name}.pdf");
+}
 
     /**
      * Teachers
@@ -566,52 +775,69 @@ class RegistrarController extends Controller
     /**
      * Reports
      */
-    public function reports()
+    public function reports(Request $request)
     {
-        $students = User::where('role_id', 4)->count();
-        $teachers = User::where('role_id', 3)->count();
-        $sections = Section::count();
         $activeSY = SchoolYear::where('status', 'active')->first();
+        $schoolYearId = $request->get('school_year_id', $activeSY?->id);
 
-        $enrollments = Enrollment::with('schoolYear')->get();
+        $schoolYears = SchoolYear::orderBy('id', 'desc')->get();
+
+        // Enrollment summary
+        $totalEnrolled = Enrollment::where('school_year_id', $schoolYearId)->count();
+        $maleCount = Enrollment::whereHas('student.user.profile', fn($q) => $q->where('sex', 'Male'))
+                            ->where('school_year_id', $schoolYearId)->count();
+        $femaleCount = Enrollment::whereHas('student.user.profile', fn($q) => $q->where('sex', 'Female'))
+                                ->where('school_year_id', $schoolYearId)->count();
+
+        // Enrollment by Grade Level
+        $byGradeLevel = Enrollment::select('grade_levels.name as grade', DB::raw('COUNT(enrollments.id) as total'))
+            ->join('sections', 'sections.id', '=', 'enrollments.section_id')
+            ->join('grade_levels', 'grade_levels.id', '=', 'sections.gradelevel_id')
+            ->where('enrollments.school_year_id', $schoolYearId)
+            ->groupBy('grade_levels.name')
+            ->orderBy('grade_levels.name')
+            ->get();
 
         return view('registrars.reports', compact(
-            'students',
-            'teachers',
-            'sections',
+            'schoolYears',
+            'schoolYearId',
             'activeSY',
-            'enrollments'
+            'totalEnrolled',
+            'maleCount',
+            'femaleCount',
+            'byGradeLevel'
         ));
     }
 
-    public function masterlist()
+    // Export summary to PDF
+    public function exportReportsPDF(Request $request)
     {
-        $students = User::with('profile')
-            ->where('role_id', 4)
-            ->orderBy('id','asc')
+        $schoolYearId = $request->get('school_year_id');
+        $schoolYear = SchoolYear::find($schoolYearId);
+
+        $totalEnrolled = Enrollment::where('school_year_id', $schoolYearId)->count();
+        $maleCount = Enrollment::whereHas('student.user.profile', fn($q) => $q->where('sex', 'Male'))
+                            ->where('school_year_id', $schoolYearId)->count();
+        $femaleCount = Enrollment::whereHas('student.user.profile', fn($q) => $q->where('sex', 'Female'))
+                                ->where('school_year_id', $schoolYearId)->count();
+
+        $byGradeLevel = Enrollment::select('grade_levels.name as grade', DB::raw('COUNT(enrollments.id) as total'))
+            ->join('sections', 'sections.id', '=', 'enrollments.section_id')
+            ->join('grade_levels', 'grade_levels.id', '=', 'sections.gradelevel_id')
+            ->where('enrollments.school_year_id', $schoolYearId)
+            ->groupBy('grade_levels.name')
+            ->orderBy('grade_levels.name')
             ->get();
 
-        $pdf = PDF::loadView('reports.masterlist', compact('students'));
-        return $pdf->download('masterlist.pdf');
-    }
+        $pdf = Pdf::loadView('exports.reports-summary-pdf', compact(
+            'schoolYear',
+            'totalEnrolled',
+            'maleCount',
+            'femaleCount',
+            'byGradeLevel'
+        ))->setPaper('a4', 'portrait');
 
-    public function enrollmentSummary()
-    {
-        $enrollments = Enrollment::with(['student.user.profile','section','schoolYear'])
-            ->orderBy('school_year_id','desc')
-            ->get();
-
-        $pdf = PDF::loadView('reports.enrollment-summary', compact('enrollments'));
-        return $pdf->download('enrollment-summary.pdf');
-    }
-    public function gradeLogs()
-    {
-        $logs = ActivityLog::where('action','like','%Grade%')
-            ->orderBy('created_at','desc')
-            ->get();
-
-        $pdf = PDF::loadView('reports.grade-logs', compact('logs'));
-        return $pdf->download('grade-validation-logs.pdf');
+        return $pdf->download('Enrollment_Report_'.$schoolYear->name.'.pdf');
     }
 
     /**

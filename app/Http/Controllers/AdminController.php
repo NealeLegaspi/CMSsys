@@ -191,6 +191,47 @@ class AdminController extends Controller
         return view('admins.student-records', compact('records', 'gradeLevels', 'schoolYears'));
     }
 
+    public function exportStudentRecords(Request $request, $format)
+    {
+        $query = Enrollment::with(['student.user.profile', 'section.gradeLevel', 'schoolYear']);
+
+        if ($request->filled('grade_level')) {
+            $query->whereHas('section.gradeLevel', fn($q) => $q->where('name', $request->grade_level));
+        }
+
+        if ($request->filled('school_year')) {
+            $query->whereHas('schoolYear', fn($q) => $q->where('name', $request->school_year));
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $records = $query->get();
+
+        if (in_array($format, ['xlsx', 'csv'])) {
+            $export = new EnrollmentReportExport($request->school_year, $request->status);
+            $filename = "student_records.{$format}";
+            return Excel::download($export, $filename);
+        }
+
+        if ($format === 'pdf') {
+            $schoolName = Setting::where('key', 'school_name')->value('value') ?? 'Children’s Mindware School Inc.';
+            $schoolAddress = Setting::where('key', 'school_address')->value('value') ?? 'Balagtas, Bulacan';
+
+            $pdf = PDF::loadView('exports.student-records-pdf', [
+                'records' => $records,
+                'schoolName' => $schoolName,
+                'schoolAddress' => $schoolAddress,
+                'generatedAt' => now()->format('F d, Y h:i A'),
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->download('student_records.pdf');
+        }
+
+        return back()->with('error', 'Invalid export format.');
+    }
+
     /**
      * User Management
      */

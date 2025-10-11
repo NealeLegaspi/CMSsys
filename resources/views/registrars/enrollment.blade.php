@@ -26,7 +26,7 @@
     <!-- Search & Filter -->
     <form method="GET" action="{{ route('registrars.enrollment') }}" class="row g-2 mb-3">
       <div class="col-md-4">
-        <input type="text" name="search" class="form-control" value="{{ request('search') }}" placeholder="Search LRN, Name or Section...">
+        <input type="text" name="search" class="form-control" value="{{ request('search') }}" placeholder="Search Name or Section...">
       </div>
       <div class="col-md-3">
         <select name="school_year_id" class="form-select">
@@ -53,108 +53,108 @@
             <th>Student Name</th>
             <th>Section</th>
             <th>School Year</th>
-            <th width="160">Actions</th>
+            <th>Status</th>
+            <th width="230">Actions</th>
           </tr>
         </thead>
         <tbody>
           @forelse($enrollments as $index => $enrollment)
-            <tr class="{{ $enrollment->schoolYear->status === 'active' ? 'table-success' : '' }}">
+            <tr>
               <td>{{ $enrollments->firstItem() + $index }}</td>
               <td class="fw-bold text-primary">{{ $enrollment->student->student_number ?? 'N/A' }}</td>
-              <td>{{ $enrollment->student->user->profile->first_name ?? '' }} {{ $enrollment->student->user->profile->last_name ?? '' }}</td>
-              <td>
-                {{ $enrollment->section->name ?? 'N/A' }}
-                @if($enrollment->section && $enrollment->section->capacity)
-                  <span class="text-muted small">
-                    ({{ $enrollment->section->enrollments->count() }}/{{ $enrollment->section->capacity }})
-                  </span>
-                @endif
-              </td>
+              <td>{{ $enrollment->student->user->profile->full_name ?? '' }}</td>
+              <td>{{ $enrollment->section->name ?? 'N/A' }}</td>
               <td>{{ $enrollment->schoolYear->name ?? 'N/A' }}</td>
               <td>
-                <!-- Edit -->
+                <span class="badge 
+                  @if($enrollment->status == 'Enrolled') bg-success
+                  @elseif($enrollment->status == 'For Verification') bg-warning text-dark
+                  @else bg-secondary @endif">
+                  {{ $enrollment->status }}
+                </span>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#docsModal{{ $enrollment->student->id }}">
+                  📎 Docs
+                </button>
+
+                @if($enrollment->status !== 'Enrolled')
+                <form method="POST" action="{{ route('registrars.enrollment.verify', $enrollment->id) }}" class="d-inline">
+                  @csrf
+                  <button class="btn btn-sm btn-success">
+                    <i class="bi bi-check-circle"></i> Verify
+                  </button>
+                </form>
+                @endif
+
                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editEnrollmentModal{{ $enrollment->id }}">
                   <i class="bi bi-pencil"></i>
                 </button>
-
-                <!-- Delete -->
                 <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteEnrollmentModal{{ $enrollment->id }}">
                   <i class="bi bi-trash"></i>
                 </button>
               </td>
             </tr>
 
-            <!-- Edit Modal -->
-            <div class="modal fade" id="editEnrollmentModal{{ $enrollment->id }}" tabindex="-1" aria-hidden="true">
-              <div class="modal-dialog">
-                <form method="POST" action="{{ route('registrars.enrollment.update', $enrollment->id) }}">
-                  @csrf @method('PUT')
-                  <div class="modal-content">
-                    <div class="modal-header bg-warning text-dark">
-                      <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i> Edit Enrollment</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                      <p><strong>Student:</strong> {{ $enrollment->student->user->profile->first_name }} {{ $enrollment->student->user->profile->last_name }}</p>
-                      <div class="mb-3">
-                        <label class="form-label">Section</label>
-                        <select name="section_id" class="form-select" required>
-                          @foreach($sections as $sec)
-                            @php
-                              $enrolledCount = $sec->enrollments->count();
-                            @endphp
-                            <option value="{{ $sec->id }}" 
-                              {{ $enrollment->section_id == $sec->id ? 'selected' : '' }}
-                              {{ $enrolledCount >= $sec->capacity && $enrollment->section_id != $sec->id ? 'disabled' : '' }}>
-                              {{ $sec->name }} ({{ $enrolledCount }}/{{ $sec->capacity ?? '∞' }})
-                            </option>
-                          @endforeach
-                        </select>
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">School Year</label>
-                        <select name="school_year_id" class="form-select" required>
-                          @foreach($schoolYears as $sy)
-                            <option value="{{ $sy->id }}" {{ $enrollment->school_year_id == $sy->id ? 'selected' : '' }}>
-                              {{ $sy->name }}
-                            </option>
-                          @endforeach
-                        </select>
-                      </div>
-                    </div>
-                    <div class="modal-footer">
-                      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                      <button class="btn btn-warning">Update</button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            </div>
-
-            <!-- Delete Modal -->
-            <div class="modal fade" id="deleteEnrollmentModal{{ $enrollment->id }}" tabindex="-1">
-              <div class="modal-dialog modal-dialog-centered">
+            <!-- Docs Modal -->
+            <div class="modal fade" id="docsModal{{ $enrollment->student->id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-lg">
                 <div class="modal-content">
-                  <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Delete</h5>
+                  <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">Documents for {{ $enrollment->student->user->profile->full_name ?? 'Student' }}</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                   </div>
                   <div class="modal-body">
-                    Are you sure you want to remove <strong>{{ $enrollment->student->user->profile->first_name }} {{ $enrollment->student->user->profile->last_name }}</strong> from <strong>{{ $enrollment->section->name }}</strong>?
-                  </div>
-                  <div class="modal-footer">
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <form action="{{ route('registrars.enrollment.destroy', $enrollment->id) }}" method="POST" class="d-inline">
-                      @csrf @method('DELETE')
-                      <button type="submit" class="btn btn-danger">Delete</button>
+                    <form method="POST" action="{{ route('registrars.documents.store', $enrollment->student->id) }}" enctype="multipart/form-data">
+                      @csrf
+                      <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                          <select name="type" class="form-select" required>
+                            <option value="Birth Certificate">Birth Certificate</option>
+                            <option value="Form 137">Form 137</option>
+                            <option value="Good Moral">Good Moral</option>
+                          </select>
+                        </div>
+                        <div class="col-md-6">
+                          <input type="file" name="file" class="form-control" required>
+                        </div>
+                      </div>
+                      <div class="text-end">
+                        <button class="btn btn-primary"><i class="bi bi-upload"></i> Upload</button>
+                      </div>
                     </form>
+
+                    <hr>
+                    <table class="table table-sm table-bordered">
+                      <thead class="table-light">
+                        <tr><th>Type</th><th>Status</th><th>Action</th></tr>
+                      </thead>
+                      <tbody>
+                        @foreach($enrollment->student->documents as $doc)
+                          <tr>
+                            <td>{{ $doc->type }}</td>
+                            <td>{{ $doc->status }}</td>
+                            <td>
+                              <a href="{{ asset('storage/'.$doc->file_path) }}" target="_blank" class="btn btn-sm btn-outline-primary">View</a>
+                              @if($doc->status != 'Verified')
+                              <form action="{{ route('registrars.documents.verify', $doc->id) }}" method="POST" class="d-inline">@csrf
+                                <button class="btn btn-sm btn-success">Mark Verified</button>
+                              </form>
+                              @endif
+                              <form action="{{ route('registrars.documents.destroy', $doc->id) }}" method="POST" class="d-inline">@csrf @method('DELETE')
+                                <button class="btn btn-sm btn-danger">Delete</button>
+                              </form>
+                            </td>
+                          </tr>
+                        @endforeach
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
             </div>
-
           @empty
-            <tr><td colspan="6" class="text-center text-muted">No enrollments yet.</td></tr>
+            <tr><td colspan="7" class="text-center text-muted">No enrollments yet.</td></tr>
           @endforelse
         </tbody>
       </table>
@@ -179,7 +179,7 @@
             <select name="student_id" class="form-select" required>
               <option value="">-- Choose --</option>
               @foreach($students as $s)
-                <option value="{{ $s->id }}">{{ $s->student_number }} - {{ $s->user->profile->first_name }} {{ $s->user->profile->last_name }}</option>
+                <option value="{{ $s->id }}">{{ $s->student_number }} - {{ $s->user->profile->full_name }}</option>
               @endforeach
             </select>
           </div>
@@ -188,9 +188,7 @@
             <select name="section_id" class="form-select" required>
               <option value="">-- Choose --</option>
               @foreach($sections as $sec)
-                @php
-                  $enrolledCount = $sec->enrollments->count();
-                @endphp
+                @php $enrolledCount = $sec->enrollments->count(); @endphp
                 <option value="{{ $sec->id }}" {{ $enrolledCount >= $sec->capacity ? 'disabled' : '' }}>
                   {{ $sec->name }} ({{ $enrolledCount }}/{{ $sec->capacity ?? '∞' }})
                 </option>

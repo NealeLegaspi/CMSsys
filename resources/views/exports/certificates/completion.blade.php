@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body { font-family: DejaVu Sans, sans-serif; text-align:center; margin:60px; }
+h2 { margin-bottom:0; }
+h4 { margin-top:0; }
+p { font-size:14px; }
+.signature { margin-top:60px; text-align:right; margin-right:100px; }
+</style>
+</head>
+<body>
+  <h2>{{ $schoolName }}</h2>
+  <h4>{{ $schoolAddress }}</h4>
+  <h3 style="margin-top:30px;">CERTIFICATE OF COMPLETION</h3>
+  <p>This certifies that <strong>{{ $student->user->profile->first_name }} {{ $student->user->profile->last_name }}</strong>
+     has successfully completed all academic requirements for their grade level at <strong>{{ $schoolName }}</strong>.</p>
+  @if($certificate->purpose)
+  <p><em>Purpose: {{ $certificate->purpose }}</em></p>
+  @endif
+  <div class="signature">
+    <p>__________________________<br>{{ $registrarName }}<br><em>Registrar</em></p>
+  </div>
+  <p style="margin-top:40px;font-size:12px;">Issued on {{ now()->format('F d, Y') }}</p>
+</body>
+</html>

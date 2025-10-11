@@ -37,4 +37,9 @@ class Student extends Model
             'id'         // Local key on users table
         );
     }
+
+    public function documents()
+    {
+        return $this->hasMany(StudentDocument::class);
+    }
 }

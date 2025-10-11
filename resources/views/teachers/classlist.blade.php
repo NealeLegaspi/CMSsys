@@ -4,60 +4,68 @@
 @section('header','Class List')
 
 @section('content')
-<div class="container my-4">
+<div class="container-fluid my-4">
+
   <!-- Tabs -->
-  <ul class="nav nav-tabs" id="classlistTab" role="tablist">
+  <ul class="nav nav-tabs mb-3" id="classlistTab" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="advisory-tab" data-bs-toggle="tab" data-bs-target="#advisory" type="button" role="tab">
-        <i class="bi bi-people-fill"></i> Advisory Class
+      <button class="nav-link active fw-semibold" id="advisory-tab" data-bs-toggle="tab" data-bs-target="#advisory" type="button" role="tab">
+        <i class="bi bi-people-fill text-primary me-1"></i> Advisory Class
       </button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="subjects-tab" data-bs-toggle="tab" data-bs-target="#subjects" type="button" role="tab">
-        <i class="bi bi-book-half"></i> My Subjects
+      <button class="nav-link fw-semibold" id="subjects-tab" data-bs-toggle="tab" data-bs-target="#subjects" type="button" role="tab">
+        <i class="bi bi-book-half text-success me-1"></i> My Subjects
       </button>
     </li>
   </ul>
 
-  <div class="tab-content mt-4">
-    <!-- Advisory -->
+  <div class="tab-content" id="classlistTabContent">
+
+    <!-- Advisory Class -->
     <div class="tab-pane fade show active" id="advisory" role="tabpanel">
       @if(!empty($sectionId))
-        <!-- Summary Card -->
-        <div class="card shadow-sm mb-4">
+        <!-- Summary -->
+        <div class="card border-0 shadow-sm rounded-3 mb-4">
           <div class="card-body d-flex justify-content-between align-items-center">
             <div>
-              <h5 class="mb-1 fw-bold text-primary">
-                Class: {{ $sectionName ?? 'No Advisory Section Assigned' }}
+              <h5 class="fw-bold text-primary mb-1">
+                <i class="bi bi-mortarboard me-2"></i> Class: {{ $sectionName ?? 'No Advisory Section Assigned' }}
               </h5>
               <p class="mb-0 text-muted">
-                Total Students: <span class="fw-semibold">{{ count($studentsMale ?? []) + count($studentsFemale ?? []) }}</span>
+                Total Students: 
+                <span class="fw-semibold">{{ count($studentsMale ?? []) + count($studentsFemale ?? []) }}</span>
               </p>
             </div>
-            <a href="{{ route('teachers.classlist.export') }}" class="btn btn-sm btn-outline-primary">
-              <i class="bi bi-file-earmark-pdf"></i> Export to PDF
+            <a href="{{ route('teachers.classlist.export') }}" class="btn btn-outline-primary">
+              <i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
             </a>
           </div>
         </div>
 
-        <!-- 🔎 Search + Filter -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <input type="text" id="searchInput" class="form-control w-50" placeholder="Search by LRN or Name...">
-          <select id="statusFilter" class="form-select w-25 ms-2">
-            <option value="">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
+        <!-- Filters -->
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+            <div class="d-flex flex-wrap gap-2">
+              <input type="text" id="searchInput" class="form-control" placeholder="🔍 Search by LRN or Name..." style="min-width: 280px;">
+              <select id="statusFilter" class="form-select" style="min-width: 180px;">
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+            <span class="text-muted small"><i class="bi bi-info-circle me-1"></i> Filter updates automatically</span>
+          </div>
         </div>
 
         <!-- Male Students -->
-        <div class="card shadow-sm mb-4">
-          <div class="card-header bg-primary text-white fw-bold">
-            <i class="bi bi-gender-male"></i> Male Students ({{ count($studentsMale ?? []) }})
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-primary text-white fw-semibold">
+            <i class="bi bi-gender-male me-1"></i> Male Students ({{ count($studentsMale ?? []) }})
           </div>
           <div class="card-body table-responsive">
             @if(!empty($studentsMale) && count($studentsMale) > 0)
-              <table class="table table-striped table-hover align-middle student-table">
+              <table class="table table-hover align-middle student-table">
                 <thead class="table-light">
                   <tr>
                     <th>LRN</th>
@@ -86,19 +94,19 @@
                 </tbody>
               </table>
             @else
-              <p class="text-muted">No male students enrolled.</p>
+              <p class="text-muted mb-0">No male students enrolled.</p>
             @endif
           </div>
         </div>
 
         <!-- Female Students -->
-        <div class="card shadow-sm mb-4">
-          <div class="card-header text-white fw-bold" style="background-color:#d63384">
-            <i class="bi bi-gender-female"></i> Female Students ({{ count($studentsFemale ?? []) }})
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header text-white fw-semibold" style="background-color: #d63384;">
+            <i class="bi bi-gender-female me-1"></i> Female Students ({{ count($studentsFemale ?? []) }})
           </div>
           <div class="card-body table-responsive">
             @if(!empty($studentsFemale) && count($studentsFemale) > 0)
-              <table class="table table-striped table-hover align-middle student-table">
+              <table class="table table-hover align-middle student-table">
                 <thead class="table-light">
                   <tr>
                     <th>LRN</th>
@@ -127,24 +135,27 @@
                 </tbody>
               </table>
             @else
-              <p class="text-muted">No female students enrolled.</p>
+              <p class="text-muted mb-0">No female students enrolled.</p>
             @endif
           </div>
         </div>
       @else
-        <div class="alert alert-warning">
-          <i class="bi bi-info-circle"></i> No advisory section assigned to you yet.
+        <div class="alert alert-warning shadow-sm border-0">
+          <i class="bi bi-info-circle me-1"></i> No advisory section assigned to you yet.
         </div>
       @endif
     </div>
 
-    <!-- Subjects -->
+    <!-- My Subjects -->
     <div class="tab-pane fade" id="subjects" role="tabpanel">
       @if(!empty($mySubjects) && count($mySubjects) > 0)
-        <div class="card shadow-sm">
+        <div class="card border-0 shadow-sm rounded-3">
+          <div class="card-header bg-light fw-semibold">
+            <i class="bi bi-book text-success me-2"></i> Subjects You Handle
+          </div>
           <div class="card-body table-responsive">
-            <table class="table table-striped table-hover align-middle">
-              <thead class="table-light">
+            <table class="table table-hover align-middle">
+              <thead class="table-primary text-center">
                 <tr>
                   <th>Grade Level</th>
                   <th>Section</th>
@@ -153,7 +164,7 @@
               </thead>
               <tbody>
                 @foreach($mySubjects as $sub)
-                <tr>
+                <tr class="text-center">
                   <td>{{ $sub->gradelevel ?? 'N/A' }}</td>
                   <td>{{ $sub->section_name ?? 'N/A' }}</td>
                   <td>{{ $sub->subject_name ?? 'N/A' }}</td>
@@ -164,15 +175,15 @@
           </div>
         </div>
       @else
-        <div class="alert alert-info">
-          <i class="bi bi-info-circle"></i> No subjects assigned to you yet.
+        <div class="alert alert-info shadow-sm border-0">
+          <i class="bi bi-info-circle me-1"></i> No subjects assigned to you yet.
         </div>
       @endif
     </div>
   </div>
 </div>
 
-<!-- 🔎 Search & Filter Script -->
+<!-- Search & Filter Script -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
   const searchInput = document.getElementById("searchInput");
@@ -181,16 +192,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function filterTable() {
     const searchText = searchInput.value.toLowerCase();
-    const filterStatus = statusFilter.value;
+    const filterStatus = statusFilter.value.toLowerCase();
 
     tables.forEach(tbody => {
       Array.from(tbody.querySelectorAll("tr")).forEach(row => {
         const rowText = row.innerText.toLowerCase();
-        const status = row.querySelector("td:last-child")?.innerText.trim();
-
+        const status = row.querySelector("td:last-child")?.innerText.toLowerCase() || "";
         const matchesSearch = rowText.includes(searchText);
-        const matchesStatus = !filterStatus || status === filterStatus;
-
+        const matchesStatus = !filterStatus || status.includes(filterStatus);
         row.style.display = (matchesSearch && matchesStatus) ? "" : "none";
       });
     });
