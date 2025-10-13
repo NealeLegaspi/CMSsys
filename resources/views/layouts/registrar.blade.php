@@ -62,10 +62,6 @@
        class="nav-link {{ request()->routeIs('registrars.sections') ? 'active' : '' }}">
        <i class='bx bx-grid-alt me-2'></i> Sections
     </a>
-    <!---<a href="{{ route('registrars.teachers') }}" 
-       class="nav-link {{ request()->routeIs('registrars.teachers') ? 'active' : '' }}">
-       <i class='bx bx-chalkboard me-2'></i> Teachers
-    </a>-->
     <a href="{{ route('registrars.reports') }}" 
        class="nav-link {{ request()->routeIs('registrars.reports') ? 'active' : '' }}">
        <i class='bx bx-file me-2'></i> Reports
@@ -88,15 +84,19 @@
           Hi, {{ optional(auth()->user()->profile)->first_name ?? 'Registrar' }} 👩‍💼
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{{ route('registrars.settings') }}">⚙️ Settings</a></li>
+          <li>
+            <a class="dropdown-item" href="{{ route('registrars.settings') }}">
+              <i class="bi bi-gear me-2"></i> Settings
+            </a>
+          </li>
           <li><hr class="dropdown-divider"></li>
           <li>
             <a class="dropdown-item text-danger" href="{{ route('logout') }}"
-               onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-              🚪 Logout
+              onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+              <i class="bi bi-box-arrow-right me-2"></i> Logout
             </a>
           </li>
-        </ul>
+        </ul> 
         <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">@csrf</form>
       </div>
     </div>

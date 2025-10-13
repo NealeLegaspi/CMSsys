@@ -47,10 +47,6 @@
        class="nav-link {{ request()->routeIs('teachers.announcements') ? 'active' : '' }}">
        <i class='bx bx-bell me-2'></i> Announcements
     </a>
-    <!----<a href="{{ route('teachers.assignments') }}" 
-       class="nav-link {{ request()->routeIs('teachers.assignments') ? 'active' : '' }}">
-       <i class='bx bx-task me-2'></i> Assignments
-    </a> ----->
     <a href="{{ route('teachers.classlist') }}" 
        class="nav-link {{ request()->routeIs('teachers.classlist') ? 'active' : '' }}">
        <i class='bx bx-group me-2'></i> Class List
@@ -81,12 +77,16 @@
           Hi, {{ optional(auth()->user()->profile)->first_name ?? 'Teacher' }} 👨‍🏫
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{{ route('teachers.settings') }}">⚙️ Settings</a></li>
+          <li>
+            <a class="dropdown-item" href="{{ route('teachers.settings') }}">
+              <i class="bi bi-gear me-2"></i> Settings
+            </a>
+          </li>
           <li><hr class="dropdown-divider"></li>
           <li>
             <a class="dropdown-item text-danger" href="{{ route('logout') }}"
-               onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-              🚪 Logout
+              onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+              <i class="bi bi-box-arrow-right me-2"></i> Logout
             </a>
           </li>
         </ul>

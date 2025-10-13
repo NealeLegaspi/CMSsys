@@ -89,12 +89,16 @@
           Hi, {{ optional(auth()->user()->profile)->first_name ?? 'Admin' }} 👨‍💼
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{{ route('admins.settings') }}">⚙️ Settings</a></li>
+          <li>
+            <a class="dropdown-item" href="{{ route('admins.settings') }}">
+              <i class="bi bi-gear me-2"></i> Settings
+            </a>
+          </li>
           <li><hr class="dropdown-divider"></li>
           <li>
             <a class="dropdown-item text-danger" href="{{ route('logout') }}"
-               onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-              🚪 Logout
+              onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+              <i class="bi bi-box-arrow-right me-2"></i> Logout
             </a>
           </li>
         </ul>
