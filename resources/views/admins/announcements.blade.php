@@ -21,9 +21,9 @@
         <div class="col-md-6">
           <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Search by title or content...">
         </div>
-        <div class="col-md-3 d-flex">
-          <button type="submit" class="btn btn-primary me-2"><i class="bi bi-search"></i></button>
-          <a href="{{ route('admins.announcements') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i></a>
+        <div class="col-md-4">
+          <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
+          <a href="{{ route('admins.announcements') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Reset</a>
         </div>
       </form>
 

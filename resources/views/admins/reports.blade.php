@@ -35,9 +35,12 @@
 
         {{-- Filter --}}
         <div class="col-md-2">
-          <button class="btn btn-primary w-100">
-            <i class="bi bi-funnel me-1"></i> Filter
+          <button class="btn btn-outline-primary flex-fill">
+            <i class="bi bi-search"></i> Search
           </button>
+          <a href="{{ route('admins.reports') }}" class="btn btn-outline-secondary flex-fill">
+            <i class="bi bi-arrow-clockwise"></i> Reset
+          </a>
         </div>
 
         {{-- Export Buttons --}}

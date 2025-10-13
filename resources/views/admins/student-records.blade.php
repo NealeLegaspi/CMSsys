@@ -65,11 +65,11 @@
         </div>
 
         <div class="col-md-2 d-flex gap-2">
-          <button type="submit" class="btn btn-primary flex-fill">
-            <i class="bi bi-search"></i> Filter
+          <button type="submit" class="btn btn-outline-primary flex-fill">
+            <i class="bi bi-search"></i> Search
           </button>
           <a href="{{ route('admins.student-records') }}" class="btn btn-outline-secondary flex-fill">
-            <i class="bi bi-x-circle"></i> Clear
+            <i class="bi bi-arrow-clockwise"></i> Reset
           </a>
         </div>
       </form>

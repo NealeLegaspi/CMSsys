@@ -6,7 +6,9 @@
 @section('content')
 <div class="card card-custom shadow-sm border-0">
   <div class="card-header d-flex justify-content-between align-items-center bg-light">
-    <h6 class="fw-bold mb-0">📘 Enrolled Students</h6>
+    <h6 class="fw-bold mb-0">
+      <i class="bi bi-journal-check me-2"></i> Enrolled Students
+    </h6>
     {{-- Optional: Uncomment if you still want to manually add students --}}
     {{-- 
     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addStudentModal">
@@ -48,11 +50,11 @@
         </select>
       </div>
       <div class="col-md-4">
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-outline-primary">
           <i class="bi bi-search"></i> Search
         </button>
-        <a href="{{ route('registrars.students') }}" class="btn btn-secondary">
-          <i class="bi bi-arrow-repeat"></i> Reset
+        <a href="{{ route('registrars.students') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-clockwise"></i> Reset
         </a>
       </div>
     </form>

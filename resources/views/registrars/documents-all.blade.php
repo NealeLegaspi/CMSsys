@@ -1,13 +1,16 @@
 @extends('layouts.registrar')
 
-@section('title','All Student Documents')
-@section('header','All Student Documents')
+@section('title','Student Documents')
+@section('header','Student Documents')
 
 @section('content')
 <div class="card shadow-sm border-0">
   <div class="card-header bg-light d-flex justify-content-between align-items-center">
-    <h6 class="fw-bold mb-0">📄 Student Documents</h6>
-  </div>
+  <h6 class="fw-bold mb-0">
+    <i class="bi bi-file-earmark-text-fill me-2"></i> Student Documents
+  </h6>
+</div>
+
 
   <div class="card-body">
     @include('partials.alerts')
@@ -17,7 +20,8 @@
         <input type="text" name="search" class="form-control" placeholder="Search by student name..." value="{{ request('search') }}">
       </div>
       <div class="col-md-3">
-        <button class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
+        <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
+        <a href="{{ route('registrars.documents.all') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Reset</a>
       </div>
     </form>
 

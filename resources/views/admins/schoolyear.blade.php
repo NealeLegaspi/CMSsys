@@ -31,11 +31,11 @@
           </select>
         </div>
         <div class="col-md-4 d-flex gap-2">
-          <button class="btn btn-primary flex-fill">
-            <i class="bi bi-search"></i> Filter
+          <button class="btn btn-outline-primary">
+            <i class="bi bi-search"></i> Search
           </button>
-          <a href="{{ route('admins.schoolyear') }}" class="btn btn-outline-secondary flex-fill">
-            <i class="bi bi-x-circle"></i> Clear
+          <a href="{{ route('admins.schoolyear') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-clockwise"></i> Reset
           </a>
         </div>
       </form>

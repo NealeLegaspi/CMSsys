@@ -6,20 +6,21 @@
 @section('content')
 <div class="card card-custom shadow-sm border-0">
   <div class="card-header d-flex justify-content-between align-items-center bg-light">
-    <h6 class="fw-bold mb-0">📋 Enrollment List</h6>
+    <h6 class="fw-bold mb-0">
+      <i class="bi bi-clipboard-data-fill me-2"></i> Enrollment List
+    </h6>
     <div>
       <a href="{{ route('registrars.enrollment.export.csv') }}" class="btn btn-sm btn-success me-2">
-      <i class="bi bi-file-earmark-excel"></i> Excel
+        <i class="bi bi-file-earmark-excel me-1"></i> Excel
       </a>
       <a href="{{ route('registrars.enrollment.export.pdf') }}" class="btn btn-sm btn-danger me-2">
-      <i class="bi bi-file-earmark-pdf"></i> PDF
+        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
       </a>
       <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addEnrollmentModal">
         <i class="bi bi-plus-circle me-1"></i> Enroll Student
       </button>
     </div>
   </div>
-
   <div class="card-body">
     @include('partials.alerts')
 
@@ -38,9 +39,13 @@
           @endforeach
         </select>
       </div>
-      <div class="col-md-3 d-flex">
-        <button type="submit" class="btn btn-primary me-2"><i class="bi bi-search"></i></button>
-        <a href="{{ route('registrars.enrollment') }}" class="btn btn-secondary"><i class="bi bi-arrow-clockwise"></i></a>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-outline-primary">
+          <i class="bi bi-search"></i> Search
+        </button>
+        <a href="{{ route('registrars.teachers') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-clockwise"></i> Reset
+        </a>
       </div>
     </form>
 

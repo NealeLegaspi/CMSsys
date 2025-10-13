@@ -17,7 +17,7 @@
   {{-- Filters Card --}}
   <div class="card shadow-sm border-0 mb-4">
     <div class="card-body">
-      <h5 class="fw-bold mb-3 text-primary"><i class="bi bi-funnel"></i> Filter Reports</h5>
+      <h5 class="fw-bold mb-3"><i class="bi bi-funnel"></i> Filter Reports</h5>
       <form class="row g-3" method="POST" action="{{ route('teachers.filterReports') }}">
         @csrf
         <div class="col-md-3">
@@ -57,7 +57,7 @@
         </div>
 
         <div class="col-md-3 d-flex align-items-end justify-content-end gap-2">
-          <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Filter</button>
+          <button type="submit" class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
           <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
             <i class="bi bi-arrow-clockwise"></i> Reset
           </button>

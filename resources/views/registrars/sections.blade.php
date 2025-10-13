@@ -6,7 +6,9 @@
 @section('content')
 <div class="card shadow-sm border-0">
   <div class="card-header bg-light d-flex justify-content-between align-items-center">
-    <h6 class="fw-bold mb-0">🏫 Sections</h6>
+    <h6 class="fw-bold mb-0">
+      <i class="bi bi-building me-2"></i> Sections
+    </h6>
     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSectionModal">
       <i class="bi bi-plus-circle"></i> Add Section
     </button>
@@ -20,8 +22,8 @@
         <input type="text" name="search" class="form-control" placeholder="Search section or adviser..." value="{{ request('search') }}">
       </div>
       <div class="col-md-2">
-        <button class="btn btn-primary"><i class="bi bi-search"></i></button>
-        <a href="{{ route('registrars.sections') }}" class="btn btn-secondary"><i class="bi bi-arrow-repeat"></i></a>
+        <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
+        <a href="{{ route('registrars.sections') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Reset</a>
       </div>
     </form>
 

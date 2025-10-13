@@ -6,7 +6,9 @@
 @section('content')
 <div class="card shadow-sm border-0">
   <div class="card-header bg-light d-flex justify-content-between align-items-center">
-    <h6 class="fw-bold mb-0">📈 Enrollment Reports</h6>
+    <h6 class="fw-bold mb-0">
+      <i class="bi bi-graph-up-arrow me-2"></i> Enrollment Reports
+    </h6>
     <a href="{{ route('registrars.reports.pdf', ['school_year_id' => $schoolYearId]) }}" class="btn btn-sm btn-danger">
       <i class="bi bi-file-earmark-pdf"></i> Export PDF
     </a>

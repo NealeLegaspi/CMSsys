@@ -8,7 +8,9 @@
   <!-- Quick Cards -->
   <div class="col-md-3">
     <div class="card card-custom p-3 shadow-sm border-0">
-      <h6 class="fw-bold text-primary">🎓 Students</h6>
+      <h6 class="fw-bold text-primary">
+        <i class="bi bi-mortarboard-fill me-2"></i> Students
+      </h6>
       <hr>
       <p class="mb-1">Total enrolled: <strong>{{ $studentCount ?? 0 }}</strong></p>
       <a href="{{ route('registrars.students') }}" class="text-decoration-none">View Students →</a>
@@ -17,7 +19,9 @@
 
   <div class="col-md-3">
     <div class="card card-custom p-3 shadow-sm border-0">
-      <h6 class="fw-bold text-success">👩‍🏫 Teachers</h6>
+      <h6 class="fw-bold text-success">
+        <i class="bi bi-person-workspace me-2"></i> Teachers
+      </h6>
       <hr>
       <p class="mb-1">Registered: <strong>{{ $teacherCount ?? 0 }}</strong></p>
       <a href="{{ route('registrars.teachers') }}" class="text-decoration-none">View Teachers →</a>
@@ -26,7 +30,9 @@
 
   <div class="col-md-3">
     <div class="card card-custom p-3 shadow-sm border-0">
-      <h6 class="fw-bold text-warning">🏫 Sections</h6>
+      <h6 class="fw-bold text-warning">
+        <i class="bi bi-building me-2"></i> Sections
+      </h6>
       <hr>
       <p class="mb-1">Total: <strong>{{ $sectionCount ?? 0 }}</strong></p>
       <a href="{{ route('registrars.sections') }}" class="text-decoration-none">Manage Sections →</a>
@@ -35,7 +41,9 @@
 
   <div class="col-md-3">
     <div class="card card-custom shadow-sm border-0 p-3 text-center">
-      <h6 class="fw-bold text-muted">📅 Active S.Y.</h6>
+      <h6 class="fw-bold text-muted">
+        <i class="bi bi-calendar-event me-2"></i> Active S.Y.
+      </h6>
       <p class="fs-6 fw-bold text-danger mb-1">
         {{ $activeSY->name ?? 'None' }}
       </p>
@@ -48,7 +56,9 @@
 <div class="row g-3 mt-4">
   <div class="col-md-8">
     <div class="card card-custom p-3 shadow-sm border-0">
-      <h6 class="fw-bold">📊 Students per Section</h6>
+      <h6 class="fw-bold">
+        <i class="bi bi-bar-chart-line-fill me-2"></i> Students per Section
+      </h6>
       @if(!empty($sections) && count($sections) > 0)
         <canvas id="sectionChart"></canvas>
       @else
@@ -56,9 +66,12 @@
       @endif
     </div>
   </div>
+
   <div class="col-md-4">
     <div class="card card-custom p-3 shadow-sm border-0">
-      <h6 class="fw-bold">⚧ Gender Distribution</h6>
+      <h6 class="fw-bold">
+        <i class="bi bi-gender-ambiguous me-2"></i> Gender Distribution
+      </h6>
       @if(!empty($genderLabels) && !empty($genderData))
         <canvas id="genderChart"></canvas>
       @else

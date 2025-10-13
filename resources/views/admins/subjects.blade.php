@@ -34,11 +34,11 @@
           </select>
         </div>
         <div class="col-md-3 d-flex gap-2">
-          <button type="submit" class="btn btn-primary flex-fill">
-            <i class="bi bi-search"></i> Filter
+          <button type="submit" class="btn btn-outline-primary">
+            <i class="bi bi-search"></i> Search
           </button>
-          <a href="{{ route('admins.subjects') }}" class="btn btn-outline-secondary flex-fill">
-            <i class="bi bi-x-circle"></i> Clear
+          <a href="{{ route('admins.subjects') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-clockwise"></i> Reset
           </a>
         </div>
       </form>

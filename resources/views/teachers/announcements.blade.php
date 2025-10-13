@@ -83,7 +83,7 @@
         <div class="card-body">
           <form method="GET" action="{{ route('teachers.announcements') }}" class="row g-2">
             <div class="col-md-5">
-              <input type="text" name="search" class="form-control" placeholder="🔍 Search by title or content..." value="{{ request('search') }}">
+              <input type="text" name="search" class="form-control" placeholder="Search by title or content..." value="{{ request('search') }}">
             </div>
             <div class="col-md-4">
               <select name="section_filter" class="form-select">
@@ -96,8 +96,8 @@
               </select>
             </div>
             <div class="col-md-3 d-flex gap-2">
-              <button class="btn btn-outline-primary"><i class="bi bi-funnel me-1"></i> Filter</button>
-              <a href="{{ route('teachers.announcements') }}" class="btn btn-outline-secondary"><i class="bi bi-x-circle me-1"></i> Reset</a>
+              <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
+              <a href="{{ route('teachers.announcements') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Reset</a>
             </div>
           </form>
         </div>
