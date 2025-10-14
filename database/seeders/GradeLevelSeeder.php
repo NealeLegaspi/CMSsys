@@ -12,7 +12,7 @@ class GradeLevelSeeder extends Seeder
      */
     public function run(): void
     {
-        $levels = ['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'];
+        $levels = ['Kindergarten','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6'];
 
         foreach ($levels as $level) {
             \App\Models\GradeLevel::create(['name' => $level]);
