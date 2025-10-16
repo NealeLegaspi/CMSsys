@@ -49,21 +49,53 @@
             <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">
               <i class="bi bi-file-earmark-spreadsheet me-1"></i> Enrollment
             </button>
+            {{-- Enrollment Export --}}
             <ul class="dropdown-menu shadow-sm">
-              <li><a class="dropdown-item" href="{{ route('admins.export.enrollment',['format'=>'xlsx','school_year_id'=>$sy,'status'=>$status]) }}">Excel (.xlsx)</a></li>
-              <li><a class="dropdown-item" href="{{ route('admins.export.enrollment',['format'=>'csv','school_year_id'=>$sy,'status'=>$status]) }}">CSV</a></li>
-              <li><a class="dropdown-item" href="{{ route('admins.export.enrollment.pdf',['school_year_id'=>$sy,'status'=>$status]) }}">PDF</a></li>
+              <li>
+                <a class="dropdown-item" 
+                  href="{{ route('admins.reports.export', ['type' => 'enrollment', 'format' => 'xlsx']) }}?school_year_id={{ $sy }}&status={{ $status }}">
+                  Excel (.xlsx)
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" 
+                  href="{{ route('admins.reports.export', ['type' => 'enrollment', 'format' => 'csv']) }}?school_year_id={{ $sy }}&status={{ $status }}">
+                  CSV
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" 
+                  href="{{ route('admins.reports.export', ['type' => 'enrollment', 'format' => 'pdf']) }}?school_year_id={{ $sy }}&status={{ $status }}">
+                  PDF
+                </a>
+              </li>
             </ul>
-          </div>
 
+          </div>
           <div class="btn-group">
-            <button type="button" class="btn btn-outline-info dropdown-toggle" data-bs-toggle="dropdown">
-              <i class="bi bi-file-earmark-text me-1"></i> Grading
+            <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">
+              <i class="bi bi-file-earmark-spreadsheet me-1"></i> Grading
             </button>
+            {{-- Grading Export --}}
             <ul class="dropdown-menu shadow-sm">
-              <li><a class="dropdown-item" href="{{ route('admins.export.grading',['format'=>'xlsx','school_year_id'=>$sy]) }}">Excel (.xlsx)</a></li>
-              <li><a class="dropdown-item" href="{{ route('admins.export.grading',['format'=>'csv','school_year_id'=>$sy]) }}">CSV</a></li>
-              <li><a class="dropdown-item" href="{{ route('admins.export.grading.pdf',['school_year_id'=>$sy]) }}">PDF</a></li>
+              <li>
+                <a class="dropdown-item" 
+                  href="{{ route('admins.reports.export', ['type' => 'grades', 'format' => 'xlsx']) }}?school_year_id={{ $sy }}">
+                  Excel (.xlsx)
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" 
+                  href="{{ route('admins.reports.export', ['type' => 'grades', 'format' => 'csv']) }}?school_year_id={{ $sy }}">
+                  CSV
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" 
+                  href="{{ route('admins.reports.export', ['type' => 'grades', 'format' => 'pdf']) }}?school_year_id={{ $sy }}">
+                  PDF
+                </a>
+              </li>
             </ul>
           </div>
         </div>

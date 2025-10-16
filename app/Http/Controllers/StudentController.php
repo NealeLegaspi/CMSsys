@@ -18,18 +18,8 @@ class StudentController extends Controller
 
         $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
 
-        $announcements = Announcement::with(['user', 'section', 'teacher.user'])
-            ->where(function ($query) use ($sectionIds, $user) {
-                $query->where('target_type', 'Global')
-                    ->orWhere(function ($q) use ($sectionIds) {
-                        $q->where('target_type', 'Section')
-                        ->whereIn('target_id', $sectionIds);
-                    })
-                    ->orWhere(function ($q) use ($user) {
-                        $q->where('target_type', 'Teacher')
-                        ->where('target_id', $user->id); // ensures only for specific teacher if logged as teacher
-                    });
-            })
+        $announcements = Announcement::with('user')
+            ->whereNull('section_id')
             ->latest()
             ->take(5)
             ->get();
@@ -46,20 +36,10 @@ class StudentController extends Controller
         $user = Auth::user();
         $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
 
-        $announcements = Announcement::with(['user', 'section', 'teacher.user'])
-            ->where(function ($q) use ($sectionIds, $user) {
-                $q->where('target_type', 'Global')
-                ->orWhere(function ($sub) use ($sectionIds) {
-                    $sub->where('target_type', 'Section')
-                        ->whereIn('target_id', $sectionIds);
-                })
-                ->orWhere(function ($sub) use ($user) {
-                    $sub->where('target_type', 'Teacher')
-                        ->where('target_id', $user->id);
-                });
-            })
-            ->latest()
-            ->get();
+        $announcements = Announcement::with('user')
+        ->whereNull('section_id')
+        ->latest()
+        ->get();
 
         return view('students.announcements', compact('announcements'));
     }

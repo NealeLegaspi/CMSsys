@@ -138,7 +138,6 @@ class RegistrarController extends Controller
                 'last_name'   => $request->last_name,
             ]);
 
-            // Generate unique student number
             do {
                 $year   = now()->format('Y');
                 $random = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -535,7 +534,7 @@ class RegistrarController extends Controller
         $section = Section::findOrFail($id);
 
         if ($section->enrollments()->exists()) {
-            return back()->withErrors(['msg' => '❌ Cannot delete section with enrolled students.']);
+            return back()->withErrors(['msg' => 'Cannot delete section with enrolled students.']);
         }
 
         $section->adviser_id = null;
@@ -546,7 +545,7 @@ class RegistrarController extends Controller
 
         $this->logActivity('Delete Section', "Deleted section {$name}");
 
-        return back()->with('success', '✅ Section deleted successfully.');
+        return back()->with('success', 'Section deleted successfully.');
     }
 
     public function classList($id)

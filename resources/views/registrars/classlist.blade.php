@@ -7,19 +7,25 @@
 <div class="card shadow-sm border-0">
   <!-- Header -->
   <div class="card-header bg-light d-flex justify-content-between align-items-center">
-    <div>
-      <h6 class="fw-bold mb-0 text-primary">
-        👨‍🏫 {{ $section->name }} — {{ $section->gradeLevel->name ?? 'N/A' }}
-      </h6>
-      <small class="text-muted">
-        Adviser:
-        <strong>{{ optional($section->adviser->profile)->first_name }}
-        {{ optional($section->adviser->profile)->last_name ?? 'N/A' }}</strong><br>
-        Capacity:
-        <strong>{{ $section->capacity ?? '∞' }}</strong> |
-        Enrolled:
-        <strong>{{ $section->enrollments->count() }}</strong>
-      </small>
+    <div class="d-flex align-items-center">
+      <!-- 🔙 Back Button -->
+      <a href="{{ route('registrars.sections') }}" class="btn btn-outline-secondary btn-sm me-3" title="Back to Sections">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div>
+        <h6 class="fw-bold mb-0 text-primary">
+          👨‍🏫 {{ $section->name }} — {{ $section->gradeLevel->name ?? 'N/A' }}
+        </h6>
+        <small class="text-muted">
+          Adviser:
+          <strong>{{ optional($section->adviser->profile)->first_name }}
+          {{ optional($section->adviser->profile)->last_name ?? 'N/A' }}</strong><br>
+          Capacity:
+          <strong>{{ $section->capacity ?? '∞' }}</strong> |
+          Enrolled:
+          <strong>{{ $section->enrollments->count() }}</strong>
+        </small>
+      </div>
     </div>
     <a href="{{ route('registrars.classlist.pdf', $section->id) }}" class="btn btn-danger btn-sm shadow-sm">
       <i class="bi bi-file-earmark-pdf"></i> Download Masterlist

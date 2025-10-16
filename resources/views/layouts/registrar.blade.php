@@ -62,10 +62,6 @@
        class="nav-link {{ request()->routeIs('registrars.sections') ? 'active' : '' }}">
        <i class='bx bx-grid-alt me-2'></i> Sections
     </a>
-    <a href="{{ route('registrars.teachers') }}" 
-       class="nav-link {{ request()->routeIs('registrars.teachers*') ? 'active' : '' }}">
-       <i class='bx bx-chalkboard me-2'></i> Teachers
-    </a>
     <a href="{{ route('registrars.reports') }}" 
        class="nav-link {{ request()->routeIs('registrars.reports') ? 'active' : '' }}">
        <i class='bx bx-file me-2'></i> Reports

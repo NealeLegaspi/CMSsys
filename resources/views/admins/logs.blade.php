@@ -148,6 +148,12 @@
                 @endforelse
               </tbody>
             </table>
+            <div class="d-flex justify-content-end mb-3">
+              <div class="alert alert-warning small py-2 px-3 mb-0 d-inline-flex align-items-center">
+                <i class="bi bi-clock-history me-2"></i>
+                Archived logs will be&nbsp;<strong>automatically deleted after 30 days</strong>.
+              </div>
+            </div>
           </div>
 
           <div class="d-flex justify-content-end mt-3">

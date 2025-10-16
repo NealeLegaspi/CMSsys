@@ -87,9 +87,9 @@ class AdminController extends Controller
 
         $announcements = $query->latest()->paginate(10)->withQueryString();
 
-        $teachers = User::where('role_id', 3)->get();
-        $students = User::where('role_id', 4)->get();
-
+        $teachers = User::where('role_id', 3)->with('profile')->get();
+        $students = User::where('role_id', 4)->with('profile')->get();
+        
         return view('admins.announcements', compact('announcements', 'teachers', 'students'));
     }
 
@@ -280,12 +280,13 @@ class AdminController extends Controller
             'role_id'         => 'required|exists:roles,id',
         ]);
 
-        $users = User::create([
+        $user = User::create([
             'email'    => $request->email,
             'password' => Hash::make($request->password),
             'role_id'  => $request->role_id,
             'status'   => 'active',
         ]);
+        $user->save();
 
 
         if ($request->hasFile('profile_picture')) {
@@ -294,28 +295,28 @@ class AdminController extends Controller
             $path = 'images/default.png';
         }
 
-        $users->profile()->create([
-            'first_name'=>$request->first_name,
-            'middle_name'=>$request->middle_name,
-            'last_name'=>$request->last_name,
-            'sex'=>$request->sex,
-            'birthdate'=>$request->birthdate,
-            'address'=>$request->address,
-            'contact_number'=>$request->contact_number,
-            'profile_picture'=>$path
+        $user->profile()->create([
+            'first_name' => $request->first_name,
+            'middle_name' => $request->middle_name,
+            'last_name' => $request->last_name,
+            'sex' => $request->sex,
+            'birthdate' => $request->birthdate,
+            'address' => $request->address,
+            'contact_number' => $request->contact_number,
+            'profile_picture' => $path,
         ]);
 
-        $this->logActivity('Create User', "Created user: {$users->email}");
+        $this->logActivity('Create User', "Created user: {$user->email}");
 
         return back()->with('success', 'User created successfully.');
     }
 
     public function updateUser(Request $request, $id)
     {
-        $users = User::with('profile')->findOrFail($id);
+        $user = User::with('profile')->findOrFail($id);
 
         $request->validate([
-            'email'           => 'required|email|unique:users,email,' . $users->id,
+            'email'           => 'required|email|unique:users,email,' . $user->id,
             'role_id'         => 'required|exists:roles,id',
             'first_name'      => 'required|string|max:50',
             'middle_name'     => 'nullable|string|max:50',
@@ -327,20 +328,22 @@ class AdminController extends Controller
             'profile_picture' => 'nullable|image|max:2048',
         ]);
 
-        $users->update([
+        $user->update([
             'email'   => $request->email,
             'role_id' => $request->role_id,
         ]);
-
-     
+            
         if ($request->hasFile('profile_picture')) {
+            if ($user->profile && $user->profile->profile_picture && Storage::disk('public')->exists($user->profile->profile_picture)) {
+                Storage::disk('public')->delete($user->profile->profile_picture);
+            }
             $path = $request->file('profile_picture')->store('profiles', 'public');
         } else {
-            $path = 'images/default.png';
+            $path = $user->profile->profile_picture ?? 'images/default.png';
         }
 
-        $users->profile()->updateOrCreate(
-            ['user_id'=>$users->id],
+        $user->profile()->updateOrCreate(
+            ['user_id'=>$user->id],
             [
                 'first_name'=>$request->first_name,
                 'middle_name'=>$request->middle_name,
@@ -353,7 +356,7 @@ class AdminController extends Controller
             ]
         );
 
-        $this->logActivity('Update User', "Updated user: {$users->email}");
+        $this->logActivity('Update User', "Updated user: {$user->email}");
 
         return back()->with('success', 'User updated successfully.');
     }
@@ -464,40 +467,43 @@ class AdminController extends Controller
             'totalSections','totalSubjects','subjects' 
         ));
     }
-
-
+    
     public function exportReport($type, $format, Request $request)
     {
         $sy = $request->school_year_id;
-        $subjects = Subject::all()->keyBy('id'); // <--- fetch subjects once
+        $status = $request->status ?? 'all';
+        $subjects = Subject::all()->keyBy('id');
 
-        // Excel / CSV
-        if (in_array($format, ['xlsx','csv'])) {
+        if (in_array($format, ['xlsx', 'csv'])) {
             if ($type === 'enrollment') {
-                return Excel::download(new EnrollmentReportExport($sy), "enrollment_report.$format");
+                return Excel::download(new EnrollmentReportExport($sy, $status), "enrollment_report.$format");
             }
+
             if ($type === 'grades') {
                 return Excel::download(new GradingReportExport($sy), "grading_report.$format");
             }
         }
 
-        // PDF
         if ($format === 'pdf') {
             if ($type === 'enrollment') {
-                $data = Enrollment::with('section.gradeLevel','student.user.profile')
-                    ->where('school_year_id',$sy)->get();
+                $data = Enrollment::with(['section.gradeLevel', 'student.user.profile', 'schoolYear'])
+                    ->when($sy, fn($q) => $q->where('school_year_id', $sy))
+                    ->when($status !== 'all', fn($q) => $q->where('status', $status))
+                    ->get();
 
-                $pdf = Pdf::loadView('reports.enrollment_pdf', compact('data','sy'))
-                    ->setPaper('a4','portrait');
+                $pdf = PDF::loadView('reports.enrollment_pdf', compact('data', 'sy'))
+                    ->setPaper('a4', 'portrait');
 
                 return $pdf->download("enrollment_report.pdf");
             }
 
             if ($type === 'grades') {
-                $data = \App\Models\Grade::selectRaw('subject_id, AVG(grade) as avg')
-                    ->where('school_year_id',$sy)
-                    ->groupBy('subject_id')
-                    ->pluck('avg','subject_id');
+                $data = \App\Models\Grade::selectRaw('grades.subject_id, AVG(grades.grade) as avg')
+                    ->join('students', 'grades.student_id', '=', 'students.id')
+                    ->join('enrollments', 'students.id', '=', 'enrollments.student_id')
+                    ->where('enrollments.school_year_id', $sy)
+                    ->groupBy('grades.subject_id')
+                    ->pluck('avg', 'grades.subject_id');
 
                 $pdf = Pdf::loadView('reports.grading_pdf', compact('data','sy','subjects'))
                     ->setPaper('a4','landscape');
@@ -506,8 +512,9 @@ class AdminController extends Controller
             }
         }
 
-        return back()->with('error','Invalid export request.');
+        return back()->with('error', 'Invalid export request.');
     }
+
 
     /**
      * School Year Management (Admin only)

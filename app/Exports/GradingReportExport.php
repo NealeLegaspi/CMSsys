@@ -3,8 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Grade;
-use App\Models\Subject;
-use App\Models\SchoolYear;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -21,8 +20,20 @@ class GradingReportExport implements FromCollection, WithHeadings, WithMapping, 
 
     public function collection()
     {
-        return Grade::with(['student.user.profile','subject','schoolYear'])
-            ->when($this->schoolYearId, fn($q) => $q->where('school_year_id',$this->schoolYearId))
+        // Join grades → students → enrollments → subjects
+        return Grade::select(
+                'grades.*',
+                'subjects.name as subject_name',
+                'enrollments.school_year_id',
+                'students.student_number'
+            )
+            ->join('students', 'grades.student_id', '=', 'students.id')
+            ->join('enrollments', 'students.id', '=', 'enrollments.student_id')
+            ->join('subjects', 'grades.subject_id', '=', 'subjects.id')
+            ->when($this->schoolYearId, function ($q) {
+                $q->where('enrollments.school_year_id', $this->schoolYearId);
+            })
+            ->with(['student.user.profile'])
             ->get();
     }
 
@@ -31,9 +42,10 @@ class GradingReportExport implements FromCollection, WithHeadings, WithMapping, 
         return [
             $grade->student->student_number,
             optional($grade->student->user->profile)->first_name . ' ' . optional($grade->student->user->profile)->last_name,
-            $grade->subject->name ?? '-',
+            $grade->subject_name ?? '-',
             $grade->grade,
-            $grade->schoolYear->name ?? '-',
+            // Fetch school year name via relationship or fallback
+            optional($grade->enrollment->schoolYear ?? null)->name ?? 'N/A',
             $grade->created_at->format('Y-m-d'),
         ];
     }

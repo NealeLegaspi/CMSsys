@@ -46,7 +46,10 @@
               <td>{{ $sections->firstItem() + $index }}</td>
               <td class="fw-bold">{{ $sec->name }}</td>
               <td>{{ $sec->gradeLevel->name ?? 'N/A' }}</td>
-              <td>{{ optional($sec->adviser->profile)->first_name }} {{ optional($sec->adviser->profile)->last_name }}</td>
+              <td>
+                {{ $sec->adviser?->profile?->first_name ?? 'N/A' }}
+                {{ $sec->adviser?->profile?->last_name ?? '' }}
+              </td>
               <td>{{ $sec->capacity ?? '∞' }}</td>
               <td>{{ $sec->enrollments->count() }}</td>
               <td>
@@ -56,12 +59,9 @@
                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editSectionModal{{ $sec->id }}">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <form action="{{ route('registrars.sections.destroy', $sec->id) }}" method="POST" class="d-inline">
-                  @csrf @method('DELETE')
-                  <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this section?')">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </form>
+                <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteSectionModal{{ $sec->id }}">
+                  <i class="bi bi-trash"></i>
+                </button>
               </td>
             </tr>
 
@@ -91,11 +91,21 @@
                         </select>
                       </div>
                       <div class="mb-3">
+                        <label class="form-label">School Year</label>
+                        <select name="school_year_id" class="form-select" required>
+                          @foreach($schoolYears as $sy)
+                            <option value="{{ $sy->id }}" {{ $sec->school_year_id == $sy->id ? 'selected' : '' }}>
+                              {{ $sy->name }}
+                            </option>
+                          @endforeach
+                        </select>
+                      </div>
+                      <div class="mb-3">
                         <label class="form-label">Adviser</label>
-                        <select name="teacher_id" class="form-select">
+                        <select name="adviser_id" class="form-select">
                           <option value="">-- None --</option>
                           @foreach($teachers as $t)
-                            <option value="{{ $t->id }}" {{ $sec->teacher_id == $t->id ? 'selected' : '' }}>
+                            <option value="{{ $t->id }}" {{ $sec->adviser_id == $t->id ? 'selected' : '' }}>
                               {{ $t->profile->first_name }} {{ $t->profile->last_name }}
                             </option>
                           @endforeach
@@ -108,10 +118,32 @@
                     </div>
                     <div class="modal-footer">
                       <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                      <button class="btn btn-warning">Update</button>
+                      <button class="btn btn-warning text-white">Update</button>
                     </div>
                   </div>
                 </form>
+              </div>
+            </div>
+
+            <!-- Delete Confirmation Modal -->
+            <div class="modal fade" id="deleteSectionModal{{ $sec->id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirm Deletion</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body text-center">
+                    <p>Are you sure you want to delete the section <strong class="text-danger">"{{ $sec->name }}"</strong>?</p>
+                  </div>
+                  <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form action="{{ route('registrars.sections.destroy', $sec->id) }}" method="POST" class="d-inline">
+                      @csrf @method('DELETE')
+                      <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                  </div>
+                </div>
               </div>
             </div>
           @empty
@@ -154,11 +186,22 @@
             </select>
           </div>
           <div class="mb-3">
+            <label class="form-label">School Year</label>
+            <select name="school_year_id" class="form-select" required>
+              <option value="">-- Select School Year --</option>
+              @foreach($schoolYears as $sy)
+                <option value="{{ $sy->id }}">{{ $sy->name }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="mb-3">
             <label class="form-label">Adviser</label>
-            <select name="teacher_id" class="form-select">
+            <select name="adviser_id" class="form-select">
               <option value="">-- None --</option>
               @foreach($teachers as $t)
-                <option value="{{ $t->id }}">{{ $t->profile->first_name }} {{ $t->profile->last_name }}</option>
+                <option value="{{ $t->id }}">
+                  {{ $t->profile?->first_name ?? 'N/A' }} {{ $t->profile?->last_name ?? '' }}
+                </option>
               @endforeach
             </select>
           </div>
