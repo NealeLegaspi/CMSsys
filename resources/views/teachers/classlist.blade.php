@@ -1,7 +1,9 @@
 @extends('layouts.teacher')
 
 @section('title','Class List')
-@section('header','Class List')
+@section('header')
+    <i class="bi bi-people-fill me-2"></i> Class List
+@endsection
 
 @section('content')
 <div class="container-fluid my-4">

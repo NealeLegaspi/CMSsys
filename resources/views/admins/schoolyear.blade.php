@@ -1,28 +1,23 @@
 @extends('layouts.admin')
 
 @section('title','School Year')
-@section('header','School Year')
+@section('header')
+    <i class="bi bi-calendar-event me-2"></i> School Year Management
+@endsection
 
 @section('content')
 <div class="container-fluid my-4">
   <div class="card shadow-sm border-0">
-    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-      <h6 class="fw-bold mb-0"><i class="bi bi-calendar-event me-2"></i> School Year Management</h6>
-      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSchoolYearModal">
-        <i class="bi bi-plus-circle me-1"></i> Add School Year
-      </button>
-    </div>
-
     <div class="card-body">
       @include('partials.alerts')
 
       {{-- 🔍 Search & Filter --}}
       <form method="GET" class="row g-2 align-items-end mb-4">
-        <div class="col-md-5">
+        <div class="col-md-4">
           <label class="form-label fw-semibold">Search</label>
           <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Search school year...">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label fw-semibold">Status</label>
           <select name="status" class="form-select">
             <option value="">All</option>
@@ -37,6 +32,11 @@
           <a href="{{ route('admins.schoolyear') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-clockwise"></i> Reset
           </a>
+        </div>
+        <div class="col-md-2 d-flex justify-content-end">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSchoolYearModal">
+            <i class="bi bi-plus-circle me-1"></i> Add School Year
+          </button>
         </div>
       </form>
 

@@ -1,7 +1,9 @@
 @extends('layouts.teacher')
 
-@section('title', 'Encode Grades')
-@section('header', 'Encode Grades')
+@section('title', 'Grades')
+@section('header')
+    <i class="bi bi-pencil-square me-2"></i> Grades
+@endsection
 
 @section('content')
 <div class="container-fluid my-4">
@@ -17,9 +19,6 @@
   <!-- Subject Selection -->
   <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
-      <h6 class="fw-bold mb-3">
-        <i class="bi bi-book-half me-2"></i> Select Subject
-      </h6>
       <form method="GET" action="{{ route('teachers.grades') }}">
         <div class="row g-2">
           <div class="col-md-9">

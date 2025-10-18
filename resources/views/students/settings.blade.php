@@ -1,7 +1,9 @@
 @extends('layouts.student')
 
 @section('title','Settings')
-@section('header','Settings')
+@section('header')
+    <i class="bi bi-gear me-2"></i> Settings
+@endsection
 
 @section('content')
 <div class="container my-4">

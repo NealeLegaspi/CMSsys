@@ -1,35 +1,21 @@
 @extends('layouts.registrar')
 
 @section('title','Enrollment')
-@section('header','Enrollment')
+@section('header')
+    <i class="bi bi-clipboard-data-fill me-2"></i> Enrollment List
+@endsection
 
 @section('content')
 <div class="card card-custom shadow-sm border-0">
-  <div class="card-header d-flex justify-content-between align-items-center bg-light">
-    <h6 class="fw-bold mb-0">
-      <i class="bi bi-clipboard-data-fill me-2"></i> Enrollment List
-    </h6>
-    <div>
-      <a href="{{ route('registrars.enrollment.export.csv') }}" class="btn btn-sm btn-success me-2">
-        <i class="bi bi-file-earmark-excel me-1"></i> Excel
-      </a>
-      <a href="{{ route('registrars.enrollment.export.pdf') }}" class="btn btn-sm btn-danger me-2">
-        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
-      </a>
-      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addEnrollmentModal">
-        <i class="bi bi-plus-circle me-1"></i> Enroll Student
-      </button>
-    </div>
-  </div>
   <div class="card-body">
     @include('partials.alerts')
 
     <!-- Search & Filter -->
     <form method="GET" action="{{ route('registrars.enrollment') }}" class="row g-2 mb-3">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <input type="text" name="search" class="form-control" value="{{ request('search') }}" placeholder="Search Name or Section...">
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <select name="school_year_id" class="form-select">
           <option value="">All School Years</option>
           @foreach($schoolYears as $sy)
@@ -43,9 +29,20 @@
         <button type="submit" class="btn btn-outline-primary">
           <i class="bi bi-search"></i> Search
         </button>
-        <a href="{{ route('registrars.teachers') }}" class="btn btn-outline-secondary">
+        <a href="{{ route('registrars.enrollment') }}" class="btn btn-outline-secondary">
           <i class="bi bi-arrow-clockwise"></i> Reset
         </a>
+      </div>
+      <div class="col-md-3 d-flex align-items-center justify-content-end">
+        <a href="{{ route('registrars.enrollment.export.csv') }}" class="btn btn-sm btn-success me-2 **d-flex align-items-center justify-content-center**">
+            <i class="bi bi-file-earmark-excel me-1"></i> Excel
+        </a>
+        <a href="{{ route('registrars.enrollment.export.pdf') }}" class="btn btn-sm btn-danger me-2 **d-flex align-items-center justify-content-center**">
+            <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+        </a>
+        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addEnrollmentModal">
+            <i class="bi bi-plus-circle me-1"></i> Enroll Student
+        </button>
       </div>
     </form>
 

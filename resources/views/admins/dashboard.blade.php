@@ -1,7 +1,9 @@
 @extends('layouts.admin')
 
 @section('title', 'Admin Dashboard')
-@section('header', 'Dashboard')
+@section('header')
+    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+@endsection
 
 @section('content')
 <div class="container-fluid mt-3">
@@ -50,7 +52,7 @@
   <div class="row g-3">
     <div class="col-md-6">
       <div class="card shadow-sm border-0 rounded-3">
-        <div class="card-header fw-bold bg-white border-0">Recent Activity Logs</div>
+        <div class="card-header fw-bold bg-white border-0"><i class="bi bi-clock me-2"></i>Recent Activity Logs</div>
         <ul class="list-group list-group-flush">
           @forelse($logs as $log)
             <li class="list-group-item small">
@@ -68,7 +70,7 @@
 
     <div class="col-md-6">
       <div class="card shadow-sm border-0 rounded-3">
-        <div class="card-header fw-bold bg-white border-0">Latest Announcements</div>
+        <div class="card-header fw-bold bg-white border-0"><i class="bi bi-megaphone me-2"></i>Latest Announcements</div>
         <ul class="list-group list-group-flush">
           @forelse($announcements as $a)
             <li class="list-group-item">

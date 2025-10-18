@@ -1,6 +1,8 @@
 @extends('layouts.admin')
 @section('title','Activity Logs')
-@section('header','Activity Logs')
+@section('header')
+    <i class="bi bi-journal-text me-2"></i> Activity Logs
+@endsection
 
 @section('content')
 @include('partials.alerts')
@@ -9,9 +11,6 @@
 
   {{-- 🧭 Header Card --}}
   <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-      <h6 class="fw-bold mb-0"><i class="bi bi-journal-text me-2"></i> Activity Logs</h6>
-    </div>
 
     <div class="card-body">
       {{-- 🔍 Search & Filter --}}

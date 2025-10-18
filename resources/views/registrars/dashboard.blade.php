@@ -1,7 +1,9 @@
 @extends('layouts.registrar')
 
 @section('title','Registrar Dashboard')
-@section('header','Dashboard')
+@section('header')
+    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+@endsection
 
 @section('content')
 <div class="row g-3">

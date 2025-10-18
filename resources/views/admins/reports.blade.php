@@ -1,7 +1,9 @@
 @extends('layouts.admin')
 
 @section('title','Reports')
-@section('header','Reports')
+@section('header')
+    <i class="bi bi-file-earmark-bar-graph-fill me-2"></i> Reports
+@endsection
 
 @section('content')
 <div class="container-fluid my-4">

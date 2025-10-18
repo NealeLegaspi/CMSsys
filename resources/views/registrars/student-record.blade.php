@@ -1,7 +1,9 @@
 @extends('layouts.registrar')
 
 @section('title', 'Student Record')
-@section('header', 'Student Record')
+@section('header')
+    <i class="bi bi-journal-bookmark-fill me-2"></i> Student Record
+@endsection
 
 @section('content')
 <div class="card shadow-sm border-0">

@@ -1,7 +1,14 @@
 @extends('layouts.registrar')
 
 @section('title', isset($student) ? 'Documents - '.$student->user->profile->last_name : 'Student Documents')
-@section('header', 'Student Documents')
+@section('header')
+    <i class="bi bi-file-earmark-text-fill me-2"></i> 
+    @if(isset($student))
+      Documents — {{ optional($student->user->profile)->last_name ?? '' }}, {{ optional($student->user->profile)->first_name ?? '' }}
+    @else
+      Student Documents
+    @endif
+@endsection
 
 @section('content')
 <div class="card shadow-sm border-0">

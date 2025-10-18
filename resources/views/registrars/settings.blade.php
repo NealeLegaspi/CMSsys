@@ -1,7 +1,9 @@
 @extends('layouts.registrar')
 
 @section('title','Settings')
-@section('header','Settings')
+@section('header')
+    <i class="bx bx-cog me-2"></i> Settings
+@endsection
 
 @section('content')
 <div class="container my-4">

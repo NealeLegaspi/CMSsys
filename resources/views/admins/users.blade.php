@@ -1,21 +1,13 @@
 @extends('layouts.admin')
 
 @section('title','Users')
-@section('header','User Management')
+@section('header')
+    <i class="bi bi-people-fill me-2"></i> User Management
+@endsection
 
 @section('content')
 <div class="container-fluid my-4">
   <div class="card shadow-sm border-0">
-
-    {{-- Header --}}
-    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-      <h6 class="fw-bold mb-0">
-        <i class="bi bi-people"></i> User Management
-      </h6>
-      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
-        <i class="bi bi-plus-circle"></i> Add User
-      </button>
-    </div>
 
     {{-- Body --}}
     <div class="card-body">
@@ -55,6 +47,12 @@
           <a href="{{ route('admins.users') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-clockwise"></i> Reset
           </a>
+        </div>
+
+        <div class="col-md-2 text-end">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+            <i class="bi bi-plus-circle me-1"></i> Add User
+          </button>
         </div>
       </form>
 

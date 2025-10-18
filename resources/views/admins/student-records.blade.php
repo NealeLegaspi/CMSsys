@@ -1,26 +1,14 @@
 @extends('layouts.admin')
 
 @section('title', 'Student Records')
-@section('header', 'Student Records')
+@section('header')
+    <i class="bi bi-mortarboard me-2"></i> Student Records
+@endsection
 
 @section('content')
 <div class="container-fluid my-4">
 
   <div class="card shadow-sm border-0">
-    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-      <h6 class="fw-bold mb-0">
-        <i class="bi bi-mortarboard"></i> Student Records
-      </h6>
-      <!---<div class="btn-group">
-        <a href="{{ route('admins.exportStudents', ['format' => 'csv'] + request()->all()) }}" class="btn btn-success btn-sm">
-          <i class="bi bi-file-earmark-spreadsheet"></i> CSV
-        </a>
-        <a href="{{ route('admins.exportStudents', ['format' => 'pdf'] + request()->all()) }}" class="btn btn-danger btn-sm">
-          <i class="bi bi-file-earmark-pdf"></i> PDF
-        </a>
-      </div>---->
-    </div>
-
     <div class="card-body">
 
       {{-- 🔍 Filter Toolbar --}}

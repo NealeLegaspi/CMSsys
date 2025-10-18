@@ -1,17 +1,13 @@
 @extends('layouts.student')
 
 @section('title', 'Announcements')
-@section('header', 'Announcements')
+@section('header')
+    <i class="bi bi-megaphone me-2"></i> Announcements
+@endsection
 
 @section('content')
 <div class="container my-4">
   <div class="card border-0 shadow-sm p-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="fw-bold mb-0">
-        <i class="bi bi-megaphone-fill me-2"></i> School Announcements
-      </h5>
-    </div>
-
     @forelse($announcements as $a)
       <div class="card border-0 shadow-sm mb-3">
         <div class="card-body">

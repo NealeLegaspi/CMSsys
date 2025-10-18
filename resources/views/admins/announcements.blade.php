@@ -1,29 +1,29 @@
 @extends('layouts.admin')
 
 @section('title', 'Announcements')
-@section('header', 'Announcements')
+@section('header')
+    <i class="bi bi-megaphone me-2"></i> Announcements
+@endsection
 
 @section('content')
 <div class="container-fluid my-4">
   <div class="card shadow-sm border-0">
-    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-      <h6 class="fw-bold mb-0"><i class="bi bi-megaphone me-2"></i> Announcements</h6>
-      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createAnnouncementModal">
-        <i class="bi bi-plus-circle me-1"></i> New Announcement
-      </button>
-    </div>
-
     <div class="card-body">
       @include('partials.alerts')
 
       {{-- 🔍 Search --}}
       <form method="GET" action="{{ route('admins.announcements') }}" class="row g-2 mb-4">
-        <div class="col-md-6">
+        <div class="col-md-5">
           <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Search by title or content...">
         </div>
         <div class="col-md-4">
           <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
           <a href="{{ route('admins.announcements') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Reset</a>
+        </div>
+        <div class="col-md-3 d-flex justify-content-end">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createAnnouncementModal">
+            <i class="bi bi-plus-circle me-1"></i> New Announcement
+          </button>
         </div>
       </form>
 
@@ -124,9 +124,9 @@
                             </select>
                           </div>
                           <div class="col-md-6 {{ $ann->target_type === 'Global' ? 'd-none' : '' }}" id="editTargetSelect{{ $ann->id }}">
-                            <label class="form-label fw-semibold">Specific User (Optional)</label>
+                            <!---<label class="form-label fw-semibold">Specific User (Optional)</label>
                             <select name="target_id" class="form-select user-target-select">
-                              <option value="">All in this group</option>
+                              <option value="">All in this group</option>--->
                               @foreach(($users ?? collect()) as $u)
                                 @php
                                   $roleName = optional($u->role)->name ?? $u->role_name ?? '';

@@ -1,17 +1,12 @@
 @extends('layouts.registrar')
 
 @section('title','Student Documents')
-@section('header','Student Documents')
+@section('header')
+    <i class="bi bi-file-earmark-text-fill me-2"></i> Student Documents
+@endsection
 
 @section('content')
 <div class="card shadow-sm border-0">
-  <div class="card-header bg-light d-flex justify-content-between align-items-center">
-  <h6 class="fw-bold mb-0">
-    <i class="bi bi-file-earmark-text-fill me-2"></i> Student Documents
-  </h6>
-</div>
-
-
   <div class="card-body">
     @include('partials.alerts')
 

@@ -1,7 +1,9 @@
 @extends('layouts.teacher')
 
 @section('title','Reports')
-@section('header','Reports')
+@section('header')
+    <i class="bi bi-people-fill me-2"></i> Reports
+@endsection
 
 @section('content')
 <div class="container my-4">
@@ -17,7 +19,6 @@
   {{-- Filters Card --}}
   <div class="card shadow-sm border-0 mb-4">
     <div class="card-body">
-      <h5 class="fw-bold mb-3"><i class="bi bi-funnel"></i> Filter Reports</h5>
       <form class="row g-3" method="POST" action="{{ route('teachers.filterReports') }}">
         @csrf
         <div class="col-md-3">
@@ -70,7 +71,7 @@
   <div class="card shadow-sm border-0">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold text-primary mb-0">
+        <h5 class="fw-bold mb-0">
           <i class="bi bi-people-fill"></i> Student Reports
         </h5>
         <div class="d-flex gap-2">

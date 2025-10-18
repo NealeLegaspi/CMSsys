@@ -1,7 +1,9 @@
 @extends('layouts.teacher')
 
 @section('title','Announcements')
-@section('header','Announcements')
+@section('header')
+    <i class="bi bi-megaphone me-2"></i> Announcements
+@endsection
 
 @section('content')
 <div class="container-fluid my-4">
@@ -38,9 +40,6 @@
     <!-- CREATE TAB -->
     <div class="tab-pane fade show active" id="create" role="tabpanel">
       <div class="card border-0 shadow-sm rounded-3">
-        <div class="card-header bg-light fw-bold">
-          <i class="bi bi-pencil-square text-primary me-2"></i>Create New Announcement
-        </div>
         <div class="card-body">
           <form method="POST" action="{{ route('teachers.announcements.store') }}">
             @csrf

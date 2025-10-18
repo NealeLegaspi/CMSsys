@@ -1,7 +1,9 @@
 @extends('layouts.registrar')
 
 @section('title', 'Class List')
-@section('header', 'Class List')
+@section('header')
+    <i class="bi bi-people-fill me-2"></i> Class List
+@endsection
 
 @section('content')
 <div class="card shadow-sm border-0">
@@ -13,8 +15,8 @@
         <i class="bi bi-arrow-left"></i>
       </a>
       <div>
-        <h6 class="fw-bold mb-0 text-primary">
-          👨‍🏫 {{ $section->name }} — {{ $section->gradeLevel->name ?? 'N/A' }}
+        <h6 class="fw-bold mb-0">
+          {{ $section->name }} — {{ $section->gradeLevel->name ?? 'N/A' }}
         </h6>
         <small class="text-muted">
           Adviser:
