@@ -49,7 +49,7 @@
           <div class="border rounded-3 p-3 mb-3 bg-light">
             <h6 class="fw-bold text-dark mb-1">{{ e($a->title ?? 'Untitled') }}</h6>
             <p class="text-muted small mb-2">
-              {!! nl2br(e($a->body ?? 'No content available.')) !!}
+              {!! nl2br(e($a->content ?? 'No content available.')) !!}
             </p>
             <small class="text-secondary d-block">
               <i class="bi bi-person-circle"></i> {{ e($a->user?->name ?? 'System') }}

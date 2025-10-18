@@ -18,8 +18,12 @@ class StudentController extends Controller
 
         $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
 
-        $announcements = Announcement::with('user')
-            ->whereNull('section_id')
+        $announcements = Announcement::with('user.profile')
+            ->whereIn('target_type', ['Global', 'Student'])
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>', now());
+            })
             ->latest()
             ->take(5)
             ->get();
@@ -34,12 +38,15 @@ class StudentController extends Controller
     public function announcements()
     {
         $user = Auth::user();
-        $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
 
-        $announcements = Announcement::with('user')
-        ->whereNull('section_id')
-        ->latest()
-        ->get();
+        $announcements = Announcement::with('user.profile')
+            ->whereIn('target_type', ['Global', 'Student'])
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>', now());
+            })
+            ->latest()
+            ->get();
 
         return view('students.announcements', compact('announcements'));
     }

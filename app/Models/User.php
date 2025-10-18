@@ -34,18 +34,7 @@ class User extends Authenticatable
 
     public function profile()
     {
-        return $this->hasOne(UserProfile::class);
-    }
-
-    protected static function booted()
-    {
-        static::created(function ($user) {
-            if (!$user->profile) {
-                $user->profile()->create([
-                    'profile_picture' => 'images/default.png',
-                ]);
-            }
-        });
+        return $this->hasOne(UserProfile::class, 'user_id');
     }
 
     public function announcements()

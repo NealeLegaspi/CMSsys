@@ -26,7 +26,6 @@ class TeacherController extends Controller
         $teacher = Auth::user();
 
         $sections = Section::where('adviser_id', $teacher->id)->pluck('name', 'id')->toArray();
-
         $sectionCount = count($sections);
 
         $totals = [];
@@ -44,10 +43,16 @@ class TeacherController extends Controller
                         ->whereHas('student.profile', fn($q) => $q->where('sex','Female'))->count();
         }
 
-        $announcements = Announcement::where('user_id', $teacher->id)
+        $announcements = Announcement::with('user.profile')
+            ->whereIn('target_type', ['Global', 'Teacher'])
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>', now());
+            })
             ->latest()
             ->take(5)
             ->get();
+
 
         return view('teachers.dashboard', [
             'teacher'      => $teacher,
@@ -62,26 +67,54 @@ class TeacherController extends Controller
 
     // ---------------- ANNOUNCEMENTS ----------------
     public function announcements(Request $request)
-    {
-        $teacher = Auth::user();
+{
+    $teacher = Auth::user();
 
-        $myAnnouncements = Announcement::where('user_id', $teacher->id)
-            ->when($request->filled('search'), function ($q) use ($request) {
-                $q->where('title', 'like', '%' . $request->search . '%')
-                  ->orWhere('content', 'like', '%' . $request->search . '%');
-            })
-            ->latest()
-            ->paginate(10);
+    // ---- My Announcements (posted by this teacher) ----
+    $myQuery = Announcement::where('user_id', $teacher->id)
+        ->with(['section', 'user'])
+        ->orderBy('created_at', 'desc');
 
-        $globalAnnouncements = Announcement::with('user')
-            ->whereNull('section_id')
-            ->latest()
-            ->paginate(10);
-
-        $sections = Section::with('gradeLevel')->get();
-
-        return view('teachers.announcements', compact('teacher', 'myAnnouncements', 'globalAnnouncements', 'sections'));
+    if ($request->filled('search')) {
+        $myQuery->where(function ($q) use ($request) {
+            $q->where('title', 'like', '%' . $request->search . '%')
+              ->orWhere('content', 'like', '%' . $request->search . '%');
+        });
     }
+
+    if ($request->filled('section_filter')) {
+        $myQuery->where('section_id', $request->section_filter);
+    }
+
+    // Paginate para consistent sa global tab
+    $myAnnouncements = $myQuery->paginate(5, ['*'], 'my_page')->withQueryString();
+
+    // ---- Global Announcements (from admin or other teachers) ----
+    $globalQuery = Announcement::with(['section', 'user.profile'])
+        ->whereIn('target_type', ['Global', 'Teacher'])
+        ->when($request->filled('search'), function ($q) use ($request) {
+            $q->where('title', 'like', '%' . $request->search . '%')
+              ->orWhere('content', 'like', '%' . $request->search . '%');
+        })
+        ->where(function ($q) {
+            $q->whereNull('expires_at')
+              ->orWhere('expires_at', '>', now());
+        })
+        ->latest();
+
+    $globalAnnouncements = $globalQuery->paginate(5, ['*'], 'global_page')->withQueryString();
+
+    // ---- Sections for create form ----
+    $sections = Section::with('gradeLevel')->get();
+
+    return view('teachers.announcements', compact(
+        'teacher',
+        'sections',
+        'myAnnouncements',
+        'globalAnnouncements'
+    ));
+}
+
 
     public function storeAnnouncement(Request $request)
     {

@@ -266,7 +266,7 @@ class AdminController extends Controller
 
     public function storeUser(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'first_name'      => 'required|string|max:50',
             'middle_name'     => 'nullable|string|max:50',
             'last_name'       => 'required|string|max:50',
@@ -274,42 +274,40 @@ class AdminController extends Controller
             'birthdate'       => 'nullable|date',
             'address'         => 'nullable|string|max:255',
             'contact_number'  => 'nullable|string|max:20',
-            'profile_picture' => 'nullable|image|max:2048',
             'email'           => 'required|email|unique:users,email',
-            'password'        => 'required|min:8|confirmed',
+            'password'        => 'required|confirmed|min:6',
             'role_id'         => 'required|exists:roles,id',
+            'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
         $user = User::create([
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'role_id'  => $request->role_id,
+            'email'    => $validated['email'],
+            'password' => bcrypt($validated['password']),
+            'role_id'  => $validated['role_id'],
             'status'   => 'active',
         ]);
-        $user->save();
 
-
+        $path = null;
         if ($request->hasFile('profile_picture')) {
             $path = $request->file('profile_picture')->store('profiles', 'public');
-        } else {
-            $path = 'images/default.png';
         }
 
         $user->profile()->create([
-            'first_name' => $request->first_name,
-            'middle_name' => $request->middle_name,
-            'last_name' => $request->last_name,
-            'sex' => $request->sex,
-            'birthdate' => $request->birthdate,
-            'address' => $request->address,
-            'contact_number' => $request->contact_number,
-            'profile_picture' => $path,
+            'first_name'      => $validated['first_name'],
+            'middle_name'     => $validated['middle_name'] ?? null,
+            'last_name'       => $validated['last_name'],
+            'sex'             => $validated['sex'] ?? null,
+            'birthdate'       => $validated['birthdate'] ?? null,
+            'address'         => $validated['address'] ?? null,
+            'contact_number'  => $validated['contact_number'] ?? null,
+            'profile_picture' => $path ?? 'images/default.png',
         ]);
 
         $this->logActivity('Create User', "Created user: {$user->email}");
 
-        return back()->with('success', 'User created successfully.');
+        return back()->with('success', 'User added successfully!');
     }
+
 
     public function updateUser(Request $request, $id)
     {

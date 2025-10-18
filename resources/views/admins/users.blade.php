@@ -227,7 +227,7 @@
         <div class="modal-body row g-3">
           <div class="col-md-6">
             <input type="text" name="first_name" placeholder="First Name" class="form-control mb-2" required>
-            <input type="text" name="middle_name" placeholder="Middle Name" class="form-control mb-2">
+            <input type="text" name="middle_name" placeholder="Middle Name" class=" form-control mb-2">
             <input type="text" name="last_name" placeholder="Last Name" class="form-control mb-2" required>
             <select name="sex" class="form-select mb-2">
               <option value="">-- Select Sex --</option>

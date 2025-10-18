@@ -19,13 +19,19 @@
             {{ e($a->title ?? 'Untitled Announcement') }}
           </h5>
           <p class="text-muted small mb-3">
-            {!! nl2br(e($a->body ?? $a->content ?? 'No content available.')) !!}
+            {!! nl2br(e($a->content ?? $a->content ?? 'No content available.')) !!}
           </p>
 
           <div class="d-flex justify-content-between align-items-center flex-wrap">
             <small class="text-secondary">
               <i class="bi bi-person-circle"></i>
-              <strong>{{ e($a->user?->name ?? 'System') }}</strong>
+              <strong>
+                @if($a->user)
+                  {{ $a->user->role->name ?? 'System' }}
+                @else
+                  System
+                @endif
+              </strong>
               &nbsp;|&nbsp;
               <i class="bi bi-calendar3"></i>
               {{ $a->created_at?->format('M d, Y h:i A') ?? 'N/A' }}

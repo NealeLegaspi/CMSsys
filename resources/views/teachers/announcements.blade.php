@@ -207,9 +207,18 @@
             <div class="card-body">
               <p class="mb-2">{{ $ann->content }}</p>
               <small class="text-secondary">
-                <i class="bi bi-person-badge me-1"></i> Posted by: 
-                <strong>{{ $ann->user?->profile?->first_name ?? 'Admin' }} {{ $ann->user?->profile?->last_name ?? '' }}</strong>
-              </small>
+              <i class="bi bi-person-circle"></i>
+              <strong>
+                @if($ann->user)
+                  {{ $ann->user->role->name ?? 'System' }}
+                @else
+                  System
+                @endif
+              </strong>
+              &nbsp;|&nbsp;
+              <i class="bi bi-calendar3"></i>
+              {{ $ann->created_at?->format('M d, Y h:i A') ?? 'N/A' }}
+            </small>
             </div>
           </div>
         @endforeach
