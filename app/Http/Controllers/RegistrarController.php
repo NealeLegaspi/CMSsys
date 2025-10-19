@@ -14,6 +14,7 @@ use App\Models\UserProfile;
 use App\Models\ActivityLog;
 use App\Models\StudentDocument; 
 use App\Models\StudentCertificate; 
+use App\Models\SubjectAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -242,14 +243,25 @@ class RegistrarController extends Controller
 
         return $pdf->download('Student_Record_' . ($student->user->profile->last_name ?? 'Student') . '.pdf');
     }
+
     /**
      * Enrollment
      */
     public function enrollment(Request $request)
     {
+        $activeSY = SchoolYear::where('status', 'active')->first();
+        $activeSYId = $activeSY ? $activeSY->id : null;
+
+        $enrolledStudentIds = $activeSYId 
+            ? Enrollment::where('school_year_id', $activeSYId)->pluck('student_id') 
+            : collect([]);
+
+        $students = Student::with('user.profile')
+            ->whereNotIn('id', $enrolledStudentIds)
+            ->get();
+            
         $schoolYears = SchoolYear::all();
-        $students    = Student::with('user.profile')->get();
-        $sections    = Section::with('gradeLevel')->get();
+        $sections = Section::with('gradeLevel', 'enrollments')->get(); 
 
         $query = Enrollment::with(['student.user.profile', 'section', 'schoolYear']);
 
@@ -259,7 +271,7 @@ class RegistrarController extends Controller
                 $q->where('first_name', 'like', "%$search%")
                 ->orWhere('last_name', 'like', "%$search%");
             })->orWhereHas('student', function ($q) use ($search) {
-                $q->where('student_number', 'like', "%$search%");
+                $q->where('student_number', 'like', "%$search%"); 
             })->orWhereHas('section', function ($q) use ($search) {
                 $q->where('name', 'like', "%$search%");
             });
@@ -268,7 +280,7 @@ class RegistrarController extends Controller
         if ($request->filled('school_year_id')) {
             $query->where('school_year_id', $request->school_year_id);
         }
-
+        
         $enrollments = $query->latest()->paginate(10);
 
         return view('registrars.enrollment', compact('students', 'sections', 'schoolYears', 'enrollments'));
@@ -289,7 +301,6 @@ class RegistrarController extends Controller
         $exists = Enrollment::where('student_id', $request->student_id)
             ->where('school_year_id', $activeSY->id)
             ->exists();
-
         if ($exists) {
             return back()->withErrors(['student_id' => 'This student is already enrolled in the active school year.']);
         }
@@ -299,20 +310,20 @@ class RegistrarController extends Controller
             $count = Enrollment::where('section_id', $section->id)
                 ->where('school_year_id', $activeSY->id)
                 ->count();
-
             if ($count >= $section->capacity) {
                 return back()->withErrors(['section_id' => 'This section has reached maximum capacity.']);
             }
         }
 
-        Enrollment::create([
+        $enrollment = Enrollment::create([
             'student_id'     => $request->student_id,
             'section_id'     => $request->section_id,
             'school_year_id' => $activeSY->id,
-            'status'         => 'enrolled',
+            'status'         => 'Enrolled', 
         ]);
 
-        $this->logActivity('Enroll Student', "Enrolled student {$request->student_id} in section {$request->section_id}");
+        $studentName = $enrollment->student->user->profile->full_name ?? 'N/A';
+        $this->logActivity('Enroll Student', "Enrolled student {$studentName} ({$request->student_id}) in section {$section->name}");
 
         return back()->with('success', 'Student enrolled successfully!');
     }
@@ -328,9 +339,8 @@ class RegistrarController extends Controller
 
         $exists = Enrollment::where('student_id', $enrollment->student_id)
             ->where('school_year_id', $request->school_year_id)
-            ->where('id', '!=', $id)
+            ->where('id', '!=', $id) 
             ->exists();
-
         if ($exists) {
             return back()->withErrors(['student_id' => 'This student is already enrolled in the selected school year.']);
         }
@@ -356,7 +366,6 @@ class RegistrarController extends Controller
         return back()->with('success', 'Enrollment updated successfully!');
     }
 
-
     public function destroyEnrollment($id)
     {
         $enrollment = Enrollment::findOrFail($id);
@@ -365,6 +374,17 @@ class RegistrarController extends Controller
         $this->logActivity('Delete Enrollment', "Deleted enrollment ID {$id}");
 
         return back()->with('success', 'Enrollment record deleted.');
+    }
+    
+    public function verifyEnrollment($id)
+    {
+        $enrollment = Enrollment::findOrFail($id);
+        
+        $enrollment->update(['status' => 'Enrolled']); 
+        
+        $this->logActivity('Verify Enrollment', "Verified enrollment ID {$id}");
+
+        return back()->with('success', 'Enrollment verified successfully.');
     }
 
         public function exportCsv()
@@ -382,25 +402,12 @@ class RegistrarController extends Controller
         return $pdf->download('enrollments.pdf');
     }
 
-     public function verifyEnrollment($id)
-    {
-        $enrollment = Enrollment::with('student.documents')->findOrFail($id);
-
-        $hasIncompleteDocs = $enrollment->student->documents()->where('status', '!=', 'Verified')->exists();
-        if ($hasIncompleteDocs) {
-            return back()->withErrors(['error' => 'All documents must be verified before approving enrollment.']);
-        }
-
-        $enrollment->update(['status' => 'Enrolled']);
-        return back()->with('success', 'Enrollment marked as Enrolled.');
-    }
 
     public function allDocuments(Request $request)
     {
         $query = StudentDocument::with(['student.user.profile'])
             ->latest();
 
-        // 🔍 Search filter
         if ($request->filled('search')) {
             $search = $request->search;
             $query->whereHas('student.user.profile', function ($q) use ($search) {
@@ -546,6 +553,66 @@ class RegistrarController extends Controller
         $this->logActivity('Delete Section', "Deleted section {$name}");
 
         return back()->with('success', 'Section deleted successfully.');
+    }
+
+    public function sectionSubjects($id)
+    {
+        $section = Section::findOrFail($id);
+
+        $teachers = User::where('role_id', 3)->get();
+
+        $sectionGradeLevelId = $section->gradelevel_id;
+
+        $availableSubjects = Subject::where('grade_level_id', $sectionGradeLevelId)->get();
+
+        $sectionSubjects = SubjectAssignment::where('section_id', $section->id)
+                                             ->with(['subject', 'teacher.profile'])
+                                             ->get();
+
+        return view('registrars.subject_load', compact(
+            'section', 
+            'teachers', 
+            'availableSubjects', 
+            'sectionSubjects'
+        ));
+    }
+
+    public function storeSectionSubject(Request $request, $id)
+    {
+        $section = Section::findOrFail($id);
+
+        $request->validate([
+            'subject_id' => 'required|exists:subjects,id',
+            'teacher_id' => 'required|exists:users,id',
+        ]);
+        
+        $exists = SubjectAssignment::where('section_id', $section->id)
+                                     ->where('subject_id', $request->subject_id)
+                                     ->exists();
+        
+        if ($exists) {
+            return back()->with('error', 'This subject is already assigned to this section.');
+        }
+
+        SubjectAssignment::create([
+            'section_id' => $section->id,
+            'subject_id' => $request->subject_id,
+            'teacher_id' => $request->teacher_id,
+            'school_year_id' => $section->school_year_id, 
+        ]);
+
+        return back()->with('success', 'Subject teacher assigned successfully!');
+    }
+
+    public function destroySectionSubject($sectionId, $subjectAssignmentId)
+    {
+        $assignment = SubjectAssignment::where('id', $subjectAssignmentId)
+                                        ->where('section_id', $sectionId) 
+                                        ->firstOrFail();
+
+        $assignment->delete();
+
+        return back()->with('success', 'Subject assignment removed successfully.');
     }
 
     public function classList($id)

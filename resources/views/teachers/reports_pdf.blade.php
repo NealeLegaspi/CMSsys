@@ -105,10 +105,15 @@
           <td>{{ $profile->address ?? '—' }}</td>
           <td>{{ $profile->birthdate ? \Carbon\Carbon::parse($profile->birthdate)->format('M d, Y') : '—' }}</td>
           <td>{{ $profile->birthdate ? \Carbon\Carbon::parse($profile->birthdate)->age : '—' }}</td>
-          <td>{{ $profile->contact ?? '—' }}</td>
+          <td>{{ $profile->contact_number ?? '—' }}</td>
+          @php
+              $enrollment = $student->activeEnrollment;
+              $gradeName = optional(optional($enrollment)->section)->gradeLevel->name ?? 'N/A';
+              $sectionName = optional(optional($enrollment)->section)->name ?? 'N/A';
+          @endphp
           <td>
-            {{ $student->section?->gradeLevel?->name ?? 'N/A' }} -
-            {{ $student->section?->name ?? 'N/A' }}
+              {{ $gradeName }} / 
+              {{ $sectionName }}
           </td>
           <td>{{ $student->status ?? 'Enrolled' }}</td>
         </tr>

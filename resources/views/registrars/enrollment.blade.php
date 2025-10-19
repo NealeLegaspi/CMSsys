@@ -2,7 +2,7 @@
 
 @section('title','Enrollment')
 @section('header')
-    <i class="bi bi-clipboard-data-fill me-2"></i> Enrollment List
+    <i class="bi bi-clipboard-data-fill me-2"></i> Enrollment
 @endsection
 
 @section('content')

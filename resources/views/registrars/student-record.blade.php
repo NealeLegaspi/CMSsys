@@ -9,7 +9,7 @@
 <div class="card shadow-sm border-0">
   <div class="card-header bg-light d-flex justify-content-between align-items-center">
     <h6 class="fw-bold mb-0">
-      📘 {{ $student->user->profile->first_name ?? '' }} {{ $student->user->profile->last_name ?? '' }}
+      {{ $student->user->profile->first_name ?? '' }} {{ $student->user->profile->middle_name ?? '' }}. {{ $student->user->profile->last_name ?? '' }}
       <span class="text-muted small">({{ $student->student_number ?? 'N/A' }})</span>
     </h6>
     <div>

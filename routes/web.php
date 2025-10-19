@@ -6,7 +6,6 @@ use App\Http\Controllers\TeacherController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Models\Announcement;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -122,6 +121,10 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::put('/sections/{id}', [RegistrarController::class, 'updateSection'])->name('registrars.sections.update');
     Route::delete('/sections/{id}', [RegistrarController::class, 'destroySection'])->name('registrars.sections.destroy');
 
+    Route::get('/sections/{id}/subjects', [App\Http\Controllers\RegistrarController::class, 'sectionSubjects'])->name('registrars.sections.subjects');
+    Route::post('/sections/{id}/subjects', [App\Http\Controllers\RegistrarController::class, 'storeSectionSubject'])->name('registrars.sections.subjects.store');
+    Route::delete('/sections/{id}/subjects/{subjectId}', [App\Http\Controllers\RegistrarController::class, 'destroySectionSubject'])->name('registrars.sections.subjects.destroy');
+
     Route::get('/sections/{id}/classlist', [App\Http\Controllers\RegistrarController::class, 'classList'])->name('registrars.classlist');
     Route::get('/sections/{id}/classlist/pdf', [App\Http\Controllers\RegistrarController::class, 'exportClassListPDF'])->name('registrars.classlist.pdf');
 
@@ -195,9 +198,9 @@ Route::prefix('teacher')->middleware(['auth', 'role:Teacher'])->group(function (
     Route::put('/assignments/{assignment}', [TeacherController::class, 'updateAssignment'])->name('teachers.assignments.update');
     Route::delete('/assignments/{assignment}', [TeacherController::class, 'destroyAssignment'])->name('teachers.assignments.destroy');
 
+    Route::post('/grades', [TeacherController::class, 'storeGrades'])->name('teachers.grades.store');
     Route::get('/grades', [TeacherController::class, 'grades'])->name('teachers.grades');
     Route::get('/grades/{subject}/{section}/encode', [TeacherController::class, 'encodeGrades'])->name('teachers.grades.encode');
-    Route::post('/grades', [TeacherController::class, 'storeGrades'])->name('teachers.storeGrades');
     Route::get('/grades/{subject}/edit', [TeacherController::class, 'editGrades'])->name('teachers.grades.edit');
     Route::put('/grades/{subject}', [TeacherController::class, 'updateGrades'])->name('teachers.grades.update');
     Route::delete('/grades/{subject}', [TeacherController::class, 'destroyGrades'])->name('teachers.grades.destroy');

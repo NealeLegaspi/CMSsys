@@ -13,6 +13,7 @@ use App\Models\Student;
 use App\Models\Enrollment;
 use App\Models\GradeLevel;
 use App\Models\ActivityLog;
+use App\Models\SchoolYear;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Validation\Rules\Password;
@@ -180,24 +181,24 @@ class TeacherController extends Controller
 
         if (!$advisorySection) {
             return view('teachers.classlist', [
-                'sectionName' => null,
+                'section' => null,
                 'studentsMale' => collect(),
                 'studentsFemale' => collect(),
                 'mySubjects' => collect(),
             ]);
         }
 
-        $sectionId = $advisorySection->id;
-        $sectionName = $advisorySection->name;
+        $section = $advisorySection;
 
-        $studentsMale = Enrollment::where('section_id', $sectionId)
-            ->whereHas('student.profile', fn($q) => $q->where('sex', 'Male'))
-            ->with('student.profile')
+        $baseQuery = Student::whereHas('activeEnrollment', fn($q) => $q->where('section_id', $section->id))
+                        ->with('user.profile'); 
+
+        $studentsMale = (clone $baseQuery)
+            ->whereHas('user.profile', fn($q) => $q->where('sex', 'Male')->orderBy('last_name'))
             ->get();
 
-        $studentsFemale = Enrollment::where('section_id', $sectionId)
-            ->whereHas('student.profile', fn($q) => $q->where('sex', 'Female'))
-            ->with('student.profile')
+        $studentsFemale = (clone $baseQuery)
+            ->whereHas('user.profile', fn($q) => $q->where('sex', 'Female')->orderBy('last_name'))
             ->get();
 
         $mySubjects = DB::table('subject_teacher')
@@ -212,8 +213,7 @@ class TeacherController extends Controller
             )
             ->get();
 
-        return view('teachers.classlist', compact('sectionName', 'studentsMale', 'studentsFemale', 'mySubjects'));
-    }
+        return view('teachers.classlist', compact('section', 'studentsMale', 'studentsFemale', 'mySubjects'));}
 
     public function exportClassList()
     {
@@ -236,40 +236,59 @@ class TeacherController extends Controller
     // ---------------- GRADES ----------------
     public function grades(Request $request)
     {
-        $teacher = Auth::user();
+        $teacher = Auth::user();    
+        $teacherId = (int) $teacher->id; 
 
-        $subjects = DB::table('subject_teacher')
-            ->join('subjects', 'subject_teacher.subject_id', '=', 'subjects.id')
-            ->join('sections', 'subject_teacher.section_id', '=', 'sections.id')
+        $assignments = DB::table('subject_assignments')
+            ->join('subjects', 'subject_assignments.subject_id', '=', 'subjects.id')
+            ->join('sections', 'subject_assignments.section_id', '=', 'sections.id')
             ->join('grade_levels', 'sections.gradelevel_id', '=', 'grade_levels.id')
-            ->where('subject_teacher.teacher_id', $teacher->id)
+            ->where('subject_assignments.teacher_id', $teacherId)
             ->select(
+                'subject_assignments.id as assignment_id',
                 'subjects.id as subject_id',
-                'grade_levels.name as gradelevel',
+                'subjects.name as subject_name',
+                'sections.id as section_id',
                 'sections.name as section_name',
-                'subjects.name as subject_name'
+                'grade_levels.name as gradelevel_name'
             )
             ->get();
 
-        $selectedSubject = null;
+        $selectedAssignment = null;
+        $students = collect(); 
+        $subject = null;
+        $section = null;
 
-        if ($request->filled('subject_id')) {
-            $selectedSubject = Subject::with('section.gradeLevel')->find($request->subject_id);
+        if ($request->filled('assignment_id')) {
+            $assignmentId = (int) $request->assignment_id; 
 
-            if ($selectedSubject) {
-                $teaches = DB::table('subject_teacher')
-                    ->where('teacher_id', $teacher->id)
-                    ->where('subject_id', $selectedSubject->id)
-                    ->exists();
+            $selectedAssignment = $assignments->where('assignment_id', $assignmentId)->first();
+            
+            if (!$selectedAssignment) {
+                return back()->withErrors(['assignment_id' => 'Invalid or unauthorized subject assignment selected.']);
+            }
 
-                if (! $teaches) {
-                    $selectedSubject = null;
-                    return back()->withErrors(['subject_id' => 'You are not assigned to the selected subject.']);
-                }
+            $subject = Subject::find($selectedAssignment->subject_id);
+            $section = Section::find($selectedAssignment->section_id);
+
+            if ($section) {
+                $students = $section->students()->with(['user.profile', 'grades' => function ($q) use ($subject) {
+                    $q->where('subject_id', $subject->id);
+                }])
+                ->get()
+                ->sortBy(function ($student) {
+                    return $student->user->profile->last_name ?? 'ZZZ';
+                });
             }
         }
 
-        return view('teachers.grades', compact('teacher', 'subjects', 'selectedSubject'));
+        return view('teachers.grades', [
+            'assignments'        => $assignments,
+            'selectedAssignment' => $selectedAssignment, 
+            'students'           => $students,           
+            'subject'            => $subject,             
+            'section'            => $section,             
+        ]);
     }
 
     public function encodeGrades($subjectId, $sectionId)
@@ -307,83 +326,161 @@ class TeacherController extends Controller
             'section_id' => 'required|exists:sections,id',
         ]);
 
+        $subject = Subject::find($request->subject_id);
+        $section = Section::find($request->section_id);
+
+        if (!$subject || !$section) {
+            return back()->with('error', 'Invalid Subject or Section data.');
+        }
+
+        $savedCount = 0;
+        $teacherId = Auth::id();
+
         foreach ($request->grades as $studentId => $quarters) {
             foreach ($quarters as $quarter => $gradeValue) {
-                if (!empty($gradeValue)) {
+                
+                if (is_numeric($gradeValue) && $gradeValue >= 60 && $gradeValue <= 100) {
                     Grade::updateOrCreate(
                         [
-                            'student_id' => $studentId,
-                            'subject_id' => $request->subject_id,
+                            'student_id' => (int)$studentId,
+                            'subject_id' => (int)$request->subject_id,
                             'quarter'    => $quarter,
                         ],
                         [
-                            'grade'      => $gradeValue,
-                            'teacher_id' => Auth::id(),
+                            'grade'      => (int)$gradeValue,
+                            'teacher_id' => $teacherId,
                         ]
                     );
+                    $savedCount++;
+                } 
+                elseif (empty($gradeValue)) {
+                     Grade::where('student_id', (int)$studentId)
+                         ->where('subject_id', (int)$request->subject_id)
+                         ->where('quarter', $quarter)
+                         ->delete();
                 }
             }
         }
 
-        $this->logActivity('Save Grades', "Saved grades for " . count($request->grades) . " students in {$request->subject_id}");
+        $this->logActivity('Save Grades', "Updated grades for {$savedCount} quarter entries in {$subject->name} ({$section->name}).");
+
+        $assignment = DB::table('subject_assignments')
+            ->where('teacher_id', $teacherId)
+            ->where('subject_id', $request->subject_id)
+            ->where('section_id', $request->section_id)
+            ->first();
+            
+        $assignmentId = $assignment->id ?? null;
 
         return redirect()
-            ->route('teachers.grades', ['subject_id' => $request->subject_id])
-            ->with('success', 'Grades saved successfully!');
+            ->route('teachers.grades', ['assignment_id' => $assignmentId])
+            ->with('success', 'Grades successfully saved/updated!');
+    }
+
+    protected function getTeacherAssignedStudents()
+    {
+        $teacherId = Auth::id();
+        
+        $subjectSectionIds = DB::table('subject_teacher')
+                                ->where('teacher_id', $teacherId)
+                                ->pluck('section_id');
+
+        $advisorySectionId = Section::where('adviser_id', $teacherId)->pluck('id');
+        
+        $allSectionIds = $subjectSectionIds->merge($advisorySectionId)->unique();
+        
+        $studentIds = Enrollment::whereIn('section_id', $allSectionIds)
+                                            ->pluck('student_id')
+                                            ->unique();
+
+        return Student::whereIn('id', $studentIds)
+                      ->with(['user.profile', 'section.gradeLevel'])
+                      ->get();
     }
 
     // ---------------- REPORTS ----------------
     public function reports()
     {
-        $gradeLevels = GradeLevel::all();
-        $sections = Section::with('gradeLevel')->get();
-        $schoolYears = ['2022-2023', '2023-2024', '2024-2025'];
-        $students = Student::with('user.profile', 'section.gradeLevel')->get();
+        $students = $this->getTeacherAssignedStudents();
+        
+        $gradeLevelIds = $students->pluck('activeEnrollment.section.gradelevel_id')
+                              ->unique()
+                              ->filter();
+        $sectionIds = $students->pluck('activeEnrollment.section.id')
+                              ->unique()
+                              ->filter();
+
+        $gradeLevels = GradeLevel::whereIn('id', $gradeLevelIds)->get();
+        $sections = Section::whereIn('id', $sectionIds)->with('gradeLevel')->get();
+        
+        $schoolYears = SchoolYear::pluck('name')->toArray(); 
 
         return view('teachers.reports', compact('gradeLevels', 'sections', 'schoolYears', 'students'));
     }
 
     public function filterReports(Request $request)
     {
-        $students = Student::with('user.profile', 'section.gradeLevel')
-            ->when($request->gradelevel_id, function ($q) use ($request) {
-                $q->whereHas('section', function ($s) use ($request) {
-                    $s->where('gradelevel_id', $request->gradelevel_id);
-                });
-            })
-            ->when($request->section_id, function ($q) use ($request) {
-                $q->where('section_id', $request->section_id);
-            })
-            ->when($request->school_year, function ($q) use ($request) {
-                $q->where('school_year', $request->school_year);
-            })
-            ->get();
+        $studentIds = $this->getTeacherAssignedStudents()->pluck('id');
 
-        $gradeLevels = GradeLevel::all();
-        $sections = Section::with('gradeLevel')->get();
-        $schoolYears = ['2022-2023', '2023-2024', '2024-2025'];
+        $query = Student::whereIn('id', $studentIds)
+            ->with(['user.profile', 'activeEnrollment.section.gradeLevel']);
+
+        $query->when($request->filled('gradelevel_id'), function ($q) use ($request) {
+            $q->whereHas('section', function ($s) use ($request) {
+                $s->where('gradelevel_id', $request->gradelevel_id);
+            });
+        });
+
+        $query->when($request->filled('section_id'), function ($q) use ($request) {
+            $q->where('section_id', $request->section_id);
+        });
+
+        $query->when($request->filled('school_year'), function ($q) use ($request) {
+            $q->whereHas('enrollments.schoolYear', function ($e) use ($request) {
+                $e->where('name', $request->school_year);
+            });
+        });
+
+        $students = $query->get();
+
+        $gradeLevelIds = $students->pluck('activeEnrollment.section.gradelevel_id')->unique()->filter();
+        $sectionIds = $students->pluck('activeEnrollment.section_id')->unique()->filter();
+    
+        $gradeLevels = GradeLevel::whereIn('id', $gradeLevelIds)->get();
+        $sections = Section::whereIn('id', $sectionIds)->with('gradeLevel')->get();
+        $schoolYears = SchoolYear::pluck('name')->toArray(); 
 
         return view('teachers.reports', compact('students', 'gradeLevels', 'sections', 'schoolYears'));
     }
 
     public function exportReportsPDF(Request $request)
     {
-        $students = Student::with('user.profile', 'section.gradeLevel')
-            ->when($request->gradelevel_id, function ($q) use ($request) {
-                $q->whereHas('section', function ($s) use ($request) {
-                    $s->where('gradelevel_id', $request->gradelevel_id);
-                });
-            })
-            ->when($request->section_id, function ($q) use ($request) {
-                $q->where('section_id', $request->section_id);
-            })
-            ->when($request->school_year, function ($q) use ($request) {
-                $q->where('school_year', $request->school_year);
-            })
-            ->get();
+        $studentIds = $this->getTeacherAssignedStudents()->pluck('id');
 
-        $pdf = Pdf::loadView('teachers.reports_pdf', compact('students'))
-                ->setPaper('a4', 'landscape');
+        $query = Student::whereIn('id', $studentIds)
+            ->with(['user.profile', 'activeEnrollment.section.gradeLevel']);
+
+        $query->when($request->filled('gradelevel_id'), function ($q) use ($request) {
+            $q->whereHas('section', function ($s) use ($request) {
+                $s->where('gradelevel_id', $request->gradelevel_id);
+            });
+        });
+
+        $query->when($request->filled('section_id'), function ($q) use ($request) {
+            $q->where('section_id', $request->section_id);
+        });
+
+        $query->when($request->filled('school_year'), function ($q) use ($request) {
+            $q->whereHas('enrollments.schoolYear', function ($e) use ($request) {
+                $e->where('name', $request->school_year);
+            });
+        });
+
+        $students = $query->get();
+
+        $pdf = \App::make('dompdf.wrapper'); 
+        $pdf->loadView('teachers.reports_pdf', compact('students'))
+                 ->setPaper('a4', 'landscape');
 
         $this->logActivity('Export Reports', "Exported reports for {$students->count()} students");
 

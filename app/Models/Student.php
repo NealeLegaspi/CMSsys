@@ -42,4 +42,11 @@ class Student extends Model
     {
         return $this->hasMany(StudentDocument::class);
     }
+
+    public function activeEnrollment()
+    {
+        return $this->hasOne(Enrollment::class)
+                    ->with(['section.gradeLevel', 'schoolYear'])
+                    ->latest('created_at');
+    }
 }

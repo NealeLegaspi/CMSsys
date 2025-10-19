@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Section;
 use App\Models\Subject;
+use App\Models\Student;
 use App\Models\Enrollment;
 use App\Models\SchoolYear;
 use App\Models\Role;
@@ -15,6 +16,7 @@ use App\Models\GradeLevel;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
@@ -280,6 +282,11 @@ class AdminController extends Controller
             'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
+        $studentRole = Role::where('name', 'Student')->first(); 
+        $studentRoleId = $studentRole ? $studentRole->id : 0;
+
+        DB::transaction(function () use ($validated, $request, $studentRoleId) {
+
         $user = User::create([
             'email'    => $validated['email'],
             'password' => bcrypt($validated['password']),
@@ -303,7 +310,18 @@ class AdminController extends Controller
             'profile_picture' => $path ?? 'images/default.png',
         ]);
 
+        if ($user->role_id == $studentRoleId) {
+            
+            $studentNumber = date('Y') . str_pad($user->id, 5, '0', STR_PAD_LEFT);
+
+            Student::create([
+                'user_id'          => $user->id,
+                'student_number'   => $studentNumber, 
+            ]);
+        }
+
         $this->logActivity('Create User', "Created user: {$user->email}");
+        });
 
         return back()->with('success', 'User added successfully!');
     }

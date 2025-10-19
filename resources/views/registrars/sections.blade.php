@@ -50,16 +50,21 @@
               </td>
               <td>{{ $sec->capacity ?? '∞' }}</td>
               <td>{{ $sec->enrollments->count() }}</td>
-              <td>
-                <a href="{{ route('registrars.classlist', $sec->id) }}" class="btn btn-sm btn-info text-white">
-                  <i class="bi bi-people"></i>
+             <td>
+                <div class="d-flex justify-content-center gap-1">
+                <a href="{{ route('registrars.sections.subjects', ['id' => $sec->id]) }}" class="btn btn-sm btn-dark" title="Manage Subject Load">
+                    <i class="bi bi-journal-bookmark-fill"></i>
                 </a>
-                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editSectionModal{{ $sec->id }}">
-                  <i class="bi bi-pencil"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteSectionModal{{ $sec->id }}">
-                  <i class="bi bi-trash"></i>
-                </button>
+                  <a href="{{ route('registrars.classlist', $sec->id) }}" class="btn btn-sm btn-info text-white">
+                    <i class="bi bi-people"></i>
+                  </a>
+                  <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editSectionModal{{ $sec->id }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteSectionModal{{ $sec->id }}">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
               </td>
             </tr>
 
@@ -216,4 +221,5 @@
     </form>
   </div>
 </div>
+
 @endsection

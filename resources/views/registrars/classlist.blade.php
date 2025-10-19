@@ -53,35 +53,39 @@
     <!-- Table -->
     <div class="table-responsive">
       <table class="table table-bordered table-striped table-hover align-middle">
-        <thead class="table-primary text-center">
-          <tr>
-            <th style="width: 5%">#</th>
-            <th style="width: 15%">LRN</th>
-            <th style="width: 30%">Full Name</th>
-            <th style="width: 15%">Gender</th>
-            <th style="width: 20%">Contact</th>
-          </tr>
-        </thead>
-        <tbody>
-          @forelse($students as $index => $s)
-            <tr>
-              <td class="text-center">{{ $index + 1 }}</td>
-              <td class="fw-bold text-primary">{{ $s->student->student_number ?? 'N/A' }}</td>
-              <td>{{ $s->profile->last_name }}, {{ $s->profile->first_name }}</td>
-              <td class="text-center">{{ $s->profile->sex ?? 'N/A' }}</td>
-              <td>{{ $s->profile->contact_number ?? 'N/A' }}</td>
-            </tr>
-          @empty
-            <tr>
-              <td colspan="5" class="text-center text-muted py-4">
-                <i class="bi bi-people"></i><br>
-                No enrolled students yet in this section.
-              </td>
-            </tr>
-          @endforelse
-        </tbody>
+          <thead class="table-primary text-center">
+              <tr>
+                  <th style="width: 5%">#</th>
+                  <th style="width: 15%">LRN</th>
+                  <th style="width: 30%">Full Name</th>
+                  <th style="width: 15%">Gender</th>
+                  <th style="width: 20%">Contact</th>
+              </tr>
+          </thead>
+          <tbody>
+              @forelse($students as $index => $s)
+                  <tr>
+                      <td class="text-center">{{ $index + 1 }}</td> 
+                      
+                      <td class="fw-bold text-primary text-center">{{ $s->student->student_number ?? 'N/A' }}</td>
+
+                      <td class="text-center">{{ $s->profile->last_name }}, {{ $s->profile->first_name }} {{ $s->profile->middle_name }}.</td>
+
+                      <td class="text-center">{{ $s->profile->sex ?? 'N/A' }}</td>
+                      
+                      <td class="text-center">{{ $s->profile->contact_number ?? 'N/A' }}</td>
+                  </tr>
+              @empty
+                  <tr>
+                      <td colspan="5" class="text-center text-muted py-4">
+                          <i class="bi bi-people"></i><br>
+                          No enrolled students yet in this section.
+                      </td>
+                  </tr>
+              @endforelse
+          </tbody>
       </table>
-    </div>
+  </div>
 
     <!-- Footer Summary -->
     <div class="d-flex justify-content-between mt-3 small text-muted">
