@@ -9,7 +9,6 @@
 <div class="container my-4">
     @include('partials.alerts')
 
-    {{-- Section Info Card --}}
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-body d-flex flex-wrap justify-content-between align-items-center">
             <div>
@@ -24,9 +23,7 @@
         </div>
     </div>
 
-    {{-- Main Card Container for Tabs --}}
     <div class="card shadow-sm border-0">
-        {{-- Tabs Navigation --}}
         <div class="card-header bg-light border-bottom-0">
             <ul class="nav nav-tabs card-header-tabs" id="subjectLoadTabs" role="tablist">
                 <li class="nav-item" role="presentation">
@@ -42,11 +39,7 @@
             </ul>
         </div>
 
-        {{-- Tabs Content: Gumagamit na ng default padding ng card-body --}}
         <div class="card-body tab-content" id="subjectLoadTabsContent">
-            
-            {{-- TAB 1: Assign Subject Teacher Form --}}
-            {{-- Walang p-class sa tab-pane, umaasa sa default padding ng card-body --}}
             <div class="tab-pane fade show active" id="assign-pane" role="tabpanel" aria-labelledby="assign-tab" tabindex="0">
                 <h5 class="fw-bold text-success mb-3">Add New Assignment</h5>
                 <form action="{{ route('registrars.sections.subjects.store', ['id' => $section->id]) }}" method="POST" class="row g-3">
@@ -111,13 +104,50 @@
                                             </span>
                                         </td>
                                         <td class="text-center">
-                                            <form action="{{ route('registrars.sections.subjects.destroy', ['id' => $section->id, 'subjectId' => $assign->id]) }}" method="POST" class="d-inline">
-                                                @csrf @method('DELETE')
-                                                <button class="btn btn-sm btn-danger shadow-sm" title="Remove Assignment" onclick="return confirm('Are you sure you want to remove this subject assignment?')">
-                                                    <i class="bi bi-trash"></i> Remove
+                                        <button type="button" 
+                                                class="btn btn-sm btn-danger shadow-sm" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#deleteSubjectModal{{ $assign->id }}">
+                                            <i class="bi bi-trash"></i> Remove
+                                        </button>
+
+                                        <div class="modal fade" id="deleteSubjectModal{{ $assign->id }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-sm modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <div class="modal-header bg-danger text-white">
+                                                <h5 class="modal-title">
+                                                    <i class="bi bi-exclamation-triangle me-2"></i> Confirm Delete
+                                                </h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                </div>
+
+                                                <div class="modal-body text-center">
+                                                <p class="mb-2">Are you sure you want to remove this subject assignment?</p>
+                                                <p class="fw-semibold mb-0 text-danger">{{ $assign->subject->name }}</p>
+                                                <small class="text-muted">
+                                                    Teacher: {{ $assign->teacher->profile->first_name ?? '' }} {{ $assign->teacher->profile->last_name ?? '' }}
+                                                </small>
+                                                </div>
+
+                                                <div class="modal-footer justify-content-center">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                    Cancel
                                                 </button>
-                                            </form>
+                                                <form action="{{ route('registrars.sections.subjects.destroy', ['id' => $section->id, 'subjectId' => $assign->id]) }}" 
+                                                        method="POST" 
+                                                        class="d-inline">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger">
+                                                        Remove
+                                                    </button>
+                                                </form>
+                                                </div>
+                                            </div>
+                                            </div>
+                                        </div>
                                         </td>
+
                                     </tr>
                                 @endforeach
                             </tbody>

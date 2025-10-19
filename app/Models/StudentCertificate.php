@@ -23,7 +23,7 @@ class StudentCertificate extends Model
         return $this->belongsTo(Student::class);
     }
 
-    public function issuedBy()
+    public function issuer()
     {
         return $this->belongsTo(User::class, 'issued_by');
     }

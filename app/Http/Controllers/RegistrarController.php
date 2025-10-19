@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\StudentsExport;
@@ -651,55 +652,100 @@ class RegistrarController extends Controller
         return view('registrars.certificates', compact('students', 'certificates'));
     }
 
-// 📄 Store and generate certificate
-public function storeCertificate(Request $request)
-{
-    $request->validate([
-        'student_id' => 'required|exists:students,id',
-        'type' => 'required|string|max:100',
-        'remarks' => 'nullable|string|max:255',
-    ]);
+    public function storeCertificate(Request $request)
+    {
+        $request->validate([
+            'student_id' => 'required|exists:students,id',
+            'type' => 'required|string|max:100',
+            'remarks' => 'nullable|string|max:255',
+            'purpose' => 'nullable|string|max:255',
+        ]);
 
-    $student = Student::with('user.profile')->findOrFail($request->student_id);
+        // Load student with profile directly via hasOneThrough
+        $student = Student::with('profile')->findOrFail($request->student_id);
 
-    $certificate = StudentCertificate::create([
-        'student_id' => $student->id,
-        'type' => $request->type,
-        'remarks' => $request->remarks,
-        'issued_by' => Auth::id(),
-    ]);
+        // Ensure profile exists
+        if (!$student->profile) {
+            return back()->with('error', 'This student has no linked user profile.');
+        }
 
-    // Generate the PDF certificate
-    $pdf = PDF::loadView('exports.certificates.template', [
-        'student' => $student,
-        'certificate' => $certificate,
-        'schoolName' => 'Children\'s Mindware School Inc.',
-        'schoolAddress' => 'Balagtas, Bulacan',
-    ])->setPaper('a4', 'portrait');
+        $certificate = StudentCertificate::create([
+            'student_id' => $student->id,
+            'type' => $request->type,
+            'remarks' => $request->remarks,
+            'purpose' => $request->purpose,
+            'issued_by' => Auth::id(),
+        ]);
 
-    $path = "certificates/{$certificate->id}.pdf";
-    Storage::disk('public')->put($path, $pdf->output());
+        // Get registrar (issuer) name
+        $issuer = Auth::user();
+        $registrarName = trim(optional($issuer->profile)->first_name . ' ' . optional($issuer->profile)->last_name);
+        $registrarName = $registrarName ?: 'The Registrar';
 
-    $certificate->update(['file_path' => $path]);
+        // Generate PDF
+        $pdf = PDF::loadView('exports.certificates.completion', [
+            'student' => $student,
+            'certificate' => $certificate,
+            'schoolName' => "Children's Mindware School Inc.",
+            'schoolAddress' => 'Balagtas, Bulacan',
+            'registrarName' => $registrarName,
+        ])->setPaper('a4', 'portrait');
 
-    return back()->with('success', 'Certificate issued successfully.');
-}
+        $safeType = Str::slug($request->type);
+        $path = "certificates/{$student->id}/{$safeType}-{$certificate->id}.pdf";
 
-// 📄 View or regenerate PDF
-public function generatePDF($id)
-{
-    $certificate = StudentCertificate::with('student.user.profile')->findOrFail($id);
-    $student = $certificate->student;
+        Storage::disk('public')->put($path, $pdf->output());
+        $certificate->update(['file_path' => $path]);
 
-    $pdf = PDF::loadView('exports.certificates.template', [
-        'student' => $student,
-        'certificate' => $certificate,
-        'schoolName' => 'Children\'s Mindware School Inc.',
-        'schoolAddress' => 'Balagtas, Bulacan',
-    ])->setPaper('a4', 'portrait');
+        return back()->with('success', 'Certificate issued successfully.');
+    }
 
-    return $pdf->download("{$certificate->type}-{$student->user->profile->last_name}.pdf");
-}
+
+    public function destroyCertificate($id) 
+    {
+        $certificate = StudentCertificate::find($id);
+
+        if (!$certificate) {
+            return back()->with('error', 'Certificate not found.');
+        }
+
+        if ($certificate->file_path && \Storage::exists('public/' . $certificate->file_path)) {
+            \Storage::delete('public/' . $certificate->file_path);
+        }
+
+        $certificate->delete();
+
+        return back()->with('success', 'Certificate deleted successfully.');
+    }
+
+    public function generateCertificatePDF(StudentCertificate $certificate)
+    {
+        $certificate->load(['student.profile', 'issuer.profile']);
+        $student = $certificate->student;
+
+        if (!$student || !$student->profile) {
+            return back()->with('error', 'This student has no linked record or user profile.');
+        }
+
+        $issuer = $certificate->issuer;
+        $registrarName = optional($issuer->profile)
+            ? trim($issuer->profile->first_name . ' ' . $issuer->profile->last_name)
+            : 'The Registrar';
+
+        $pdf = Pdf::loadView('exports.certificates.completion', [
+            'student' => $student,
+            'certificate' => $certificate,
+            'schoolName' => "Children's Mindware School Inc.",
+            'schoolAddress' => 'Balagtas, Bulacan',
+            'registrarName' => $registrarName,
+        ])->setPaper('a4', 'portrait');
+
+        $type = $certificate->type ?? 'Certificate';
+        $lastName = optional($student->profile)->last_name ?? 'Student';
+
+        return $pdf->download("{$type}-{$lastName}.pdf");
+    }
+
 
     /**
      * Teachers

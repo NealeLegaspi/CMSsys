@@ -14,8 +14,15 @@ p { font-size:14px; }
   <h2>{{ $schoolName }}</h2>
   <h4>{{ $schoolAddress }}</h4>
   <h3 style="margin-top:30px;">CERTIFICATE OF COMPLETION</h3>
-  <p>This certifies that <strong>{{ $student->user->profile->first_name }} {{ $student->user->profile->last_name }}</strong>
-     has successfully completed all academic requirements for their grade level at <strong>{{ $schoolName }}</strong>.</p>
+  <p>
+  This certifies that
+  <strong>
+    {{ optional($student->profile)->first_name ?? 'Unknown' }}
+    {{ optional($student->profile)->last_name ?? '' }}
+  </strong>
+  has successfully completed all academic requirements for their grade level at
+  <strong>{{ $schoolName }}</strong>.
+  </p>
   @if($certificate->purpose)
   <p><em>Purpose: {{ $certificate->purpose }}</em></p>
   @endif

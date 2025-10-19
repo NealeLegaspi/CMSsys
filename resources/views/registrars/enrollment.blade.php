@@ -155,6 +155,97 @@
                 </div>
               </div>
             </div>
+
+            <!-- Edit Enrollment Modal -->
+            <div class="modal fade" id="editEnrollmentModal{{ $enrollment->id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog">
+                <form method="POST" action="{{ route('registrars.enrollment.update', $enrollment->id) }}">
+                  @csrf
+                  @method('PUT')
+                  <div class="modal-content">
+                    <div class="modal-header bg-warning text-white">
+                      <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i> Edit Enrollment</h5>
+                      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+
+                    <div class="modal-body">
+                      <div class="mb-3">
+                        <label class="form-label">Student</label>
+                        <input type="text" class="form-control" 
+                          value="{{ $enrollment->student->user->profile->full_name }}" readonly>
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">Section</label>
+                        <select name="section_id" class="form-select" required>
+                          @foreach($sections as $sec)
+                            @php $enrolledCount = $sec->enrollments->count(); @endphp
+                            <option value="{{ $sec->id }}" 
+                              {{ $enrollment->section_id == $sec->id ? 'selected' : '' }}
+                              {{ $enrolledCount >= $sec->capacity && $enrollment->section_id != $sec->id ? 'disabled' : '' }}>
+                              {{ $sec->name }} ({{ $enrolledCount }}/{{ $sec->capacity ?? '∞' }})
+                            </option>
+                          @endforeach
+                        </select>
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">School Year</label>
+                        <select name="school_year_id" class="form-select" required>
+                          @foreach($schoolYears as $year)
+                            <option value="{{ $year->id }}" {{ $enrollment->school_year_id == $year->id ? 'selected' : '' }}>
+                              {{ $year->name }}
+                            </option>
+                          @endforeach
+                        </select>
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select name="status" class="form-select">
+                          <option value="Enrolled" {{ $enrollment->status == 'Enrolled' ? 'selected' : '' }}>Enrolled</option>
+                          <option value="For Verification" {{ $enrollment->status == 'For Verification' ? 'selected' : '' }}>For Verification</option>
+                          <option value="Dropped" {{ $enrollment->status == 'Dropped' ? 'selected' : '' }}>Dropped</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="modal-footer">
+                      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      <button class="btn btn-warning text-white">Update</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- Delete Enrollment Modal -->
+            <div class="modal fade" id="deleteEnrollmentModal{{ $enrollment->id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-sm modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i> Confirm Delete</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <p class="mb-0">Are you sure you want to delete enrollment for</p>
+                    <p class="fw-bold mb-0">{{ $enrollment->student->user->profile->full_name ?? 'Student' }}</p>
+                    <p class="text-muted small mt-2">Section: {{ $enrollment->section->name ?? 'N/A' }}</p>
+                  </div>
+                  <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+
+                    <form action="{{ route('registrars.enrollment.destroy', $enrollment->id) }}" method="POST" class="d-inline">
+                      @csrf
+                      @method('DELETE')
+                      <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
           @empty
             <tr><td colspan="7" class="text-center text-muted">No enrollments yet.</td></tr>
           @endforelse

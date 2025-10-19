@@ -2,7 +2,7 @@
 
 @section('title','Certificates & Document Issuance')
 @section('header')
-    <i class="bi bi-award-fill me-2"></i> Certificates & Document Issuance
+  <i class="bi bi-award-fill me-2"></i> Certificates & Document Issuance
 @endsection
 
 @section('content')
@@ -56,17 +56,39 @@
                 @endif
               </td>
               <td>
-                <a href="{{ route('registrars.certificates.pdf', $cert->id) }}" class="btn btn-sm btn-success">
-                  <i class="bi bi-printer"></i>
-                </a>
-                <form action="{{ route('registrars.certificates.destroy', $cert->id) }}" method="POST" class="d-inline">
-                  @csrf @method('DELETE')
-                  <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this certificate?')">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </form>
+                <!-- Delete Button -->
+                <button 
+                  type="button" 
+                  class="btn btn-sm btn-danger" 
+                  data-bs-toggle="modal" 
+                  data-bs-target="#deleteModal{{ $cert->id }}">
+                  <i class="bi bi-trash"></i>
+                </button>
               </td>
             </tr>
+
+            <!-- Delete Modal -->
+            <div class="modal fade" id="deleteModal{{ $cert->id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i> Confirm Delete</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    Are you sure you want to delete the certificate for 
+                    <strong>{{ $cert->student->user->profile->last_name }}, {{ $cert->student->user->profile->first_name }}</strong>?
+                  </div>
+                  <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form action="{{ route('registrars.certificates.destroy', $cert->id) }}" method="POST" class="d-inline">
+                      @csrf @method('DELETE')
+                      <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
           @empty
             <tr><td colspan="7" class="text-center text-muted">No certificates issued yet.</td></tr>
           @endforelse
@@ -124,4 +146,28 @@
     </form>
   </div>
 </div>
+
+<!-- PDF Loading Modal -->
+<div class="modal fade" id="loadingPdfModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center py-4">
+      <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+      <h6>Generating PDF... Please wait</h6>
+    </div>
+  </div>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+function openPdf(url) {
+  const loadingModal = new bootstrap.Modal(document.getElementById('loadingPdfModal'));
+  loadingModal.show();
+
+  const newTab = window.open(url, '_blank');
+
+  // Close loading modal after 2 seconds
+  setTimeout(() => loadingModal.hide(), 2000);
+}
+</script>
+@endpush

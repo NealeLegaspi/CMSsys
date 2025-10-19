@@ -156,6 +156,7 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::delete('/documents/{id}', [App\Http\Controllers\RegistrarController::class, 'destroyDocument'])
         ->name('registrars.documents.destroy');
 
+    
     // Student Record Management
     Route::get('/students/{id}/record', [App\Http\Controllers\RegistrarController::class, 'viewStudentRecord'])
         ->name('registrars.student.record');
@@ -176,7 +177,6 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::post('/certificates', [App\Http\Controllers\RegistrarController::class, 'storeCertificate'])->name('registrars.certificates.store');
     Route::get('/certificates/{id}/pdf', [App\Http\Controllers\RegistrarController::class, 'generateCertificatePDF'])->name('registrars.certificates.pdf');
     Route::delete('/certificates/{id}', [App\Http\Controllers\RegistrarController::class, 'destroyCertificate'])->name('registrars.certificates.destroy');
-
 
 
     Route::get('/settings', [RegistrarController::class, 'settings'])->name('registrars.settings');

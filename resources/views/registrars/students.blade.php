@@ -83,7 +83,7 @@
               <td>{{ $student->email }}</td>
               <td>{{ $student->profile->sex ?? 'N/A' }}</td>
               <td>{{ $student->profile->contact_number ?? 'N/A' }}</td>
-              <td>{{ $student->student->section->name ?? 'N/A' }}</td>
+              <td>{{ $student->student->enrollments->where('status', 'enrolled')->first()->section->name ?? 'N/A' }}</td>
               <td>
                 <!-- View Record Button -->
                 <a href="{{ route('registrars.student.record', $student->student->id) }}" 

@@ -61,25 +61,76 @@
               </td>
               <td>{{ $doc->created_at?->format('M d, Y h:i A') ?? 'N/A' }}</td>
               <td>
+                {{-- Verify Button --}}
                 @if($doc->status !== 'Verified')
-                  <form action="{{ route('registrars.documents.verify', $doc->id) }}" method="POST" class="d-inline">
-                    @csrf
-                    @method('PUT')
-                    <button class="btn btn-sm btn-success" onclick="return confirm('Verify this document?')">
-                      <i class="bi bi-check-circle"></i>
-                    </button>
-                  </form>
+                  <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#verifyModal{{ $doc->id }}">
+                    <i class="bi bi-check-circle"></i>
+                  </button>
                 @endif
 
-                <form action="{{ route('registrars.documents.destroy', $doc->id) }}" method="POST" class="d-inline">
-                  @csrf
-                  @method('DELETE')
-                  <button class="btn btn-sm btn-danger" onclick="return confirm('Delete this document?')">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </form>
+                {{-- Delete Button --}}
+                <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ $doc->id }}">
+                  <i class="bi bi-trash"></i>
+                </button>
               </td>
             </tr>
+
+            {{-- Verify Modal --}}
+            <div class="modal fade" id="verifyModal{{ $doc->id }}" tabindex="-1" aria-labelledby="verifyModalLabel{{ $doc->id }}" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow">
+                  <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="verifyModalLabel{{ $doc->id }}">
+                      <i class="bi bi-check-circle-fill me-2"></i> Verify Document
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    Are you sure you want to verify this document?
+                    <div class="mt-2 text-muted small">
+                      <strong>{{ optional($doc->student->user->profile)->last_name }}, {{ optional($doc->student->user->profile)->first_name }}</strong> — {{ $doc->type }}
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form action="{{ route('registrars.documents.verify', $doc->id) }}" method="POST" class="d-inline">
+                      @csrf
+                      @method('PUT')
+                      <button class="btn btn-success">Verify</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {{-- Delete Modal --}}
+            <div class="modal fade" id="deleteModal{{ $doc->id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ $doc->id }}" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow">
+                  <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteModalLabel{{ $doc->id }}">
+                      <i class="bi bi-trash-fill me-2"></i> Delete Document
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    Are you sure you want to delete this document? This action cannot be undone.
+                    <div class="mt-2 text-muted small">
+                      <strong>{{ optional($doc->student->user->profile)->last_name }}, {{ optional($doc->student->user->profile)->first_name }}</strong> — {{ $doc->type }}
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form action="{{ route('registrars.documents.destroy', $doc->id) }}" method="POST" class="d-inline">
+                      @csrf
+                      @method('DELETE')
+                      <button class="btn btn-danger">Delete</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           @empty
             <tr><td colspan="7" class="text-center text-muted">No documents uploaded yet.</td></tr>
           @endforelse
