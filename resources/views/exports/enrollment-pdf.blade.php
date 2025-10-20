@@ -3,12 +3,19 @@
 <head>
     <title>Enrollment List</title>
     <style>
+          img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 70px;
+        }
         table { width:100%; border-collapse: collapse; font-size:12px; }
         th, td { border:1px solid #000; padding:6px; text-align:left; }
         th { background:#eee; }
     </style>
 </head>
 <body>
+    <img src="{{ public_path('Mindware.png') }}" alt="School Logo">
     <h3>Enrollment List</h3>
     <table>
         <thead>

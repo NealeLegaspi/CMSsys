@@ -51,8 +51,8 @@
                                 (Male: {{ $studentsMale->count() }}, Female: {{ $studentsFemale->count() }})
                             </p>
                         </div>
-                        <a href="{{ route('teachers.classlist.export') }}" class="btn btn-primary mt-2 mt-md-0 shadow-sm">
-                            <i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
+                        <a href="{{ route('teachers.classlist.export') }}" class="btn btn-danger mt-2 mt-md-0 shadow-sm">
+                            <i class="bi bi-file-earmark-pdf me-1"></i> PDF
                         </a>
                     </div>
                 </div>

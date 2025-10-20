@@ -236,7 +236,7 @@ class TeacherController extends Controller
     // ---------------- GRADES ----------------
     public function grades(Request $request)
     {
-        $teacher = Auth::user();    
+        $teacher = Auth::user(); 
         $teacherId = (int) $teacher->id; 
 
         $assignments = DB::table('subject_assignments')
@@ -285,7 +285,7 @@ class TeacherController extends Controller
         return view('teachers.grades', [
             'assignments'        => $assignments,
             'selectedAssignment' => $selectedAssignment, 
-            'students'           => $students,           
+            'students'           => $students,             
             'subject'            => $subject,             
             'section'            => $section,             
         ]);
@@ -334,7 +334,7 @@ class TeacherController extends Controller
         }
 
         $savedCount = 0;
-        $teacherId = Auth::id();
+        $teacherId = Auth::id(); // Keep the teacher ID for logging/auditing if needed
 
         foreach ($request->grades as $studentId => $quarters) {
             foreach ($quarters as $quarter => $gradeValue) {
@@ -347,17 +347,17 @@ class TeacherController extends Controller
                             'quarter'    => $quarter,
                         ],
                         [
+                            // Aalisin ang teacher_id dito para maiwasan ang 'Unknown column' error
                             'grade'      => (int)$gradeValue,
-                            'teacher_id' => $teacherId,
                         ]
                     );
                     $savedCount++;
                 } 
                 elseif (empty($gradeValue)) {
-                     Grade::where('student_id', (int)$studentId)
-                         ->where('subject_id', (int)$request->subject_id)
-                         ->where('quarter', $quarter)
-                         ->delete();
+                    Grade::where('student_id', (int)$studentId)
+                        ->where('subject_id', (int)$request->subject_id)
+                        ->where('quarter', $quarter)
+                        ->delete();
                 }
             }
         }
@@ -376,6 +376,7 @@ class TeacherController extends Controller
             ->route('teachers.grades', ['assignment_id' => $assignmentId])
             ->with('success', 'Grades successfully saved/updated!');
     }
+
 
     protected function getTeacherAssignedStudents()
     {
