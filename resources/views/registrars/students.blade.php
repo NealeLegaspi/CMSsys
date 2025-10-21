@@ -2,7 +2,7 @@
 
 @section('title','Student Records')
 @section('header')
-    <i class="bi bi-journal-check me-2"></i> Enrolled Students
+    <i class="bi bi-journal-check me-2"></i> Student Records
 @endsection
 
 @section('content')

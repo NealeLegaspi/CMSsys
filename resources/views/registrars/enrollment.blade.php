@@ -80,15 +80,6 @@
                   📎 Docs
                 </button>
 
-                @if($enrollment->status !== 'Enrolled')
-                <form method="POST" action="{{ route('registrars.enrollment.verify', $enrollment->id) }}" class="d-inline">
-                  @csrf
-                  <button class="btn btn-sm btn-success">
-                    <i class="bi bi-check-circle"></i> Verify
-                  </button>
-                </form>
-                @endif
-
                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editEnrollmentModal{{ $enrollment->id }}">
                   <i class="bi bi-pencil"></i>
                 </button>
@@ -125,32 +116,6 @@
                         <button class="btn btn-primary"><i class="bi bi-upload"></i> Upload</button>
                       </div>
                     </form>
-
-                    <hr>
-                    <table class="table table-sm table-bordered">
-                      <thead class="table-light">
-                        <tr><th>Type</th><th>Status</th><th>Action</th></tr>
-                      </thead>
-                      <tbody>
-                        @foreach($enrollment->student->documents as $doc)
-                          <tr>
-                            <td>{{ $doc->type }}</td>
-                            <td>{{ $doc->status }}</td>
-                            <td>
-                              <a href="{{ asset('storage/'.$doc->file_path) }}" target="_blank" class="btn btn-sm btn-outline-primary">View</a>
-                              @if($doc->status != 'Verified')
-                              <form action="{{ route('registrars.documents.verify', $doc->id) }}" method="POST" class="d-inline">@csrf
-                                <button class="btn btn-sm btn-success">Mark Verified</button>
-                              </form>
-                              @endif
-                              <form action="{{ route('registrars.documents.destroy', $doc->id) }}" method="POST" class="d-inline">@csrf @method('DELETE')
-                                <button class="btn btn-sm btn-danger">Delete</button>
-                              </form>
-                            </td>
-                          </tr>
-                        @endforeach
-                      </tbody>
-                    </table>
                   </div>
                 </div>
               </div>

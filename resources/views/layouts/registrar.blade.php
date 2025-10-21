@@ -42,9 +42,15 @@
        class="nav-link {{ request()->routeIs('registrars.dashboard') ? 'active' : '' }}">
        <i class='bx bx-home me-2'></i> Dashboard
     </a>
-    <a href="{{ route('registrars.documents.all') }}" 
-      class="nav-link {{ request()->routeIs('registrars.documents*') ? 'active' : '' }}">
-      <i class="bi bi-folder2-open me-2"></i> Documents
+    <a href="{{ route('registrars.docs.certs') }}" 
+    class="nav-link 
+    {{ 
+      request()->routeIs('registrars.docs.certs') || 
+      request()->routeIs('registrars.documents.all') || 
+      request()->routeIs('registrars.certificates') 
+      ? 'active' : '' 
+    }}">
+    <i class="bi bi-file-earmark-ruled-fill me-2"></i> Documents
     </a>
     <a href="{{ route('registrars.students') }}" 
        class="nav-link {{ request()->routeIs('registrars.students*') ? 'active' : '' }}">
@@ -53,10 +59,6 @@
     <a href="{{ route('registrars.enrollment') }}" 
        class="nav-link {{ request()->routeIs('registrars.enrollment') ? 'active' : '' }}">
        <i class='bx bx-edit me-2'></i> Enrollment
-    </a>
-    <a href="{{ route('registrars.certificates') }}" 
-      class="nav-link {{ request()->routeIs('registrars.certificates*') ? 'active' : '' }}">
-      <i class="bi bi-award me-2"></i> Certificates
     </a>
     <a href="{{ route('registrars.sections') }}" 
        class="nav-link {{ request()->routeIs('registrars.sections') ? 'active' : '' }}">

@@ -403,26 +403,39 @@ class RegistrarController extends Controller
         return $pdf->download('enrollments.pdf');
     }
 
-
-    public function allDocuments(Request $request)
+    /**
+     * Documents and Certificates
+     */
+    public function documentsAndCertificates(Request $request)
     {
-        $query = StudentDocument::with(['student.user.profile'])
-            ->latest();
+        $documentQuery = StudentDocument::with(['student.user.profile'])->latest();
 
-        if ($request->filled('search')) {
+        if ($request->filled('search') && $request->input('tab') !== 'certificates') {
             $search = $request->search;
-            $query->whereHas('student.user.profile', function ($q) use ($search) {
+            $documentQuery->whereHas('student.user.profile', function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
                 ->orWhere('last_name', 'like', "%{$search}%");
             });
         }
 
-        $documents = $query->paginate(10)->withQueryString();
+        $documents = $documentQuery->paginate(10, ['*'], 'doc_page')->withQueryString();
 
-        return view('registrars.documents-all', compact('documents'));
+        $certificateQuery = StudentCertificate::with(['student.user.profile'])->latest();
+        $students = Student::with('user.profile')->get(); 
+
+        if ($request->filled('search') && $request->input('tab') === 'certificates') {
+            $search = $request->search;
+            $certificateQuery->whereHas('student.user.profile', function ($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                ->orWhere('last_name', 'like', "%{$search}%");
+            });
+        }
+
+        $certificates = $certificateQuery->paginate(10, ['*'], 'cert_page')->withQueryString();
+
+        return view('registrars.documents-certificates', compact('documents', 'certificates', 'students'));
     }
 
-    // ✅ Upload student document
     public function storeDocument(Request $request, $studentId)
     {
         $request->validate([
@@ -443,7 +456,6 @@ class RegistrarController extends Controller
         return back()->with('success', 'Document uploaded successfully.');
     }
 
-    // ✅ View per-student documents
     public function viewDocuments($studentId)
     {
         $student = Student::with('user.profile')->findOrFail($studentId);
@@ -452,7 +464,6 @@ class RegistrarController extends Controller
         return view('registrars.documents', compact('student', 'documents'));
     }
 
-    // ✅ Verify document
     public function verifyDocument($id)
     {
         $doc = StudentDocument::findOrFail($id);
@@ -460,7 +471,6 @@ class RegistrarController extends Controller
         return back()->with('success', 'Document marked as verified.');
     }
 
-    // ✅ Delete document
     public function destroyDocument($id)
     {
         $doc = StudentDocument::findOrFail($id);
@@ -640,16 +650,6 @@ class RegistrarController extends Controller
             ->setPaper('a4', 'portrait');
 
         return $pdf->download("ClassList_{$section->name}.pdf");
-    }
-
-    public function certificates()
-    {
-        $students = Student::with('user.profile')->get();
-        $certificates = StudentCertificate::with(['student.user.profile'])
-            ->latest()
-            ->paginate(10);
-
-        return view('registrars.certificates', compact('students', 'certificates'));
     }
 
     public function storeCertificate(Request $request)
