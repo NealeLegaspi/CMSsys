@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\Announcement;
 use App\Models\Grade;
+use App\Models\SubjectAssignment;
 use App\Models\Assignment;
 
 class StudentController extends Controller
@@ -56,6 +57,9 @@ class StudentController extends Controller
         $user = Auth::user();
         $grades = Grade::with('subject')
             ->where('student_id', $user->student?->id)
+            ->whereHas('subject.subjectAssignments', function ($q) {
+                $q->where('grade_status', 'approved');
+            })
             ->get()
             ->groupBy('subject.name');
 

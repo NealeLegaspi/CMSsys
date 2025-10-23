@@ -14,6 +14,7 @@ class SubjectAssignment extends Model
         'subject_id',
         'teacher_id',
         'school_year_id',
+        'grade_status',
     ];
 
     public function teacher()

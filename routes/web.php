@@ -138,7 +138,6 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::get('registrar/enrollment/export/csv', [RegistrarController::class, 'exportCsv'])->name('registrars.enrollment.export.csv');
     Route::get('registrar/enrollment/export/pdf', [RegistrarController::class, 'exportPdf'])->name('registrars.enrollment.export.pdf');
 
-    // Enrollment Verification
     Route::post('/enrollment/{id}/verify', [RegistrarController::class, 'verifyEnrollment'])->name('registrars.enrollment.verify');
 
     Route::get('/documents', [App\Http\Controllers\RegistrarController::class, 'documentsAndCertificates'])
@@ -159,7 +158,12 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::get('/docs-and-certs', [App\Http\Controllers\RegistrarController::class, 'documentsAndCertificates'])
     ->name('registrars.docs.certs');
 
-    // Student Record Management
+    Route::get('/grades', [RegistrarController::class, 'grades'])->name('registrars.grades');
+    Route::get('/grade-submissions', [RegistrarController::class, 'gradeSubmissions'])->name('registrars.gradeSubmissions');
+    Route::get('/grade-submissions/{id}', [RegistrarController::class, 'viewSubmission'])->name('registrars.viewSubmission');
+    Route::put('/grade-submissions/{id}/update', [RegistrarController::class, 'updateStatus'])->name('registrars.updateStatus');
+    Route::post('/grades/{assignment_id}/return', [RegistrarController::class, 'returnGrades'])->name('registrars.grades.return');
+
     Route::get('/students/{id}/record', [App\Http\Controllers\RegistrarController::class, 'viewStudentRecord'])
         ->name('registrars.student.record');
 
@@ -205,6 +209,8 @@ Route::prefix('teacher')->middleware(['auth', 'role:Teacher'])->group(function (
     Route::get('/grades/{subject}/edit', [TeacherController::class, 'editGrades'])->name('teachers.grades.edit');
     Route::put('/grades/{subject}', [TeacherController::class, 'updateGrades'])->name('teachers.grades.update');
     Route::delete('/grades/{subject}', [TeacherController::class, 'destroyGrades'])->name('teachers.grades.destroy');
+
+    Route::post('/grades/submit', [TeacherController::class, 'submitGrades'])->name('teachers.grades.submit');
 
     Route::get('/reports', [TeacherController::class, 'reports'])->name('teachers.reports');
     Route::post('/reports', [TeacherController::class, 'storeReport'])->name('teachers.reports.store');

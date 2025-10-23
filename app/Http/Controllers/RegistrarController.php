@@ -323,6 +323,8 @@ class RegistrarController extends Controller
             'status'         => 'Enrolled', 
         ]);
 
+        Student::where('id', $request->student_id)->update(['section_id' => $request->section_id]);
+
         $studentName = $enrollment->student->user->profile->full_name ?? 'N/A';
         $this->logActivity('Enroll Student', "Enrolled student {$studentName} ({$request->student_id}) in section {$section->name}");
 
@@ -361,6 +363,8 @@ class RegistrarController extends Controller
             'section_id'     => $request->section_id,
             'school_year_id' => $request->school_year_id,
         ]);
+
+        Student::where('id', $enrollment->student_id)->update(['section_id' => $request->section_id]);
 
         $this->logActivity('Update Enrollment', "Updated enrollment ID {$id}");
 
@@ -482,6 +486,148 @@ class RegistrarController extends Controller
         $doc->delete();
         return back()->with('success', 'Document deleted successfully.');
     }
+
+    /**
+     * Grade Submissions
+     */
+    public function grades(Request $request)
+    {
+        $query = SubjectAssignment::with(['teacher', 'subject', 'section']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('teacher', function ($sub) use ($search) {
+                    $sub->where('name', 'like', "%$search%");
+                })
+                ->orWhereHas('subject', function ($sub) use ($search) {
+                    $sub->where('name', 'like', "%$search%");
+                });
+            });
+        }
+
+        $assignments = $query->orderByDesc('updated_at')->paginate(10);
+
+        return view('registrars.grades', compact('assignments'));
+    }
+
+
+    public function gradeSubmissions(Request $request)
+    {
+        $query = DB::table('subject_assignments')
+            ->join('subjects', 'subject_assignments.subject_id', '=', 'subjects.id')
+            ->join('sections', 'subject_assignments.section_id', '=', 'sections.id')
+            ->join('users', 'subject_assignments.teacher_id', '=', 'users.id')
+            ->select(
+                'subject_assignments.id',
+                'subjects.name as subject_name',
+                'sections.name as section_name',
+                'subject_assignments.grade_status',
+                'users.name as teacher_name'
+            );
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('subjects.name', 'like', "%{$search}%")
+                ->orWhere('users.name', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('subject_assignments.grade_status', $request->status);
+        }
+
+        $summary = [
+            'submitted' => DB::table('subject_assignments')->where('grade_status', 'submitted')->count(),
+            'approved'  => DB::table('subject_assignments')->where('grade_status', 'approved')->count(),
+            'returned'  => DB::table('subject_assignments')->where('grade_status', 'returned')->count(),
+            'total'     => DB::table('subject_assignments')->count(),
+        ];
+
+        return view('registrars.gradeSubmissions', compact('submissions', 'summary'));
+    }
+
+
+    public function viewSubmission($id)
+    {
+        $assignment = SubjectAssignment::with(['teacher', 'subject', 'section'])
+            ->findOrFail($id);
+
+        $subject = $assignment->subject;
+        $section = $assignment->section;
+
+        $students = $section->students()->with(['user.profile', 'grades' => function ($q) use ($subject) {
+            $q->where('subject_id', $subject->id);
+        }])->get();
+
+        return view('registrars.grade-view', compact('assignment', 'subject', 'section', 'students'));
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $assignment = DB::table('subject_assignments')->where('id', $id)->first();
+
+        if (!$assignment) {
+            return back()->with('error', 'Assignment not found.');
+        }
+
+        $status = $request->input('status');
+
+        if (!in_array($status, ['approved', 'returned'])) {
+            return back()->with('error', 'Invalid status value.');
+        }
+
+        if ($status === 'approved') {
+            $hasGrades = DB::table('grades')
+                ->where('subject_id', $assignment->subject_id)
+                ->exists();
+
+            if (!$hasGrades) {
+                return back()->with('error', 'Cannot approve. No grades have been submitted yet.');
+            }
+        }
+
+        DB::table('subject_assignments')
+            ->where('id', $id)
+            ->update([
+                'grade_status' => $status,
+                'updated_at' => now(),
+            ]);
+
+        if ($status === 'approved') {
+            $this->logActivity('Approve Grades', "Approved grades for assignment #{$id}.");
+            $message = 'Grades approved successfully!';
+        } else {
+            $this->logActivity('Return Grades', "Returned grades for assignment #{$id} to teacher.");
+            $message = 'Grades returned to teacher for revision.';
+        }
+
+        return back()->with('success', $message);
+    }
+
+
+
+    public function returnGrades($assignment_id)
+    {
+        $assignment = DB::table('subject_assignments')->where('id', $assignment_id)->first();
+
+        if (!$assignment) {
+            return back()->with('error', 'Assignment not found.');
+        }
+
+        DB::table('subject_assignments')
+            ->where('id', $assignment_id)
+            ->update([
+                'grade_status' => 'returned',
+                'updated_at' => now(),
+            ]);
+
+        $this->logActivity('Return Grades', "Returned grades for {$assignment->id} to teacher for revision.");
+
+        return back()->with('info', 'Grades returned to teacher for revision.');
+    }
+
     /**
      * Sections
      */
@@ -862,7 +1008,6 @@ class RegistrarController extends Controller
 
         $teacher = User::findOrFail($request->teacher_id);
 
-        // extra safety: ensure selected user is actually a teacher role
         if ($teacher->role_id != 3) {
             return back()->withErrors(['teacher_id' => 'Selected user is not a teacher.']);
         }

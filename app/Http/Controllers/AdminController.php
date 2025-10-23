@@ -452,7 +452,6 @@ class AdminController extends Controller
         $sy = $request->school_year_id ?? $schoolYears->first()?->id;
         $status = $request->status ?? 'all';
 
-        // Enrollment Data
         $enrollments = Enrollment::with('section.gradeLevel','student.user.profile')
             ->when($sy, fn($q) => $q->where('school_year_id',$sy))
             ->when($status !== 'all', fn($q) => $q->where('status',$status))
@@ -463,13 +462,11 @@ class AdminController extends Controller
             ->groupBy(fn($e) => $e->section->gradeLevel->name ?? 'Unknown')
             ->map->count();
 
-        // Grading Data
         $gradingData = \App\Models\Grade::selectRaw('subject_id, AVG(grade) as avg')
             ->groupBy('subject_id')
-            ->paginate(10);
+            ->pluck('avg', 'subject_id');
 
             
-        // Summary Cards
         $totalStudents    = User::where('role_id',4)->count();
         $totalTeachers    = User::where('role_id',3)->count();
         $totalEnrollments = $enrollments->count();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Announcement;
 use App\Models\Assignment;
+use App\Models\SubjectAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Subject;
@@ -68,53 +69,53 @@ class TeacherController extends Controller
 
     // ---------------- ANNOUNCEMENTS ----------------
     public function announcements(Request $request)
-{
-    $teacher = Auth::user();
+    {
+        $teacher = Auth::user();
 
-    // ---- My Announcements (posted by this teacher) ----
-    $myQuery = Announcement::where('user_id', $teacher->id)
-        ->with(['section', 'user'])
-        ->orderBy('created_at', 'desc');
+        // ---- My Announcements (posted by this teacher) ----
+        $myQuery = Announcement::where('user_id', $teacher->id)
+            ->with(['section', 'user'])
+            ->orderBy('created_at', 'desc');
 
-    if ($request->filled('search')) {
-        $myQuery->where(function ($q) use ($request) {
-            $q->where('title', 'like', '%' . $request->search . '%')
-              ->orWhere('content', 'like', '%' . $request->search . '%');
-        });
+        if ($request->filled('search')) {
+            $myQuery->where(function ($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->search . '%')
+                ->orWhere('content', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        if ($request->filled('section_filter')) {
+            $myQuery->where('section_id', $request->section_filter);
+        }
+
+        // Paginate para consistent sa global tab
+        $myAnnouncements = $myQuery->paginate(5, ['*'], 'my_page')->withQueryString();
+
+        // ---- Global Announcements (from admin or other teachers) ----
+        $globalQuery = Announcement::with(['section', 'user.profile'])
+            ->whereIn('target_type', ['Global', 'Teacher'])
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->search . '%')
+                ->orWhere('content', 'like', '%' . $request->search . '%');
+            })
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                ->orWhere('expires_at', '>', now());
+            })
+            ->latest();
+
+        $globalAnnouncements = $globalQuery->paginate(5, ['*'], 'global_page')->withQueryString();
+
+        // ---- Sections for create form ----
+        $sections = Section::with('gradeLevel')->get();
+
+        return view('teachers.announcements', compact(
+            'teacher',
+            'sections',
+            'myAnnouncements',
+            'globalAnnouncements'
+        ));
     }
-
-    if ($request->filled('section_filter')) {
-        $myQuery->where('section_id', $request->section_filter);
-    }
-
-    // Paginate para consistent sa global tab
-    $myAnnouncements = $myQuery->paginate(5, ['*'], 'my_page')->withQueryString();
-
-    // ---- Global Announcements (from admin or other teachers) ----
-    $globalQuery = Announcement::with(['section', 'user.profile'])
-        ->whereIn('target_type', ['Global', 'Teacher'])
-        ->when($request->filled('search'), function ($q) use ($request) {
-            $q->where('title', 'like', '%' . $request->search . '%')
-              ->orWhere('content', 'like', '%' . $request->search . '%');
-        })
-        ->where(function ($q) {
-            $q->whereNull('expires_at')
-              ->orWhere('expires_at', '>', now());
-        })
-        ->latest();
-
-    $globalAnnouncements = $globalQuery->paginate(5, ['*'], 'global_page')->withQueryString();
-
-    // ---- Sections for create form ----
-    $sections = Section::with('gradeLevel')->get();
-
-    return view('teachers.announcements', compact(
-        'teacher',
-        'sections',
-        'myAnnouncements',
-        'globalAnnouncements'
-    ));
-}
 
 
     public function storeAnnouncement(Request $request)
@@ -125,11 +126,14 @@ class TeacherController extends Controller
             'section_id' => 'nullable|exists:sections,id',
         ]);
 
+        $targetType = $request->section_id ? 'Student' : 'Global';
+
         Announcement::create([
             'title'      => $request->title,
             'content'    => $request->content,
             'section_id' => $request->section_id ?? null,
             'user_id'    => Auth::id(),
+            'target_type' => $targetType,
         ]);
 
         $this->logActivity('Create Announcement', "Created announcement {$request->title}");
@@ -236,60 +240,64 @@ class TeacherController extends Controller
     // ---------------- GRADES ----------------
     public function grades(Request $request)
     {
-        $teacher = Auth::user(); 
-        $teacherId = (int) $teacher->id; 
+        $teacherId = Auth::id();
 
-        $assignments = DB::table('subject_assignments')
-            ->join('subjects', 'subject_assignments.subject_id', '=', 'subjects.id')
-            ->join('sections', 'subject_assignments.section_id', '=', 'sections.id')
-            ->join('grade_levels', 'sections.gradelevel_id', '=', 'grade_levels.id')
-            ->where('subject_assignments.teacher_id', $teacherId)
-            ->select(
-                'subject_assignments.id as assignment_id',
-                'subjects.id as subject_id',
-                'subjects.name as subject_name',
-                'sections.id as section_id',
-                'sections.name as section_name',
-                'grade_levels.name as gradelevel_name'
-            )
-            ->get();
+        $assignments = SubjectAssignment::with(['subject', 'section.gradeLevel'])
+            ->where('teacher_id', $teacherId)
+            ->get()
+            ->map(function ($a) {
+                return (object)[
+                    'assignment_id'  => $a->id,
+                    'subject_id'     => $a->subject->id ?? null,
+                    'subject_name'   => $a->subject->name ?? 'N/A',
+                    'section_id'     => $a->section->id ?? null,
+                    'section_name'   => $a->section->name ?? 'N/A',
+                    'gradelevel_name'=> $a->section->gradeLevel->name ?? 'N/A',
+                    'grade_status'   => $a->grade_status ?? 'draft',
+                ];
+            });
 
         $selectedAssignment = null;
-        $students = collect(); 
+        $students = collect();
         $subject = null;
         $section = null;
 
         if ($request->filled('assignment_id')) {
-            $assignmentId = (int) $request->assignment_id; 
+            $assignmentId = (int) $request->assignment_id;
 
-            $selectedAssignment = $assignments->where('assignment_id', $assignmentId)->first();
-            
+            $selectedAssignment = SubjectAssignment::with(['subject', 'section.gradeLevel'])
+                ->where('teacher_id', $teacherId)
+                ->find($assignmentId);
+
             if (!$selectedAssignment) {
                 return back()->withErrors(['assignment_id' => 'Invalid or unauthorized subject assignment selected.']);
             }
 
-            $subject = Subject::find($selectedAssignment->subject_id);
-            $section = Section::find($selectedAssignment->section_id);
+            $subject = $selectedAssignment->subject;
+            $section = $selectedAssignment->section;
 
             if ($section) {
-                $students = $section->students()->with(['user.profile', 'grades' => function ($q) use ($subject) {
-                    $q->where('subject_id', $subject->id);
-                }])
-                ->get()
-                ->sortBy(function ($student) {
-                    return $student->user->profile->last_name ?? 'ZZZ';
-                });
+                $students = $section->students()
+                    ->with([
+                        'user.profile',
+                        'grades' => function ($q) use ($subject) {
+                            $q->where('subject_id', $subject->id);
+                        }
+                    ])
+                    ->get()
+                    ->sortBy(fn($s) => $s->user->profile->last_name ?? 'ZZZ');
             }
         }
 
         return view('teachers.grades', [
             'assignments'        => $assignments,
-            'selectedAssignment' => $selectedAssignment, 
-            'students'           => $students,             
-            'subject'            => $subject,             
-            'section'            => $section,             
+            'selectedAssignment' => $selectedAssignment,
+            'students'           => $students,
+            'subject'            => $subject,
+            'section'            => $section,
         ]);
     }
+
 
     public function encodeGrades($subjectId, $sectionId)
     {
@@ -334,7 +342,17 @@ class TeacherController extends Controller
         }
 
         $savedCount = 0;
-        $teacherId = Auth::id(); // Keep the teacher ID for logging/auditing if needed
+        $teacherId = Auth::id();
+
+        $assignment = DB::table('subject_assignments')
+            ->where('teacher_id', $teacherId)
+            ->where('subject_id', $request->subject_id)
+            ->where('section_id', $request->section_id)
+            ->first();
+            
+        if ($assignment && $assignment->grade_status === 'approved') {
+            return back()->with('error', 'Grades are already approved and locked.');
+        }
 
         foreach ($request->grades as $studentId => $quarters) {
             foreach ($quarters as $quarter => $gradeValue) {
@@ -347,7 +365,6 @@ class TeacherController extends Controller
                             'quarter'    => $quarter,
                         ],
                         [
-                            // Aalisin ang teacher_id dito para maiwasan ang 'Unknown column' error
                             'grade'      => (int)$gradeValue,
                         ]
                     );
@@ -364,19 +381,45 @@ class TeacherController extends Controller
 
         $this->logActivity('Save Grades', "Updated grades for {$savedCount} quarter entries in {$subject->name} ({$section->name}).");
 
-        $assignment = DB::table('subject_assignments')
-            ->where('teacher_id', $teacherId)
-            ->where('subject_id', $request->subject_id)
-            ->where('section_id', $request->section_id)
-            ->first();
-            
-        $assignmentId = $assignment->id ?? null;
+        if ($assignment && $assignment->grade_status === 'draft') {
+            DB::table('subject_assignments')
+                ->where('id', $assignment->id)
+                ->update(['updated_at' => now()]);
+        }
 
         return redirect()
-            ->route('teachers.grades', ['assignment_id' => $assignmentId])
+            ->route('teachers.grades', ['assignment_id' => $assignment->id ?? null])
             ->with('success', 'Grades successfully saved/updated!');
     }
 
+    public function submitGrades(Request $request)
+    {
+        $teacherId = Auth::id();
+
+        $assignment = DB::table('subject_assignments')
+            ->where('id', $request->assignment_id)
+            ->where('teacher_id', $teacherId)
+            ->first();
+
+        if (!$assignment) {
+            return back()->with('error', 'Invalid assignment.');
+        }
+
+        if ($assignment->grade_status === 'approved') {
+            return back()->with('error', 'Grades are already approved and cannot be resubmitted.');
+        }
+
+        DB::table('subject_assignments')
+            ->where('id', $assignment->id)
+            ->update([
+                'grade_status' => 'submitted',
+                'updated_at' => now(),
+            ]);
+
+        $this->logActivity('Submit Grades', "Submitted grades for {$assignment->subject_id} ({$assignment->section_id}).");
+
+        return back()->with('success', 'Grades submitted for review successfully!');
+    }
 
     protected function getTeacherAssignedStudents()
     {

@@ -76,7 +76,7 @@
                   $fname = $student->profile->first_name ?? '';
                   $mname = $student->profile->middle_name ?? '';
                   $lname = $student->profile->last_name ?? '';
-                  $fullName = trim($fname . ' ' . ($mname ? substr($mname,0,1).'. ' : '') . $lname);
+                  $fullName = trim($lname . ', '  . $fname . ' ' . ($mname ? substr($mname,0,1).'. ' : ''));
                 @endphp
                 {{ $fullName ?: 'N/A' }}
               </td>

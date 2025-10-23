@@ -60,6 +60,10 @@
        class="nav-link {{ request()->routeIs('registrars.enrollment') ? 'active' : '' }}">
        <i class='bx bx-edit me-2'></i> Enrollment
     </a>
+    <a href="{{ route('registrars.grades') }}" 
+       class="nav-link {{ request()->routeIs('registrars.grades*') ? 'active' : '' }}">
+       <i class='bx bx-book me-2'></i> Grades
+    </a>
     <a href="{{ route('registrars.sections') }}" 
        class="nav-link {{ request()->routeIs('registrars.sections') ? 'active' : '' }}">
        <i class='bx bx-grid-alt me-2'></i> Sections
