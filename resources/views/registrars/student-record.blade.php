@@ -9,14 +9,14 @@
 <div class="card shadow-sm border-0">
   <div class="card-header bg-light d-flex justify-content-between align-items-center">
     <h6 class="fw-bold mb-0">
-      {{ $student->user->profile->first_name ?? '' }} {{ $student->user->profile->middle_name ?? '' }}. {{ $student->user->profile->last_name ?? '' }}
+      {{ $student->user->profile->first_name ?? '' }} {{ $student->user->profile->middle_name ?? '' }} {{ $student->user->profile->last_name ?? '' }}
       <span class="text-muted small">({{ $student->student_number ?? 'N/A' }})</span>
     </h6>
     <div>
       <a href="{{ route('registrars.student.record.pdf', $student->id) }}" class="btn btn-sm btn-danger">
         <i class="bi bi-file-pdf"></i> Export PDF
       </a>
-      <a href="{{ route('registrars.students') }}" class="btn btn-sm btn-secondary">
+      <a href="{{ route('registrars.enrollment') }}" class="btn btn-sm btn-secondary">
         <i class="bi bi-arrow-left"></i> Back
       </a>
     </div>

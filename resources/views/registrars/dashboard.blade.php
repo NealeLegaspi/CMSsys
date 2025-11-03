@@ -14,7 +14,7 @@
         <i class="bi bi-mortarboard-fill me-2"></i> Students
       </h6>
       <hr>
-      <p class="mb-1">Total enrolled: <strong>{{ $studentCount ?? 0 }}</strong></p>
+      <p class="mb-1">Total: <strong>{{ $studentCount ?? 0 }}</strong></p>
       <a href="{{ route('registrars.students') }}" class="text-decoration-none">View Students →</a>
     </div>
   </div>

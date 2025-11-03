@@ -52,17 +52,25 @@
     }}">
     <i class="bi bi-file-earmark-ruled-fill me-2"></i> Documents
     </a>
-    <a href="{{ route('registrars.students') }}" 
+    <!----<a href="{{ route('registrars.students') }}" 
        class="nav-link {{ request()->routeIs('registrars.students*') ? 'active' : '' }}">
        <i class='bx bx-user me-2'></i> Student Records
-    </a>
+    </a>---->
     <a href="{{ route('registrars.enrollment') }}" 
        class="nav-link {{ request()->routeIs('registrars.enrollment') ? 'active' : '' }}">
-       <i class='bx bx-edit me-2'></i> Enrollment
+       <i class='bx bx-edit me-2'></i> Student Records
+    </a>
+    <a href="{{ route('registrars.quarterSettings') }}" 
+      class="nav-link {{ request()->routeIs('registrars.quarterSettings') ? 'active' : '' }}">
+      <i class="bi bi-calendar-check me-2"></i> Quarter Control
     </a>
     <a href="{{ route('registrars.grades') }}" 
        class="nav-link {{ request()->routeIs('registrars.grades*') ? 'active' : '' }}">
        <i class='bx bx-book me-2'></i> Grades
+    </a>
+    <a href="{{ route('registrars.subjects') }}" 
+       class="nav-link {{ request()->routeIs('registrars.subjects') ? 'active' : '' }}">
+       <i class='bx bx-book me-2'></i> Subjects
     </a>
     <a href="{{ route('registrars.sections') }}" 
        class="nav-link {{ request()->routeIs('registrars.sections') ? 'active' : '' }}">

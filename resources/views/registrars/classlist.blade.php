@@ -69,7 +69,7 @@
                       
                       <td class="fw-bold text-primary text-center">{{ $s->student->student_number ?? 'N/A' }}</td>
 
-                      <td class="text-center">{{ $s->profile->last_name }}, {{ $s->profile->first_name }} {{ $s->profile->middle_name }}.</td>
+                      <td class="text-center">{{ $s->profile->last_name }}, {{ $s->profile->first_name }} {{ $s->profile->middle_name }}</td>
 
                       <td class="text-center">{{ $s->profile->sex ?? 'N/A' }}</td>
                       

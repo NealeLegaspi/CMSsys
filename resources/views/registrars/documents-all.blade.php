@@ -40,6 +40,7 @@
               <td>
                 {{ optional($doc->student->user->profile)->last_name ?? '' }},
                 {{ optional($doc->student->user->profile)->first_name ?? '' }}
+                {{ optional($doc->student->user->profile)->middle_name ?? '' }}.
               </td>
               <td>{{ $doc->type ?? $doc->document_type }}</td>
               <td>

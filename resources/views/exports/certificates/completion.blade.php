@@ -25,6 +25,7 @@ p { font-size:14px; }
   This certifies that
   <strong>
     {{ optional($student->profile)->first_name ?? 'Unknown' }}
+    {{ optional($student->profile)->middle_name ? ' ' . strtoupper(optional($student->profile)->middle_name[0]) . '.' : '' }}
     {{ optional($student->profile)->last_name ?? '' }}
   </strong>
   has successfully completed all academic requirements for their grade level at

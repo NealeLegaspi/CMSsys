@@ -60,7 +60,7 @@
   }
 
   td {
-    text-align: left;
+    text-align: center;
   }
 
   .meta {
@@ -95,6 +95,10 @@
     font-size: 12px;
     color: #555;
   }
+
+  .address { 
+    font-size: 12px;
+  }
 </style>
 </head>
 <body>
@@ -102,7 +106,7 @@
 <div class="header">
   <img src="{{ public_path('Mindware.png') }}" alt="School Logo">
   <div class="school-name">{{ $schoolName }}</div>
-  <div class="school-address">{{ $schoolAddress }}</div>
+  <div class="address">027 St Francis Subdivision Rd, Balagtas, 3016 Bulacan</div>
   <div class="report-title">CLASS MASTERLIST</div>
 </div>
 

@@ -1,19 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Class List</title>
+    <meta charset="UTF-8">
+    <title>Class List - {{ $section->name ?? 'N/A' }}</title>
     <style>
-        body { font-family: sans-serif; font-size: 12px; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 12px; }
         h3 { text-align: center; margin-bottom: 10px; }
+        h4 { margin-top: 20px; margin-bottom: 5px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th, td { border: 1px solid #000; padding: 5px; text-align: left; }
         th { background: #f2f2f2; }
     </style>
 </head>
 <body>
-    <h3>Class List - {{ $sectionName ?? 'N/A' }}</h3>
+    <h3>
+        Class List — {{ $section->gradeLevel->name ?? '' }} {{ $section->name ?? 'N/A' }}
+    </h3>
 
-    <h4>Male Students ({{ count($studentsMale ?? []) }})</h4>
+    <h4>Male Students ({{ $studentsMale->count() }})</h4>
     <table>
         <thead>
             <tr>
@@ -25,19 +29,21 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($studentsMale as $st)
+            @forelse($studentsMale as $st)
             <tr>
-                <td>{{ $st->lrn ?? 'N/A' }}</td>
-                <td>{{ $st->last_name ?? '' }}</td>
-                <td>{{ $st->first_name ?? '' }}</td>
-                <td>{{ $st->middle_name ?? '' }}</td>
-                <td>{{ $st->status ?? '' }}</td>
+                <td>{{ $st->student_number ?? 'N/A' }}</td>
+                <td>{{ $st->user->profile->last_name ?? '' }}</td>
+                <td>{{ $st->user->profile->first_name ?? '' }}</td>
+                <td>{{ $st->user->profile->middle_name ?? '' }}</td>
+                <td>{{ ucfirst($st->status ?? '') }}</td>
             </tr>
-            @endforeach
+            @empty
+            <tr><td colspan="5" align="center">No male students</td></tr>
+            @endforelse
         </tbody>
     </table>
 
-    <h4>Female Students ({{ count($studentsFemale ?? []) }})</h4>
+    <h4>Female Students ({{ $studentsFemale->count() }})</h4>
     <table>
         <thead>
             <tr>
@@ -49,15 +55,17 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($studentsFemale as $st)
+            @forelse($studentsFemale as $st)
             <tr>
-                <td>{{ $st->lrn ?? 'N/A' }}</td>
-                <td>{{ $st->last_name ?? '' }}</td>
-                <td>{{ $st->first_name ?? '' }}</td>
-                <td>{{ $st->middle_name ?? '' }}</td>
-                <td>{{ $st->status ?? '' }}</td>
+                <td>{{ $st->student_number ?? 'N/A' }}</td>
+                <td>{{ $st->user->profile->last_name ?? '' }}</td>
+                <td>{{ $st->user->profile->first_name ?? '' }}</td>
+                <td>{{ $st->user->profile->middle_name ?? '' }}</td>
+                <td>{{ ucfirst($st->status ?? '') }}</td>
             </tr>
-            @endforeach
+            @empty
+            <tr><td colspan="5" align="center">No female students</td></tr>
+            @endforelse
         </tbody>
     </table>
 </body>

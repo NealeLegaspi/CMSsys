@@ -15,6 +15,7 @@ use App\Models\Enrollment;
 use App\Models\GradeLevel;
 use App\Models\ActivityLog;
 use App\Models\SchoolYear;
+use App\Helpers\SystemHelper;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Validation\Rules\Password;
@@ -107,7 +108,13 @@ class TeacherController extends Controller
         $globalAnnouncements = $globalQuery->paginate(5, ['*'], 'global_page')->withQueryString();
 
         // ---- Sections for create form ----
-        $sections = Section::with('gradeLevel')->get();
+        $sections = Section::with('gradeLevel')
+            ->whereIn('id', function ($q) use ($teacher) {
+                $q->select('section_id')
+                ->from('subject_assignments')
+                ->where('teacher_id', $teacher->id);
+            })
+            ->get();
 
         return view('teachers.announcements', compact(
             'teacher',
@@ -175,7 +182,7 @@ class TeacherController extends Controller
         $this->logActivity('Delete Announcement', "Deleted announcement {$announcement->id}");
 
         return back()->with('success', 'Announcement deleted successfully!');
-    }
+    }   
 
     // ---------------- CLASS LIST ----------------
     public function classlist()
@@ -219,23 +226,39 @@ class TeacherController extends Controller
 
         return view('teachers.classlist', compact('section', 'studentsMale', 'studentsFemale', 'mySubjects'));}
 
-    public function exportClassList()
-    {
-        $teacher = Auth::user();
-        $section = Section::where('adviser_id', $teacher->id)->first();
+public function exportClassList()
+{
+    $teacher = Auth::user();
+    $section = Section::where('adviser_id', $teacher->id)->first();
 
-        if (!$section) {
-            return back()->withErrors('You have no advisory section.');
-        }
-
-        $studentsMale = $section->students()->whereHas('profile', fn($q) => $q->where('sex', 'Male'))->get();
-        $studentsFemale = $section->students()->whereHas('profile', fn($q) => $q->where('sex', 'Female'))->get();
-
-        $pdf = Pdf::loadView('teachers.reports.classlist-pdf', compact('section', 'studentsMale', 'studentsFemale'));
-        $this->logActivity('Export Class List', "Exported class list for section {$section->name}");
-
-        return $pdf->download("{$section->name}_classlist.pdf");
+    if (!$section) {
+        return back()->withErrors('You have no advisory section.');
     }
+
+    // Students grouped by gender
+    $studentsMale = $section->students()
+        ->whereHas('profile', fn($q) => $q->where('sex', 'Male'))
+        ->with('profile')
+        ->get();
+
+    $studentsFemale = $section->students()
+        ->whereHas('profile', fn($q) => $q->where('sex', 'Female'))
+        ->with('profile')
+        ->get();
+
+    // Load view
+    $pdf = Pdf::loadView('teachers.reports.classlist-pdf', [
+        'section' => $section,
+        'studentsMale' => $studentsMale,
+        'studentsFemale' => $studentsFemale,
+    ])->setPaper('A4', 'portrait');
+
+    // Log activity (optional)
+    $this->logActivity('Export Class List', "Exported class list for section {$section->name}");
+
+    return $pdf->download("{$section->name}_classlist.pdf");
+}
+
 
     // ---------------- GRADES ----------------
     public function grades(Request $request)
@@ -343,34 +366,38 @@ class TeacherController extends Controller
 
         $savedCount = 0;
         $teacherId = Auth::id();
+        $currentQuarter = SystemHelper::getActiveQuarter();
 
         $assignment = DB::table('subject_assignments')
             ->where('teacher_id', $teacherId)
             ->where('subject_id', $request->subject_id)
             ->where('section_id', $request->section_id)
             ->first();
-            
-        if ($assignment && $assignment->grade_status === 'approved') {
-            return back()->with('error', 'Grades are already approved and locked.');
+
+        if ($assignment && $assignment->grade_status === 'approved') { 
+            return back()->with('error', 'Grades are already approved and locked.'); 
         }
 
         foreach ($request->grades as $studentId => $quarters) {
             foreach ($quarters as $quarter => $gradeValue) {
-                
+
+                if ((int)$quarter > $currentQuarter) continue;
+
                 if (is_numeric($gradeValue) && $gradeValue >= 60 && $gradeValue <= 100) {
-                    Grade::updateOrCreate(
-                        [
-                            'student_id' => (int)$studentId,
-                            'subject_id' => (int)$request->subject_id,
-                            'quarter'    => $quarter,
-                        ],
-                        [
-                            'grade'      => (int)$gradeValue,
-                        ]
-                    );
+
+                Grade::updateOrCreate(
+                    [
+                        'student_id' => (int)$studentId,
+                        'subject_id' => (int)$request->subject_id,
+                        'quarter'    => $quarter,
+                    ],
+                    [
+                        'grade'    => (int)$gradeValue,
+                    ]
+                );
+
                     $savedCount++;
-                } 
-                elseif (empty($gradeValue)) {
+                } elseif (empty($gradeValue)) {
                     Grade::where('student_id', (int)$studentId)
                         ->where('subject_id', (int)$request->subject_id)
                         ->where('quarter', $quarter)
@@ -379,7 +406,7 @@ class TeacherController extends Controller
             }
         }
 
-        $this->logActivity('Save Grades', "Updated grades for {$savedCount} quarter entries in {$subject->name} ({$section->name}).");
+        $this->logActivity('Save Grades', "Updated {$savedCount} grade entries for {$subject->name} ({$section->name}) in Q{$currentQuarter}.");
 
         if ($assignment && $assignment->grade_status === 'draft') {
             DB::table('subject_assignments')
@@ -389,24 +416,61 @@ class TeacherController extends Controller
 
         return redirect()
             ->route('teachers.grades', ['assignment_id' => $assignment->id ?? null])
-            ->with('success', 'Grades successfully saved/updated!');
+            ->with('success', "Grades successfully saved for Quarter {$currentQuarter}!");
     }
 
     public function submitGrades(Request $request)
     {
+        $request->validate([
+            'subject_id' => 'required|exists:subjects,id',
+            'section_id' => 'required|exists:sections,id',
+        ]);
+
         $teacherId = Auth::id();
+        $currentQuarter = SystemHelper::getActiveQuarter();
 
         $assignment = DB::table('subject_assignments')
-            ->where('id', $request->assignment_id)
             ->where('teacher_id', $teacherId)
+            ->where('subject_id', $request->subject_id)
+            ->where('section_id', $request->section_id)
             ->first();
 
         if (!$assignment) {
-            return back()->with('error', 'Invalid assignment.');
+            return back()->with('error', 'No subject assignment found for this section.');
         }
 
         if ($assignment->grade_status === 'approved') {
-            return back()->with('error', 'Grades are already approved and cannot be resubmitted.');
+            return back()->with('error', 'Grades have already been approved and cannot be resubmitted.');
+        }
+
+        if ($assignment->grade_status === 'returned') {
+            $hasUpdated = DB::table('grades')
+                ->where('subject_id', $request->subject_id)
+                ->where('quarter', $currentQuarter)
+                ->whereExists(function ($query) use ($assignment) {
+                    $query->select(DB::raw(1))
+                        ->from('subject_assignments')
+                        ->where('id', $assignment->id)
+                        ->whereColumn('subject_assignments.updated_at', '<', 'grades.updated_at');
+                })
+                ->exists();
+
+            if (!$hasUpdated) {
+                return back()->with('error', 'You must update the returned grades before resubmitting.');
+            }
+        }
+
+        $enrolledStudents = Enrollment::where('section_id', $request->section_id)
+            ->where('status', 'enrolled')
+            ->pluck('student_id');
+
+        $gradedCount = Grade::whereIn('student_id', $enrolledStudents)
+            ->where('subject_id', $request->subject_id)
+            ->where('quarter', $currentQuarter)
+            ->count();
+
+        if ($gradedCount < $enrolledStudents->count()) {
+            return back()->with('error', 'All enrolled students must have grades before submission.');
         }
 
         DB::table('subject_assignments')
@@ -416,16 +480,22 @@ class TeacherController extends Controller
                 'updated_at' => now(),
             ]);
 
-        $this->logActivity('Submit Grades', "Submitted grades for {$assignment->subject_id} ({$assignment->section_id}).");
+        $subject = Subject::find($request->subject_id);
+        $section = Section::find($request->section_id);
 
-        return back()->with('success', 'Grades submitted for review successfully!');
+        $this->logActivity('Submit Grades', "Submitted grades for {$subject->name} ({$section->name}) - Quarter {$currentQuarter}");
+
+        return redirect()
+            ->route('teachers.grades', ['assignment_id' => $assignment->id])
+            ->with('success', "Grades successfully submitted for Quarter {$currentQuarter}. Pending registrar approval.");
     }
+
 
     protected function getTeacherAssignedStudents()
     {
         $teacherId = Auth::id();
         
-        $subjectSectionIds = DB::table('subject_teacher')
+        $subjectSectionIds = DB::table('subject_assignments')
                                 ->where('teacher_id', $teacherId)
                                 ->pluck('section_id');
 

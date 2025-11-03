@@ -83,7 +83,7 @@
                 <td class="text-start">
                   {{ $record->student->user->profile->last_name ?? '' }},
                   {{ $record->student->user->profile->first_name ?? '' }}
-                  {{ $record->student->user->profile->middle_name ?? '' }}.
+                  {{ $record->student->user->profile->middle_name ?? '' }}
                 </td>
                 <td>{{ $record->section->gradeLevel->name ?? 'N/A' }}</td>
                 <td>{{ $record->section->name ?? 'N/A' }}</td>
@@ -124,7 +124,7 @@
                               style="width:120px;height:120px;object-fit:cover;">
                           <p class="fw-bold mb-0">
                             {{ $record->student->user->profile->first_name ?? '' }} 
-                            {{ $record->student->user->profile->middle_name ?? '' }}.
+                            {{ $record->student->user->profile->middle_name ?? '' }}
                             {{ $record->student->user->profile->last_name ?? '' }}
                           </p>
                           <small class="text-muted">Student ID: {{ $record->student->student_number ?? 'N/A' }}</small>

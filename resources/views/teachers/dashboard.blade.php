@@ -79,7 +79,32 @@
     </div>
   </div>
 
-  <!-- Charts and Announcements -->
+  <!-- Recent Announcements (Moved Up) -->
+  <div class="card shadow-sm border-0 rounded-3 mb-4">
+    <div class="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-broadcast me-2 text-primary"></i>Recent Announcements</span>
+      <a href="{{ route('teachers.announcements') }}" class="text-decoration-none small text-primary">View All</a>
+    </div>
+    <div class="card-body">
+      @if($announcements->count() > 0)
+        <ul class="list-group list-group-flush">
+          @foreach($announcements as $ann)
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-semibold">{{ $ann->title }}</div>
+                <div class="text-muted small">{{ Str::limit($ann->content, 80) }}</div>
+              </div>
+              <span class="badge bg-secondary-subtle text-dark small">{{ $ann->created_at->format('M d, Y') }}</span>
+            </li>
+          @endforeach
+        </ul>
+      @else
+        <p class="text-muted small mb-0">No announcements found.</p>
+      @endif
+    </div>
+  </div>
+
+  <!-- Charts -->
   <div class="row g-4">
     <div class="col-lg-8">
       <div class="card shadow-sm border-0 rounded-3 p-3 h-100">
@@ -105,31 +130,6 @@
           <p class="text-muted small">No gender data available yet.</p>
         @endif
       </div>
-    </div>
-  </div>
-
-  <!-- Recent Announcements -->
-  <div class="card shadow-sm border-0 rounded-3 mt-4">
-    <div class="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
-      <span><i class="bi bi-broadcast me-2 text-primary"></i>Recent Announcements</span>
-      <a href="{{ route('teachers.announcements') }}" class="text-decoration-none small text-primary">View All</a>
-    </div>
-    <div class="card-body">
-      @if($announcements->count() > 0)
-        <ul class="list-group list-group-flush">
-          @foreach($announcements as $ann)
-            <li class="list-group-item d-flex justify-content-between align-items-start">
-              <div>
-                <div class="fw-semibold">{{ $ann->title }}</div>
-                <div class="text-muted small">{{ Str::limit($ann->content, 80) }}</div>
-              </div>
-              <span class="badge bg-secondary-subtle text-dark small">{{ $ann->created_at->format('M d, Y') }}</span>
-            </li>
-          @endforeach
-        </ul>
-      @else
-        <p class="text-muted small mb-0">No announcements found.</p>
-      @endif
     </div>
   </div>
 </div>

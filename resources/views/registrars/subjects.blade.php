@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends('layouts.registrar')
 
 @section('title','Subjects')
 @section('header')
@@ -12,7 +12,7 @@
       @include('partials.alerts')
 
       {{-- 🔍 Search & Filter --}}
-      <form method="GET" action="{{ route('admins.subjects') }}" class="row g-2 align-items-end mb-4">
+      <form method="GET" action="{{ route('registrars.subjects') }}" class="row g-2 align-items-end mb-4">
         <div class="col-md-5">
           <label class="form-label fw-semibold">Search</label>
           <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Search subject...">
@@ -32,7 +32,7 @@
           <button type="submit" class="btn btn-outline-primary">
             <i class="bi bi-search"></i> Search
           </button>
-          <a href="{{ route('admins.subjects') }}" class="btn btn-outline-secondary">
+          <a href="{{ route('registrars.subjects') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-clockwise"></i> Reset
           </a>
         </div>
@@ -71,7 +71,7 @@
                   </button>
 
                   {{-- 🗑 Delete --}}
-                  <form action="{{ route('admins.subjects.destroy',$subj->id) }}" method="POST" onsubmit="return confirm('Delete subject?')">
+                  <form action="{{ route('registrars.subjects.destroy',$subj->id) }}" method="POST" onsubmit="return confirm('Delete subject?')">
                     @csrf @method('DELETE')
                     <button class="btn btn-sm btn-danger">
                       <i class="bi bi-trash"></i>
@@ -84,7 +84,7 @@
             {{-- 🟡 Edit Modal --}}
             <div class="modal fade" id="editSubjectModal{{ $subj->id }}" tabindex="-1">
               <div class="modal-dialog">
-                <form method="POST" action="{{ route('admins.subjects.update',$subj->id) }}">
+                <form method="POST" action="{{ route('registrars.subjects.update',$subj->id) }}">
                   @csrf @method('PUT')
                   <div class="modal-content">
                     <div class="modal-header bg-warning text-dark">
@@ -139,7 +139,7 @@
 {{-- ➕ Add Subject Modal --}}
 <div class="modal fade" id="addSubjectModal" tabindex="-1">
   <div class="modal-dialog">
-    <form method="POST" action="{{ route('admins.subjects.store') }}">
+    <form method="POST" action="{{ route('registrars.subjects.store') }}">
       @csrf
       <div class="modal-content">
         <div class="modal-header bg-primary text-white">

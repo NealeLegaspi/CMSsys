@@ -12,6 +12,7 @@ class Grade extends Model
         'school_year_id',
         'quarter',
         'grade',
+        'comment',
     ];
 
     public function student()

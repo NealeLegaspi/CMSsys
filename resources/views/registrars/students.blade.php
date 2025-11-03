@@ -59,51 +59,45 @@
             <th>Full Name</th>
             <th>Email</th>
             <th>Gender</th>
-            <th>Contact</th>
             <th>Section</th>
             <th width="180">Actions</th>
           </tr>
         </thead>
         <tbody>
-          @forelse($students as $index => $student)
+          @forelse($students as $index => $user)
+            @php
+              $profile = $user->profile;
+              $student = $user->student;
+              $enrollment = $student?->enrollments?->first();
+              $sectionName = $enrollment?->section?->name ?? 'N/A';
+              $fullName = $profile 
+                  ? trim(($profile->last_name ?? '') . ', ' . ($profile->first_name ?? '') . ' ' . ($profile->middle_name ? substr($profile->middle_name,0,1).'.' : ''))
+                  : 'N/A';
+            @endphp
+
             <tr>
               <td>{{ $students->firstItem() + $index }}</td>
-              <td class="fw-bold text-primary">
-                {{ $student->student->student_number ?? 'N/A' }}
-              </td>
+              <td class="fw-bold text-primary">{{ $student->student_number ?? 'N/A' }}</td>
+              <td>{{ $fullName }}</td>
+              <td>{{ $user->email }}</td>
+              <td>{{ $profile->sex ?? 'N/A' }}</td>
+              <td>{{ $sectionName }}</td>
               <td>
-                @php
-                  $fname = $student->profile->first_name ?? '';
-                  $mname = $student->profile->middle_name ?? '';
-                  $lname = $student->profile->last_name ?? '';
-                  $fullName = trim($lname . ', '  . $fname . ' ' . ($mname ? substr($mname,0,1).'. ' : ''));
-                @endphp
-                {{ $fullName ?: 'N/A' }}
-              </td>
-              <td>{{ $student->email }}</td>
-              <td>{{ $student->profile->sex ?? 'N/A' }}</td>
-              <td>{{ $student->profile->contact_number ?? 'N/A' }}</td>
-              <td>{{ $student->student->enrollments->where('status', 'enrolled')->first()->section->name ?? 'N/A' }}</td>
-              <td>
-                <!-- View Record Button -->
-                <a href="{{ route('registrars.student.record', $student->student->id) }}" 
+                <a href="{{ route('registrars.student.record', $student->id) }}" 
                   class="btn btn-sm btn-info text-white">
                   <i class="bi bi-eye"></i>
                 </a>
-                <!-- Edit Button -->
+
                 <button class="btn btn-sm btn-warning" 
                         data-bs-toggle="modal" 
-                        data-bs-target="#editStudentModal{{ $student->id }}">
+                        data-bs-target="#editStudentModal{{ $user->id }}">
                   <i class="bi bi-pencil"></i>
                 </button>
 
-                <!-- Delete Button -->
-                <form action="{{ route('registrars.students.destroy', $student->id) }}" 
-                      method="POST" 
-                      class="d-inline">
+                <form action="{{ route('registrars.students.destroy', $user->id) }}" 
+                      method="POST" class="d-inline">
                   @csrf @method('DELETE')
-                  <button type="submit" 
-                          class="btn btn-sm btn-danger" 
+                  <button type="submit" class="btn btn-sm btn-danger"
                           onclick="return confirm('Are you sure you want to delete this student?')">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -111,43 +105,10 @@
               </td>
             </tr>
 
-            <!-- View Student Modal -->
-            <div class="modal fade" id="viewStudentModal{{ $student->id }}" tabindex="-1" aria-hidden="true">
+            <!-- Edit Modal -->
+            <div class="modal fade" id="editStudentModal{{ $user->id }}" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                  <div class="modal-header bg-info text-white">
-                    <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>View Student</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                  </div>
-                  <div class="modal-body">
-                    <dl class="row">
-                      <dt class="col-sm-3">LRN</dt>
-                      <dd class="col-sm-9">{{ $student->student->student_number ?? 'N/A' }}</dd>
-
-                      <dt class="col-sm-3">Full Name</dt>
-                      <dd class="col-sm-9">{{ $fullName ?: 'N/A' }}</dd>
-
-                      <dt class="col-sm-3">Email</dt>
-                      <dd class="col-sm-9">{{ $student->email }}</dd>
-
-                      <dt class="col-sm-3">Gender</dt>
-                      <dd class="col-sm-9">{{ $student->profile->sex ?? 'N/A' }}</dd>
-
-                      <dt class="col-sm-3">Contact</dt>
-                      <dd class="col-sm-9">{{ $student->profile->contact_number ?? 'N/A' }}</dd>
-
-                      <dt class="col-sm-3">Section</dt>
-                      <dd class="col-sm-9">{{ $student->student->section->name ?? 'N/A' }}</dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Edit Student Modal -->
-            <div class="modal fade" id="editStudentModal{{ $student->id }}" tabindex="-1" aria-hidden="true">
-              <div class="modal-dialog modal-lg">
-                <form method="POST" action="{{ route('registrars.students.update', $student->id) }}">
+                <form method="POST" action="{{ route('registrars.students.update', $user->id) }}">
                   @csrf
                   @method('PUT')
                   <div class="modal-content">
@@ -160,22 +121,22 @@
                         <div class="col-md-4">
                           <label class="form-label">First Name</label>
                           <input type="text" name="first_name" class="form-control" 
-                                 value="{{ old('first_name', $student->profile->first_name) }}" required>
+                                 value="{{ old('first_name', $profile->first_name ?? '') }}" required>
                         </div>
                         <div class="col-md-4">
                           <label class="form-label">Middle Name</label>
                           <input type="text" name="middle_name" class="form-control" 
-                                 value="{{ old('middle_name', $student->profile->middle_name) }}">
+                                 value="{{ old('middle_name', $profile->middle_name ?? '') }}">
                         </div>
                         <div class="col-md-4">
                           <label class="form-label">Last Name</label>
                           <input type="text" name="last_name" class="form-control" 
-                                 value="{{ old('last_name', $student->profile->last_name) }}" required>
+                                 value="{{ old('last_name', $profile->last_name ?? '') }}" required>
                         </div>
                         <div class="col-md-6">
                           <label class="form-label">Email</label>
                           <input type="email" name="email" class="form-control" 
-                                 value="{{ old('email', $student->email) }}" required>
+                                 value="{{ old('email', $user->email) }}" required>
                         </div>
                       </div>
                     </div>
@@ -187,7 +148,6 @@
                 </form>
               </div>
             </div>
-
           @empty
             <tr>
               <td colspan="8" class="text-center text-muted">
@@ -200,10 +160,10 @@
       </table>
     </div>
 
-    <!-- Pagination -->
     <div class="mt-3">
       {{ $students->links('pagination::bootstrap-5') }}
     </div>
   </div>
 </div>
+
 @endsection

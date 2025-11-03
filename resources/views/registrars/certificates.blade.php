@@ -42,7 +42,7 @@
           @forelse($certificates as $index => $cert)
             <tr>
               <td>{{ $certificates->firstItem() + $index }}</td>
-              <td>{{ $cert->student->user->profile->last_name }}, {{ $cert->student->user->profile->first_name }}</td>
+              <td>{{ $cert->student->user->profile->last_name }}, {{ $cert->student->user->profile->first_name }} {{ optional($cert->student->user->profile)->middle_name ? $cert->student->user->profile->middle_name . '.' : '' }}</td>
               <td>{{ $cert->type }}</td>
               <td>{{ $cert->purpose ?? 'N/A' }}</td>
               <td>{{ $cert->created_at->format('M d, Y') }}</td>

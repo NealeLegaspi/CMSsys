@@ -20,6 +20,7 @@ class UserProfile extends Model
         'birthdate',
         'address',
         'contact_number',
+        'guardian_name',
         'profile_picture',
     ];
 

@@ -21,7 +21,7 @@ p { font-size:14px; }
   <h2>{{ $schoolName }}</h2>
   <h4>{{ $schoolAddress }}</h4>
   <h3 style="margin-top:30px;">CERTIFICATE OF ENROLLMENT</h3>
-  <p>This is to certify that <strong>{{ $student->user->profile->first_name }} {{ $student->user->profile->last_name }}</strong>
+  <p>This is to certify that <strong>{{ $student->user->profile->first_name }} {{ optional($student->user->profile)->middle_name ? ' ' . strtoupper(optional($student->user->profile)->middle_name[0]) . '.' : '' }} {{ $student->user->profile->last_name }}</strong>
      is officially enrolled at <strong>{{ $schoolName }}</strong> for the current school year.</p>
   @if($certificate->purpose)
   <p><em>Purpose: {{ $certificate->purpose }}</em></p>

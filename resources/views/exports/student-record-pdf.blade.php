@@ -22,8 +22,7 @@
     <img src="{{ public_path('Mindware.png') }}" alt="Logo">
     <div class="school-info">
       <div class="school-name">CHILDREN’S MINDWARE SCHOOL, INC.</div>
-      <div class="address">123 Example Street, City, Philippines</div>
-      <div class="address">Tel: (02) 123-4567 | Email: info@mindware.edu.ph</div>
+      <div class="address">027 St Francis Subdivision Rd, Balagtas, 3016 Bulacan</div>
     </div>
   </div>
 

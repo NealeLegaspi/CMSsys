@@ -12,6 +12,11 @@ class Section extends Model
         return $this->belongsTo(GradeLevel::class, 'gradelevel_id');
     }
 
+    public function announcements()
+    {
+        return $this->hasMany(Announcement::class);
+    }
+
     public function schoolYear()
     {
         return $this->belongsTo(SchoolYear::class, 'school_year_id');

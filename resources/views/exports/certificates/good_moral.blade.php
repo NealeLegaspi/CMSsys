@@ -21,7 +21,7 @@ p { font-size:14px; }
   <h2>{{ $schoolName }}</h2>
   <h4>{{ $schoolAddress }}</h4>
   <h3 style="margin-top:30px;">CERTIFICATE OF GOOD MORAL CHARACTER</h3>
-  <p>This is to certify that <strong>{{ $student->user->profile->first_name }} {{ $student->user->profile->last_name }}</strong>
+  <p>This is to certify that <strong>{{ $student->user->profile->first_name }} {{ optional($student->user->profile)->middle_name ? ' ' . strtoupper(optional($student->user->profile)->middle_name[0]) . '.' : '' }} {{ $student->user->profile->last_name }}</strong>
      has maintained good moral character and proper conduct while enrolled at this institution.</p>
   @if($certificate->purpose)
   <p><em>Purpose: {{ $certificate->purpose }}</em></p>

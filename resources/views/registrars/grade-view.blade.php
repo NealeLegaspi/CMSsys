@@ -10,8 +10,8 @@
   <div class="card-body">
     @include('partials.alerts')
 
-    <!-- Back Button -->
-    <div class="mb-3">
+    <!-- Top Controls -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
       <a href="{{ route('registrars.grades') }}" class="btn btn-light border d-inline-flex align-items-center">
         <i class="bi bi-arrow-left me-2"></i> Back to Grade Submissions
       </a>
@@ -46,7 +46,7 @@
           @forelse($students as $s)
             @php
               $grades = [];
-              foreach (['1st','2nd','3rd','4th','Final'] as $q) {
+              foreach (['1st','2nd','3rd','4th'] as $q) {
                   $grades[$q] = $s->grades->firstWhere('quarter', $q)?->grade;
               }
               $valid = array_filter($grades, fn($g) => is_numeric($g));
@@ -57,7 +57,7 @@
               <td class="text-start ps-3">
                 {{ optional($s->user->profile)->last_name ?? 'N/A' }},
                 {{ optional($s->user->profile)->first_name ?? '' }}
-                {{ optional($s->user->profile)->middle_name ?? ''}}.
+                {{ optional($s->user->profile)->middle_name ?? '' }}
               </td>
               @foreach(['1st','2nd','3rd','4th'] as $q)
                 <td>{{ $grades[$q] ?? '-' }}</td>
@@ -67,7 +67,10 @@
               </td>
               <td>
                 @if ($final)
-                  <span class="badge rounded-pill px-3 py-2 {{ $final >= 75 ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle' }}">
+                  <span class="badge rounded-pill px-3 py-2 
+                        {{ $final >= 75 
+                            ? 'bg-success-subtle text-success border border-success-subtle' 
+                            : 'bg-danger-subtle text-danger border border-danger-subtle' }}">
                     {{ $final >= 75 ? 'PASSED' : 'FAILED' }}
                   </span>
                 @else
@@ -77,7 +80,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="7" class="text-center text-muted py-4">
+              <td colspan="8" class="text-center text-muted py-4">
                 <i class="bi bi-inbox me-2"></i> No students found for this section.
               </td>
             </tr>
@@ -91,10 +94,9 @@
       <button type="button" class="btn btn-outline-warning px-4" data-bs-toggle="modal" data-bs-target="#returnModal">
         <i class="bi bi-arrow-counterclockwise me-1"></i> Return to Teacher
       </button>
-
-      <button type="button" class="btn btn-outline-success px-4" data-bs-toggle="modal" data-bs-target="#approveModal">
-        <i class="bi bi-check-circle me-1"></i> Approve Grades
-      </button>
+        <button type="button" class="btn btn-outline-success px-4" data-bs-toggle="modal" data-bs-target="#approveModal">
+          <i class="bi bi-check-circle me-1"></i> Approve Grades
+        </button>
     </div>
   </div>
 </div>

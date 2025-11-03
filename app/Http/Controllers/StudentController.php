@@ -10,12 +10,14 @@ use App\Models\Announcement;
 use App\Models\Grade;
 use App\Models\SubjectAssignment;
 use App\Models\Assignment;
+use App\Helpers\SystemHelper;
 
 class StudentController extends Controller
 {
     public function dashboard()
     {
         $user = Auth::user();
+        $activeQuarter = SystemHelper::getActiveQuarter();
 
         $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
 
@@ -31,9 +33,13 @@ class StudentController extends Controller
 
         $grades = Grade::with('subject')
             ->where('student_id', $user->student?->id)
+            ->where('quarter', $activeQuarter)
+            ->whereHas('subject.subjectAssignments', function ($q) {
+                $q->where('grade_status', 'approved');
+            })
             ->get();
 
-        return view('students.dashboard', compact('announcements', 'grades'));
+        return view('students.dashboard', compact('announcements', 'grades', 'activeQuarter'));
     }
 
     public function announcements()
@@ -55,6 +61,7 @@ class StudentController extends Controller
     public function grades()
     {
         $user = Auth::user();
+
         $grades = Grade::with('subject')
             ->where('student_id', $user->student?->id)
             ->whereHas('subject.subjectAssignments', function ($q) {
@@ -65,6 +72,7 @@ class StudentController extends Controller
 
         return view('students.grades', compact('grades'));
     }
+
 
     public function settings()
     {

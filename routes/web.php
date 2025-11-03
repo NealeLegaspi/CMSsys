@@ -54,6 +54,8 @@ Route::prefix('admin')->middleware(['auth', 'role:Admin'])->group(function () {
     Route::post('/users/{id}/toggle', [AdminController::class, 'toggleUser'])->name('admins.users.toggle');
     Route::post('/users/{id}/reset', [AdminController::class, 'resetPassword'])->name('admins.users.reset');
     Route::delete('/users/{id}', [AdminController::class, 'destroyUser'])->name('admins.users.destroy');
+    Route::post('/users/{id}/approve', [AdminController::class, 'approveUser'])->name('admins.users.approve');
+    Route::post('/users/{id}/reject', [AdminController::class, 'rejectUser'])->name('admins.users.reject');
 
     // Activity Logs
     Route::get('/logs', [AdminController::class, 'logs'])->name('admins.logs');
@@ -71,12 +73,6 @@ Route::prefix('admin')->middleware(['auth', 'role:Admin'])->group(function () {
     Route::delete('/schoolyear/{id}', [AdminController::class, 'destroySchoolYear'])->name('admins.schoolyear.destroy');
     Route::post('/schoolyear/{id}/close', [AdminController::class, 'closeSchoolYear'])->name('admins.schoolyear.close');
     Route::post('/schoolyears/{id}/activate', [AdminController::class, 'activateSchoolYear'])->name('admins.schoolyear.activate');
-
-    Route::get('/subjects', [AdminController::class, 'subjects'])->name('admins.subjects');
-    Route::post('/subjects', [AdminController::class, 'storeSubject'])->name('admins.subjects.store');
-    Route::get('/subjects/{id}', [AdminController::class, 'showSubject'])->name('admins.subjects.show');
-    Route::put('/subjects/{id}', [AdminController::class, 'updateSubject'])->name('admins.subjects.update');
-    Route::delete('/subjects/{id}', [AdminController::class, 'destroySubject'])->name('admins.subjects.destroy');
 
     Route::get('/student-records', [AdminController::class, 'studentRecords'])->name('admins.student-records');
 
@@ -109,6 +105,11 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::post('/students/import', [RegistrarController::class, 'importStudents'])->name('registrars.students.import');
     Route::get('/students/export', [RegistrarController::class, 'exportStudents'])->name('registrars.students.export');
 
+
+    // Aayusin pa
+    Route::get('/forms/form137/{student}', [RegistrarController::class, 'printForm137'])->name('registrars.printForm137');
+    Route::get('/forms/form138/{student}', [RegistrarController::class, 'printForm138'])->name('registrars.printForm138');
+
     Route::get('/teachers', [RegistrarController::class, 'teachers'])->name('registrars.teachers');
     Route::post('/teachers', [RegistrarController::class, 'storeTeacher'])->name('registrars.teachers.store');
     Route::get('/teachers/{id}', [RegistrarController::class, 'showTeacher'])->name('registrars.teachers.show');
@@ -139,6 +140,9 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::get('registrar/enrollment/export/pdf', [RegistrarController::class, 'exportPdf'])->name('registrars.enrollment.export.pdf');
 
     Route::post('/enrollment/{id}/verify', [RegistrarController::class, 'verifyEnrollment'])->name('registrars.enrollment.verify');
+    Route::post('/enrollment/add-student', [RegistrarController::class, 'addStudent'])->name('registrars.enrollment.addStudent');
+    Route::post('/enrollments/import', [RegistrarController::class, 'importExcel'])->name('registrars.enrollment.import');
+
 
     Route::get('/documents', [App\Http\Controllers\RegistrarController::class, 'documentsAndCertificates'])
         ->name('registrars.documents.all');
@@ -163,6 +167,16 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::get('/grade-submissions/{id}', [RegistrarController::class, 'viewSubmission'])->name('registrars.viewSubmission');
     Route::put('/grade-submissions/{id}/update', [RegistrarController::class, 'updateStatus'])->name('registrars.updateStatus');
     Route::post('/grades/{assignment_id}/return', [RegistrarController::class, 'returnGrades'])->name('registrars.grades.return');
+    Route::get('/quarter-settings', [RegistrarController::class, 'quarterSettings'])->name('registrars.quarterSettings');
+    Route::post('/quarter-settings', [RegistrarController::class, 'updateQuarter'])->name('registrars.updateQuarter');
+
+
+    Route::get('/grades/export/excel', [RegistrarController::class, 'exportGradesExcel'])
+    ->name('registrars.grades.export.excel');
+
+Route::get('/grades/export/pdf', [RegistrarController::class, 'exportGradesPDF'])
+    ->name('registrars.grades.export.pdf');
+
 
     Route::get('/students/{id}/record', [App\Http\Controllers\RegistrarController::class, 'viewStudentRecord'])
         ->name('registrars.student.record');
@@ -187,6 +201,12 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::get('/settings', [RegistrarController::class, 'settings'])->name('registrars.settings');
     Route::put('/settings', [RegistrarController::class, 'updateSettings'])->name('registrars.updateSettings');
     Route::post('/settings/change-password', [RegistrarController::class, 'changePassword'])->name('registrars.changePassword');
+
+    Route::get('/subjects', [RegistrarController::class, 'subjects'])->name('registrars.subjects');
+    Route::post('/subjects', [RegistrarController::class, 'storeSubject'])->name('registrars.subjects.store');
+    Route::get('/subjects/{id}', [RegistrarController::class, 'showSubject'])->name('registrars.subjects.show');
+    Route::put('/subjects/{id}', [RegistrarController::class, 'updateSubject'])->name('registrars.subjects.update');
+    Route::delete('/subjects/{id}', [RegistrarController::class, 'destroySubject'])->name('registrars.subjects.destroy');
 });
 
 // -------------------- TEACHER ROUTES --------------------

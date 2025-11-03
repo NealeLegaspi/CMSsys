@@ -419,6 +419,48 @@ class AdminController extends Controller
         return back()->with('success', 'User deleted successfully.');
     }
 
+    public function approveUser($id)
+    {
+        $user = User::with('student.enrollments')->findOrFail($id);
+
+        if ($user->status !== 'pending') {
+            return back()->withErrors(['error' => 'User is not pending approval.']);
+        }
+
+        $user->update(['status' => 'active']);
+
+        if ($user->student && $user->student->enrollments) {
+            foreach ($user->student->enrollments as $enrollment) {
+                if ($enrollment->status === 'For Verification') {
+                    $enrollment->update(['status' => 'enrolled']);
+                }
+            }
+        }
+
+        $this->logActivity('Approve User', "Approved user {$user->email} and verified enrollment(s).");
+
+        return back()->with('success', 'User account approved and enrollment verified successfully.');
+    }
+
+    public function rejectUser($id)
+    {
+        $user = User::findOrFail($id);
+
+        if ($user->profile) {
+            $user->profile->delete();
+        }
+
+        if ($user->student) {
+            $user->student->delete();
+        }
+
+        $user->delete();
+
+        return redirect()->back()->with('success', 'User rejected and removed successfully.');
+    }
+
+
+
     /**
      * Import/Export Users
      */
@@ -630,80 +672,6 @@ class AdminController extends Controller
         $this->logActivity('Change Active School Year', "Changed active school year to {$sy->name}");
 
         return back()->with('success', 'Active school year updated.');
-    }
-
-        /**
-     * Subjects
-     */
-    public function subjects(Request $request)
-    {
-        $subjects = Subject::with('gradeLevel')
-            ->when($request->filled('search'), function ($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search . '%');
-            })
-            ->when($request->filled('grade_level_id'), function ($q) use ($request) {
-                $q->where('grade_level_id', $request->grade_level_id);
-            })
-            ->orderBy('grade_level_id')
-            ->paginate(10);
-
-        $gradeLevels = GradeLevel::all();
-
-        return view('admins.subjects', compact('subjects', 'gradeLevels'));
-    }
-
-    public function storeSubject(Request $request)
-    {
-        $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique('subjects')->where(function ($q) use ($request) {
-                    return $q->where('grade_level_id', $request->grade_level_id);
-                }),
-            ],
-            'grade_level_id' => 'required|exists:grade_levels,id',
-        ]);
-
-        Subject::create($request->only('name', 'grade_level_id'));
-
-        $this->logActivity('Add Subject', "Added subject {$request->name}");
-
-        return back()->with('success', 'Subject added.');
-    }
-
-    public function updateSubject(Request $request, $id)
-    {
-        $subject = Subject::findOrFail($id);
-
-        $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique('subjects')->where(function ($q) use ($request) {
-                    return $q->where('grade_level_id', $request->grade_level_id);
-                })->ignore($subject->id),
-            ],
-            'grade_level_id' => 'required|exists:grade_levels,id',
-        ]);
-
-        $subject->update($request->only('name', 'grade_level_id'));
-
-        $this->logActivity('Update Subject', "Updated subject {$subject->name}");
-
-        return back()->with('success', 'Subject updated.');
-    }
-
-    public function destroySubject($id)
-    {
-        $subject = Subject::findOrFail($id);
-        $subject->delete();
-
-        $this->logActivity('Delete Subject', "Deleted subject {$subject->name}");
-
-        return back()->with('success', 'Subject deleted.');
     }
 
     /**

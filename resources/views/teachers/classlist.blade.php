@@ -24,11 +24,6 @@
                 <i class="bi bi-people-fill text-primary me-1"></i> Advisory Class
             </button>
         </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link fw-semibold" id="subjects-tab" data-bs-toggle="tab" data-bs-target="#subjects" type="button" role="tab" aria-controls="subjects" aria-selected="false">
-                <i class="bi bi-book-half text-success me-1"></i> My Subjects
-            </button>
-        </li>
     </ul>
 
     <div class="tab-content" id="classlistTabContent">
@@ -51,9 +46,6 @@
                                 (Male: {{ $studentsMale->count() }}, Female: {{ $studentsFemale->count() }})
                             </p>
                         </div>
-                        <a href="{{ route('teachers.classlist.export') }}" class="btn btn-danger mt-2 mt-md-0 shadow-sm">
-                            <i class="bi bi-file-earmark-pdf me-1"></i> PDF
-                        </a>
                     </div>
                 </div>
 

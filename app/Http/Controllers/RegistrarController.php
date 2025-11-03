@@ -15,6 +15,7 @@ use App\Models\ActivityLog;
 use App\Models\StudentDocument; 
 use App\Models\StudentCertificate; 
 use App\Models\SubjectAssignment;
+use App\Helpers\SystemHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -132,6 +133,7 @@ class RegistrarController extends Controller
                 'email'    => $request->email,
                 'password' => bcrypt('password123'),
                 'role_id'  => 4,
+                'status'   => 'pending',
             ]);
 
             $user->profile()->create([
@@ -244,6 +246,16 @@ class RegistrarController extends Controller
 
         return $pdf->download('Student_Record_' . ($student->user->profile->last_name ?? 'Student') . '.pdf');
     }
+
+public function printForm137($studentId)
+{
+    return view('registrars.forms.form137', compact('student', 'grades'));
+}
+
+public function printForm138($studentId)
+{
+    return view('registrars.forms.form138', compact('student', 'grades'));
+}
 
     /**
      * Enrollment
@@ -397,6 +409,74 @@ class RegistrarController extends Controller
         return Excel::download(new EnrollmentsExport, 'enrollments.csv');
     }
 
+    public function addStudent(Request $request)
+    {
+        $request->validate([
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'sex' => 'required|string',
+            'birthdate' => 'required|date',
+            'contact_number' => 'required|string|max:20',
+            'guardian_name' => 'required|string|max:255',
+            'address' => 'required|string|max:255',
+            'section_id' => 'required|exists:sections,id',
+        ]);
+
+        $currentSchoolYear = SchoolYear::where('status', 'active')->first();
+        if (!$currentSchoolYear) {
+            return back()->withErrors(['school_year' => 'No active school year found. Please set one first.']);
+        }
+
+        $baseCode = '400655';
+        $lastStudent = Student::orderBy('id', 'desc')->first();
+        $lastNumber = $lastStudent && preg_match('/^400655(\d{4,})$/', $lastStudent->student_number, $m)
+            ? (int) $m[1] : 0;
+        $studentNumber = $baseCode . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
+
+        $email = strtolower($request->last_name . '.' . $request->first_name . '@mindware.edu.ph');
+        if (User::where('email', $email)->exists()) {
+            return back()->withErrors(['email' => 'A student with this name already exists.']);
+        }
+
+        DB::transaction(function () use ($request, $currentSchoolYear, $studentNumber, $email) {
+            $user = User::create([
+                'email' => $email,
+                'password' => Hash::make('password'),
+                'role_id' => 4,
+                'status' => 'active',
+            ]);
+
+            UserProfile::create([
+                'user_id' => $user->id,
+                'first_name' => $request->first_name,
+                'middle_name' => $request->middle_name,
+                'last_name' => $request->last_name,
+                'sex' => $request->sex,
+                'birthdate' => $request->birthdate, 
+                'address' => $request->address,
+                'contact_number' => $request->contact_number,
+                'guardian_name' => $request->guardian_name,
+            ]);
+
+            $student = Student::create([
+                'user_id' => $user->id,
+                'student_number' => $studentNumber,
+                'section_id' => $request->section_id,
+            ]);
+
+            Enrollment::create([
+                'student_id' => $student->id,
+                'section_id' => $request->section_id,
+                'school_year_id' => $currentSchoolYear->id,
+                'status' => 'Enrolled',
+            ]);
+        });
+
+        return back()->with('success', 'Student successfully added and enrolled! Student Number: ' . $studentNumber);
+    }
+
+
     public function exportPdf()
     {
         $enrollments = Enrollment::with(['student.user.profile', 'section', 'schoolYear'])->get();
@@ -530,13 +610,15 @@ class RegistrarController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('subjects.name', 'like', "%{$search}%")
-                ->orWhere('users.name', 'like', "%{$search}%");
+                  ->orWhere('users.name', 'like', "%{$search}%");
             });
         }
 
         if ($request->filled('status')) {
             $query->where('subject_assignments.grade_status', $request->status);
         }
+
+        $submissions = $query->orderBy('subjects.name', 'asc')->paginate(10);
 
         $summary = [
             'submitted' => DB::table('subject_assignments')->where('grade_status', 'submitted')->count(),
@@ -548,7 +630,6 @@ class RegistrarController extends Controller
         return view('registrars.gradeSubmissions', compact('submissions', 'summary'));
     }
 
-
     public function viewSubmission($id)
     {
         $assignment = SubjectAssignment::with(['teacher', 'subject', 'section'])
@@ -557,35 +638,46 @@ class RegistrarController extends Controller
         $subject = $assignment->subject;
         $section = $assignment->section;
 
-        $students = $section->students()->with(['user.profile', 'grades' => function ($q) use ($subject) {
-            $q->where('subject_id', $subject->id);
-        }])->get();
+        $students = $section->students()
+            ->with(['user.profile', 'grades' => function ($q) use ($subject) {
+                $q->where('subject_id', $subject->id);
+            }])
+            ->get();
 
         return view('registrars.grade-view', compact('assignment', 'subject', 'section', 'students'));
     }
+
 
     public function updateStatus(Request $request, $id)
     {
         $assignment = DB::table('subject_assignments')->where('id', $id)->first();
 
-        if (!$assignment) {
-            return back()->with('error', 'Assignment not found.');
+        if (!$assignment) { 
+            return back()->with('error', 'Assignment not found.'); 
         }
 
         $status = $request->input('status');
 
-        if (!in_array($status, ['approved', 'returned'])) {
-            return back()->with('error', 'Invalid status value.');
-        }
-
-        if ($status === 'approved') {
-            $hasGrades = DB::table('grades')
-                ->where('subject_id', $assignment->subject_id)
+        if ($status === 'approved') { 
+            $hasGrades = DB::table('grades') 
+                ->where('subject_id', $assignment->subject_id) 
+                ->whereExists(function ($query) use ($assignment) {
+                    $query->select(DB::raw(1))
+                        ->from('students')
+                        ->whereColumn('students.id', 'grades.student_id')
+                        ->where('students.section_id', $assignment->section_id);
+                })
                 ->exists();
 
-            if (!$hasGrades) {
-                return back()->with('error', 'Cannot approve. No grades have been submitted yet.');
-            }
+            if (!$hasGrades) { 
+                return back()->with('error', 'Cannot approve. No grades have been submitted yet.'); 
+            } 
+
+            $this->logActivity('Approve Grades', "Approved grades for assignment #{$id}.");
+            $message = 'Grades approved successfully!'; 
+        } else { 
+            $this->logActivity('Return Grades', "Returned grades for assignment #{$id} to teacher.");
+            $message = 'Grades returned to teacher for revision.'; 
         }
 
         DB::table('subject_assignments')
@@ -595,25 +687,16 @@ class RegistrarController extends Controller
                 'updated_at' => now(),
             ]);
 
-        if ($status === 'approved') {
-            $this->logActivity('Approve Grades', "Approved grades for assignment #{$id}.");
-            $message = 'Grades approved successfully!';
-        } else {
-            $this->logActivity('Return Grades', "Returned grades for assignment #{$id} to teacher.");
-            $message = 'Grades returned to teacher for revision.';
-        }
-
         return back()->with('success', $message);
     }
 
 
+        public function returnGrades($assignment_id)
+        {
+            $assignment = DB::table('subject_assignments')->where('id', $assignment_id)->first();
 
-    public function returnGrades($assignment_id)
-    {
-        $assignment = DB::table('subject_assignments')->where('id', $assignment_id)->first();
-
-        if (!$assignment) {
-            return back()->with('error', 'Assignment not found.');
+            if (!$assignment) {
+                return back()->with('error', 'Assignment not found.');
         }
 
         DB::table('subject_assignments')
@@ -626,6 +709,23 @@ class RegistrarController extends Controller
         $this->logActivity('Return Grades', "Returned grades for {$assignment->id} to teacher for revision.");
 
         return back()->with('info', 'Grades returned to teacher for revision.');
+    }
+
+    public function quarterSettings()
+    {
+        $activeQuarter = SystemHelper::getActiveQuarter();
+        return view('registrars.quarter-settings', compact('activeQuarter'));
+    }
+
+    public function updateQuarter(Request $request)
+    {
+        $request->validate([
+            'quarter' => 'required|integer|min:1|max:4',
+        ]);
+
+        SystemHelper::setActiveQuarter($request->quarter);
+
+        return back()->with('success', 'Active quarter updated successfully!');
     }
 
     /**
@@ -1163,5 +1263,76 @@ class RegistrarController extends Controller
         $this->logActivity('Change Password', "Changed password for {$registrar->email}");
 
         return back()->with('success', 'Password changed successfully!');
+    }
+
+    public function subjects(Request $request)
+    {
+        $subjects = Subject::with('gradeLevel')
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%');
+            })
+            ->when($request->filled('grade_level_id'), function ($q) use ($request) {
+                $q->where('grade_level_id', $request->grade_level_id);
+            })
+            ->orderBy('grade_level_id')
+            ->paginate(10);
+
+        $gradeLevels = GradeLevel::all();
+
+        return view('registrars.subjects', compact('subjects', 'gradeLevels'));
+    }
+
+    public function storeSubject(Request $request)
+    {
+        $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('subjects')->where(function ($q) use ($request) {
+                    return $q->where('grade_level_id', $request->grade_level_id);
+                }),
+            ],
+            'grade_level_id' => 'required|exists:grade_levels,id',
+        ]);
+
+        Subject::create($request->only('name', 'grade_level_id'));
+
+        $this->logActivity('Add Subject', "Added subject {$request->name}");
+
+        return back()->with('success', 'Subject added.');
+    }
+
+    public function updateSubject(Request $request, $id)
+    {
+        $subject = Subject::findOrFail($id);
+
+        $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('subjects')->where(function ($q) use ($request) {
+                    return $q->where('grade_level_id', $request->grade_level_id);
+                })->ignore($subject->id),
+            ],
+            'grade_level_id' => 'required|exists:grade_levels,id',
+        ]);
+
+        $subject->update($request->only('name', 'grade_level_id'));
+
+        $this->logActivity('Update Subject', "Updated subject {$subject->name}");
+
+        return back()->with('success', 'Subject updated.');
+    }
+
+    public function destroySubject($id)
+    {
+        $subject = Subject::findOrFail($id);
+        $subject->delete();
+
+        $this->logActivity('Delete Subject', "Deleted subject {$subject->name}");
+
+        return back()->with('success', 'Subject deleted.');
     }
 }

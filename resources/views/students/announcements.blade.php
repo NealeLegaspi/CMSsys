@@ -15,7 +15,7 @@
             {{ e($a->title ?? 'Untitled Announcement') }}
           </h5>
           <p class="text-muted small mb-3">
-            {!! nl2br(e($a->content ?? $a->content ?? 'No content available.')) !!}
+            {!! nl2br(e($a->content ?? 'No content available.')) !!}
           </p>
 
           <div class="d-flex justify-content-between align-items-center flex-wrap">
@@ -23,7 +23,7 @@
               <i class="bi bi-person-circle"></i>
               <strong>
                 @if($a->user)
-                  {{ $a->user->role->name ?? 'System' }}
+                  {{ e($a->user->role->name ?? 'System') }}: {{ e($a->user->profile->first_name ?? 'Unknown') }} {{ e($a->user->profile->last_name ?? 'Unknown') }}
                 @else
                   System
                 @endif

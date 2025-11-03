@@ -23,8 +23,7 @@
             <button type="submit" class="btn btn-info w-100 text-white">Login</button>
 
             <p class="mt-3 text-center">
-                Don't have an account?
-                <a href="javascript:void(0)" onclick="showForm('register_form')">Register</a> |
+                <!---<a href="javascript:void(0)" onclick="showForm('register_form')">Register</a> --->
                 <a href="javascript:void(0)" onclick="showForm('forgot_form')">Forgot Password?</a>
             </p>
         </form>

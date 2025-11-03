@@ -73,7 +73,7 @@
           </button>
         </div>
 
-        <form action="{{ route('teachers.grades.store') }}" method="POST">
+        <form id="gradesForm" action="{{ route('teachers.grades.store') }}" method="POST">
           @csrf
           <input type="hidden" name="assignment_id" value="{{ $selectedAssignment->assignment_id }}"> 
           <input type="hidden" name="subject_id" value="{{ $subject->id }}">
@@ -124,11 +124,14 @@
                         value="{{ $final ?? '' }}" readonly>
                     </td>
                     <td class="fw-bold remarks">
-                      @if($remarks)
-                        <span class="badge rounded-pill px-3 py-2 {{ $remarks == 'PASSED' ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle' }}">
-                          {{ $remarks }}
-                        </span>
-                      @endif
+                      <span class="badge rounded-pill px-3 py-2 
+                            {{ $remarks == 'PASSED' 
+                                ? 'bg-success-subtle text-success border border-success-subtle' 
+                                : ($remarks == 'FAILED' 
+                                    ? 'bg-danger-subtle text-danger border border-danger-subtle' 
+                                    : '') }}">
+                        {{ $remarks ?? '' }}
+                      </span>
                     </td>
                   </tr>
                 @endforeach
@@ -137,28 +140,21 @@
           </div>
 
           {{-- Action Buttons --}}
-            <div class="text-end mt-4">
+          <div class="text-end mt-4">
             @if(in_array($selectedAssignment->grade_status ?? 'draft', ['draft','returned']))
-                <div class="d-flex justify-content-end gap-2">
-                {{-- Save Draft --}}
-                <button type="submit" name="action" value="save" class="btn btn-outline-primary px-4 btn-lg shadow-sm">
-                    <i class="bi bi-save me-1"></i> Save Draft
+              <div class="d-flex justify-content-end gap-2">
+                {{-- Submit Button with Modal --}}
+                <button type="button" class="btn btn-outline-success px-4 btn-lg shadow-sm"
+                        data-bs-toggle="modal" data-bs-target="#confirmSubmitModal">
+                  <i class="bi bi-send-check me-1"></i> Submit Grades
                 </button>
-
-                {{-- Submit for Review --}}
-                <button type="submit" formaction="{{ route('teachers.grades.submit') }}" 
-                        name="action" value="submit"
-                        class="btn btn-outline-success px-4 btn-lg shadow-sm"
-                        onclick="return confirm('Submit grades for review? You won’t be able to edit after submission.')">
-                    <i class="bi bi-send-check me-1"></i> Submit Grades
-                </button>
-                </div>
+              </div>
             @else
-                <button type="button" class="btn btn-secondary px-4 btn-lg" disabled>
+              <button type="button" class="btn btn-secondary px-4 btn-lg" disabled>
                 <i class="bi bi-lock me-1"></i> Grades Locked
-                </button>
+              </button>
             @endif
-            </div>
+          </div>
         </form>
       </div>
     </div>
@@ -171,6 +167,32 @@
       </div>
     </div>
   @endif
+</div>
+
+{{-- Confirm Submit Modal --}}
+<div class="modal fade" id="confirmSubmitModal" tabindex="-1" aria-labelledby="confirmSubmitModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="confirmSubmitModalLabel"><i class="bi bi-send-check me-2"></i> Confirm Submission</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0 fs-5 text-center">
+          Are you sure you want to <strong>submit these grades</strong> for review?<br>
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle"></i> Cancel
+        </button>
+        <button type="submit" form="gradesForm" name="action" value="save"
+                class="btn btn-success px-4">
+          <i class="bi bi-send-check"></i> Confirm 
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
 {{-- JS --}}

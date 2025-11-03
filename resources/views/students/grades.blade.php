@@ -11,6 +11,12 @@
     
     @if($grades->count())
       @foreach($grades as $subject => $records)
+        @php
+          $quartersCompleted = $records->pluck('quarter')->unique()->count();
+          $final = $quartersCompleted === 4 ? $records->avg('grade') : null;
+          $remarks = $final !== null ? ($final >= 75 ? 'PASSED' : 'FAILED') : null;
+        @endphp
+
         <div class="card mb-4 border-0 shadow-sm">
           <div class="card-header bg-light fw-bold">
             <i class="bi bi-book"></i> {{ e($subject) }}
@@ -25,11 +31,7 @@
                 </tr>
               </thead>
               <tbody class="text-center">
-                @php
-                  $final = $records->avg('grade');
-                  $remarks = $final >= 75 ? 'PASSED' : 'FAILED';
-                @endphp
-                @foreach($records as $g)
+                @foreach($records->sortBy('quarter') as $g)
                 <tr>
                   <td>{{ e($g->quarter ?? '-') }}</td>
                   <td>
@@ -42,11 +44,16 @@
                   </td>
                 </tr>
                 @endforeach
+
+                @if($final !== null)
                 <tr class="fw-bold table-light">
                   <td colspan="1" class="text-end">Final Average:</td>
                   <td>{{ number_format($final, 2) }}</td>
-                  <td class="{{ $remarks === 'PASSED' ? 'text-success' : 'text-danger' }}">{{ $remarks }}</td>
+                  <td class="{{ $remarks === 'PASSED' ? 'text-success' : 'text-danger' }}">
+                    {{ $remarks }}
+                  </td>
                 </tr>
+                @endif
               </tbody>
             </table>
           </div>

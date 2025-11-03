@@ -206,18 +206,18 @@
                         <div class="card-body">
                             <p class="mb-2">{{ $ann->content }}</p>
                             <small class="text-secondary">
-                            <i class="bi bi-person-circle"></i>
-                            <strong>
-                                @if($ann->user)
-                                    {{ $ann->user->role->name ?? 'System' }}
-                                @else
-                                    System
-                                @endif
-                            </strong>
-                            &nbsp;|&nbsp;
-                            <i class="bi bi-calendar3"></i>
-                            {{ $ann->created_at?->format('M d, Y h:i A') ?? 'N/A' }}
-                        </small>
+                                <i class="bi bi-person-circle"></i>
+                                <strong>
+                                    @if($ann->user)
+                                        {{ e($ann->user->role->name ?? 'System') }}: {{ e($a->user->profile->first_name ?? 'Unknown') }} {{ e($a->user->profile->last_name ?? 'Unknown') }}
+                                    @else
+                                        System
+                                    @endif
+                                </strong>
+                                &nbsp;|&nbsp;
+                                <i class="bi bi-calendar3"></i>
+                                {{ $ann->created_at?->format('M d, Y h:i A') ?? 'N/A' }}
+                            </small>
                         </div>
                     </div>
                 @endforeach
