@@ -2,9 +2,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes; // ✅ Import SoftDeletes
 
 class Section extends Model
 {
+    use SoftDeletes; 
+
     protected $fillable = ['name', 'gradelevel_id', 'school_year_id', 'adviser_id', 'capacity'];
 
     public function gradeLevel()

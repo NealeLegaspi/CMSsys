@@ -9,6 +9,7 @@ class Subject extends Model
         'name',
         'description',
         'grade_level_id',
+        'is_archived',
     ];
 
     public function grades()

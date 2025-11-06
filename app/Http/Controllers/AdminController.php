@@ -73,6 +73,9 @@ class AdminController extends Controller
             ->where(function($q) {
                 $q->whereNull('expires_at')
                 ->orWhere('expires_at', '>', now());
+            })
+            ->whereHas('user', function ($q) {
+                $q->where('role_id', 1); 
             });
 
         if ($request->filled('search')) {
@@ -94,6 +97,7 @@ class AdminController extends Controller
         
         return view('admins.announcements', compact('announcements', 'teachers', 'students'));
     }
+
 
 
     public function storeAnnouncement(Request $request)
@@ -268,7 +272,7 @@ class AdminController extends Controller
 
     public function storeUser(Request $request)
     {
-        $validated = $request->validate([
+         $validated = $request->validate([
             'first_name'      => 'required|string|max:50',
             'middle_name'     => 'nullable|string|max:50',
             'last_name'       => 'required|string|max:50',
@@ -277,9 +281,14 @@ class AdminController extends Controller
             'address'         => 'nullable|string|max:255',
             'contact_number'  => 'nullable|string|max:20',
             'email'           => 'required|email|unique:users,email',
-            'password'        => 'required|confirmed|min:6',
+            'password'        => [
+                'required', 'confirmed',
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/'
+            ],
             'role_id'         => 'required|exists:roles,id',
             'profile_picture' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ], [
+            'password.regex' => 'Password must contain at least 8 characters, including uppercase, lowercase, number, and special character.'
         ]);
 
         $studentRole = Role::where('name', 'Student')->first(); 
@@ -391,14 +400,14 @@ class AdminController extends Controller
     public function resetPassword($id)
     {
         $user = User::findOrFail($id);
-        $tempPassword = Str::random(8);
+        $tempPassword = 'Password123!';
 
         $user->password = Hash::make($tempPassword);
         $user->save();
 
         $this->logActivity('Reset Password', "Reset password for {$user->email}");
 
-        return back()->with('success', "New password: {$tempPassword}");
+        return back()->with('success', "Password has been reset to the default: {$tempPassword}");
     }
 
     public function destroyUser($id)
@@ -627,9 +636,17 @@ class AdminController extends Controller
 
         $sy->update(['status' => 'active']);
 
-        $this->logActivity('Activate School Year', "Activated school year {$sy->name}");
+        Enrollment::where('school_year_id', '!=', $sy->id)->where('status', 'Enrolled')->update(['status' => 'Inactive']);
 
-        return back()->with('success', "School year {$sy->name} is now active.");
+        Enrollment::where('school_year_id', $sy->id)->whereIn('status', ['Inactive', 'Pending'])->update(['status' => 'Enrolled']);
+
+        $this->logActivity(
+        'Activate School Year',
+        "Activated school year {$sy->name}, reactivated its enrollments, and inactivated previous years.");
+
+        return back()->with(
+        'success',
+        "School year {$sy->name} is now active. Related enrollments have been updated accordingly.");
     }
 
     public function updateSchoolYear(Request $request, $id)
@@ -673,6 +690,51 @@ class AdminController extends Controller
 
         return back()->with('success', 'Active school year updated.');
     }
+
+    public function archivedSchoolYears(Request $request)
+    {
+        $query = SchoolYear::onlyTrashed()
+            ->orderBy('deleted_at', 'desc');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                ->orWhere('start_date', 'like', "%{$search}%")
+                ->orWhere('end_date', 'like', "%{$search}%");
+            });
+        }
+
+        $schoolYears = $query->paginate(10)->withQueryString();
+
+        return view('admins.schoolyear_archived', compact('schoolYears'));
+    }
+
+    public function archiveSchoolYear($id)
+    {
+        $sy = SchoolYear::findOrFail($id);
+
+        if ($sy->status === 'active') {
+            return back()->with('error', 'Cannot archive an active school year.');
+        }
+
+        $sy->delete();
+
+        $this->logActivity('Archive School Year', "Archived school year {$sy->name}");
+
+        return back()->with('success', 'School year archived successfully!');
+    }
+
+    public function restoreSchoolYear($id)
+    {
+        $sy = SchoolYear::onlyTrashed()->findOrFail($id);
+        $sy->restore();
+
+        $this->logActivity('Restore School Year', "Restored school year {$sy->name}");
+
+        return back()->with('success', 'School year restored successfully!');
+    }
+
 
     /**
      * Activity Logs

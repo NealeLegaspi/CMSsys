@@ -131,7 +131,7 @@
   <div class="container">
     <p class="fw-bold">Connect With Our Admissions Team</p>
     <p>We are here to help you every step of the way. Feel free to reach out to us for any inquiries.</p>
-    <p>Sta. Francis Subd., Boni Ave., Batangas, Batangas</p>
+    <p>027 St Francis Subdivision Rd, Balagtas, 3016 Bulacan</p>
     <p>09369210244</p>
     <p>Children's Mindware School Inc.</p>
     <p>© {{ date('Y') }} Children's Mindware School, Inc. All rights reserved.

@@ -13,7 +13,7 @@
 
       {{-- 🔍 Search & Filter --}}
       <form method="GET" action="{{ route('registrars.subjects') }}" class="row g-2 align-items-end mb-4">
-        <div class="col-md-5">
+        <div class="col-md-4">
           <label class="form-label fw-semibold">Search</label>
           <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Search subject...">
         </div>
@@ -36,7 +36,10 @@
             <i class="bi bi-arrow-clockwise"></i> Reset
           </a>
         </div>
-        <div class="col-md-2 d-flex justify-content-end">
+        <div class="col-md-3 d-flex justify-content-end gap-2">
+          <a href="{{ route('registrars.subjects.archived') }}" class="btn btn-outline-dark">
+            <i class="bi bi-archive"></i> View Archived
+          </a>
           <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
             <i class="bi bi-plus-circle me-1"></i> Add Subject
           </button>
@@ -70,13 +73,37 @@
                     <i class="bi bi-pencil"></i>
                   </button>
 
-                  {{-- 🗑 Delete --}}
-                  <form action="{{ route('registrars.subjects.destroy',$subj->id) }}" method="POST" onsubmit="return confirm('Delete subject?')">
-                    @csrf @method('DELETE')
-                    <button class="btn btn-sm btn-danger">
-                      <i class="bi bi-trash"></i>
+                  {{-- 🗄 Archive --}}
+                  <form id="archiveForm{{ $subj->id }}" action="{{ route('registrars.subjects.archive', $subj->id) }}" method="POST" style="display:inline;">
+                    @csrf @method('PUT')
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#archiveModal{{ $subj->id }}">
+                      <i class="bi bi-archive"></i>
                     </button>
                   </form>
+
+                  {{-- 🗂 Archive Modal --}}
+                  <div class="modal fade" id="archiveModal{{ $subj->id }}" tabindex="-1" aria-labelledby="archiveModalLabel{{ $subj->id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                      <div class="modal-content">
+                        <div class="modal-header bg-secondary text-white">
+                          <h5 class="modal-title" id="archiveModalLabel{{ $subj->id }}">
+                            <i class="bi bi-archive me-2"></i> Confirm Archive
+                          </h5>
+                          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                          Are you sure you want to archive the subject 
+                          <strong>{{ $subj->name }}</strong>?
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                          <button type="submit" form="archiveForm{{ $subj->id }}" class="btn btn-secondary">
+                            Archive
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </td>
             </tr>

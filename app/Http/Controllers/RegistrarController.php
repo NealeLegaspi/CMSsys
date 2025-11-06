@@ -733,7 +733,14 @@ public function printForm138($studentId)
      */
     public function sections(Request $request)
     {
-        $query = Section::with(['gradeLevel', 'schoolYear', 'adviser.profile']);
+        $currentSY = SchoolYear::where('status', 'active')->first();
+
+        if (!$currentSY) {
+            return back()->withErrors(['msg' => 'No active school year found. Please set one as active first.']);
+        }
+
+        $query = Section::with(['gradeLevel', 'schoolYear', 'adviser.profile'])
+                        ->where('school_year_id', $currentSY->id);
 
         if ($request->filled('search')) {
             $query->where('name', 'like', '%' . $request->search . '%');
@@ -743,31 +750,32 @@ public function printForm138($studentId)
             $query->where('gradelevel_id', $request->gradelevel_id);
         }
 
-        if ($request->filled('school_year_id')) {
-            $query->where('school_year_id', $request->school_year_id);
-        }
-
         $sections    = $query->paginate(10)->withQueryString();
         $gradeLevels = GradeLevel::all();
-        $schoolYears = SchoolYear::all();
         $teachers    = User::where('role_id', 3)->with('profile')->get();
+        $subjects    = Subject::with('gradeLevel')->orderBy('grade_level_id')->orderBy('name')->get();
 
-        $subjects = Subject::with('gradeLevel')->orderBy('grade_level_id')->orderBy('name')->get();
-
-        return view('registrars.sections', compact('sections', 'gradeLevels', 'schoolYears', 'teachers', 'subjects'));
+        return view('registrars.sections', compact('sections', 'gradeLevels', 'teachers', 'subjects', 'currentSY'));
     }
 
     public function storeSection(Request $request)
     {
+        $currentSY = SchoolYear::where('status', 'active')->firstOrFail();
+
         $request->validate([
-            'name'           => 'required|string|max:100|unique:sections,name',
-            'gradelevel_id'  => 'required|exists:grade_levels,id',
-            'school_year_id' => 'required|exists:school_years,id',
-            'adviser_id'     => 'nullable|exists:users,id',
-            'capacity'       => 'required|integer|min:10|max:100',
+            'name'          => 'required|string|max:100|unique:sections,name',
+            'gradelevel_id' => 'required|exists:grade_levels,id',
+            'adviser_id'    => 'nullable|exists:users,id',
+            'capacity'      => 'required|integer|min:1|max:30',
         ]);
 
-        Section::create($request->only('name', 'gradelevel_id', 'school_year_id', 'adviser_id', 'capacity'));
+        Section::create([
+            'name'           => $request->name,
+            'gradelevel_id'  => $request->gradelevel_id,
+            'school_year_id' => $currentSY->id,
+            'adviser_id'     => $request->adviser_id,
+            'capacity'       => $request->capacity ?? 30,
+        ]);
 
         $this->logActivity('Add Section', "Added section {$request->name}");
 
@@ -779,37 +787,52 @@ public function printForm138($studentId)
         $section = Section::findOrFail($id);
 
         $request->validate([
-            'name'           => 'required|string|max:100|unique:sections,name,' . $section->id,
-            'gradelevel_id'  => 'required|exists:grade_levels,id',
-            'school_year_id' => 'required|exists:school_years,id',
-            'adviser_id'     => 'nullable|exists:users,id',
-            'capacity'       => 'required|integer|min:10|max:100',
+            'name'          => 'required|string|max:100|unique:sections,name,' . $section->id,
+            'gradelevel_id' => 'required|exists:grade_levels,id',
+            'adviser_id'    => 'nullable|exists:users,id',
+            'capacity'      => 'required|integer|min:1|max:30',
         ]);
 
-        $section->update($request->only('name', 'gradelevel_id', 'school_year_id', 'adviser_id', 'capacity'));
+        $section->update([
+            'name'          => $request->name,
+            'gradelevel_id' => $request->gradelevel_id,
+            'adviser_id'    => $request->adviser_id,
+            'capacity'      => $request->capacity,
+        ]);
 
         $this->logActivity('Update Section', "Updated section {$section->name}");
 
         return back()->with('success', 'Section updated successfully.');
     }
 
-    public function destroySection($id)
+    public function archiveSection($id)
     {
         $section = Section::findOrFail($id);
-
-        if ($section->enrollments()->exists()) {
-            return back()->withErrors(['msg' => 'Cannot delete section with enrolled students.']);
-        }
-
-        $section->adviser_id = null;
-        $section->save();
-
-        $name = $section->name;
         $section->delete();
 
-        $this->logActivity('Delete Section', "Deleted section {$name}");
+        $this->logActivity('Archive Section', "Archived section {$section->name}");
 
-        return back()->with('success', 'Section deleted successfully.');
+        return back()->with('success', 'Section archived successfully.');
+    }
+
+    public function archivedSections()
+    {
+        $sections = Section::onlyTrashed()
+            ->with(['gradeLevel', 'schoolYear', 'adviser.profile'])
+            ->orderBy('deleted_at', 'desc')
+            ->paginate(10);
+
+        return view('registrars.sections_archived', compact('sections'));
+    }
+
+    public function restoreSection($id)
+    {
+        $section = Section::onlyTrashed()->findOrFail($id);
+        $section->restore();
+
+        $this->logActivity('Restore Section', "Restored section {$section->name}");
+
+        return redirect()->route('registrars.sections.archived')->with('success', 'Section restored successfully!');
     }
 
     public function sectionSubjects($id)
@@ -1268,6 +1291,7 @@ public function printForm138($studentId)
     public function subjects(Request $request)
     {
         $subjects = Subject::with('gradeLevel')
+            ->where('is_archived', false)
             ->when($request->filled('search'), function ($q) use ($request) {
                 $q->where('name', 'like', '%' . $request->search . '%');
             })
@@ -1326,13 +1350,41 @@ public function printForm138($studentId)
         return back()->with('success', 'Subject updated.');
     }
 
-    public function destroySubject($id)
+    public function archiveSubject($id)
     {
         $subject = Subject::findOrFail($id);
-        $subject->delete();
+        $subject->update(['is_archived' => true]);
 
-        $this->logActivity('Delete Subject', "Deleted subject {$subject->name}");
+        $this->logActivity('Archive Subject', "Archived subject {$subject->name}");
 
-        return back()->with('success', 'Subject deleted.');
+        return back()->with('success', 'Subject archived.');
+    }
+
+    public function archivedSubjects(Request $request)
+    {
+        $subjects = Subject::with('gradeLevel')
+            ->where('is_archived', true)
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%');
+            })
+            ->when($request->filled('grade_level_id'), function ($q) use ($request) {
+                $q->where('grade_level_id', $request->grade_level_id);
+            })
+            ->orderBy('grade_level_id')
+            ->paginate(10);
+
+        $gradeLevels = GradeLevel::all();
+
+        return view('registrars.subjects-archived', compact('subjects', 'gradeLevels'));
+    }
+
+    public function restoreSubject($id)
+    {
+        $subject = Subject::findOrFail($id);
+        $subject->update(['is_archived' => false]);
+
+        $this->logActivity('Restore Subject', "Restored subject {$subject->name}");
+
+        return back()->with('success', 'Subject restored successfully.');
     }
 }

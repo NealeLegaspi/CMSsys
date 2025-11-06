@@ -25,7 +25,7 @@
             <option value="closed" {{ request('status')=='closed'?'selected':'' }}>Closed</option>
           </select>
         </div>
-        <div class="col-md-4 d-flex gap-2">
+        <div class="col-md-3 d-flex gap-2">
           <button class="btn btn-outline-primary">
             <i class="bi bi-search"></i> Search
           </button>
@@ -33,9 +33,12 @@
             <i class="bi bi-arrow-clockwise"></i> Reset
           </a>
         </div>
-        <div class="col-md-2 d-flex justify-content-end">
+        <div class="col-md-3 d-flex justify-content-end gap-2">
+          <a href="{{ route('admins.schoolyear.archived') }}" class="btn btn-outline-dark">
+            <i class="bi bi-archive me-1"></i> Archived
+          </a>
           <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSchoolYearModal">
-            <i class="bi bi-plus-circle me-1"></i> Add School Year
+            <i class="bi bi-plus-circle me-1"></i> Add
           </button>
         </div>
       </form>
@@ -72,10 +75,10 @@
                       <i class="bi bi-pencil"></i>
                     </button>
 
-                    {{-- 🗑 Delete (only if closed) --}}
+                    {{-- 🗃 Archive (only if closed) --}}
                     @if($sy->status !== 'active')
-                      <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteSchoolYearModal{{ $sy->id }}">
-                        <i class="bi bi-trash"></i>
+                      <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#archiveSchoolYearModal{{ $sy->id }}">
+                        <i class="bi bi-archive"></i>
                       </button>
                     @endif
 
@@ -122,22 +125,24 @@
                 </div>
               </div>
 
-              {{-- 🔴 Delete Modal --}}
-              <div class="modal fade" id="deleteSchoolYearModal{{ $sy->id }}" tabindex="-1">
+              {{-- 🗃 Archive Modal --}}
+              <div class="modal fade" id="archiveSchoolYearModal{{ $sy->id }}" tabindex="-1">
                 <div class="modal-dialog">
-                  <form method="POST" action="{{ route('admins.schoolyear.destroy',$sy->id) }}">
+                  <form method="POST" action="{{ route('admins.schoolyear.archive',$sy->id) }}">
                     @csrf @method('DELETE')
                     <div class="modal-content">
                       <div class="modal-header bg-danger text-white">
-                        <h5 class="modal-title"><i class="bi bi-trash me-2"></i> Delete School Year</h5>
+                        <h5 class="modal-title"><i class="bi bi-archive me-2"></i> Archive School Year</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                       </div>
                       <div class="modal-body">
-                        Are you sure you want to delete <strong>{{ $sy->name ?? $sy->start_date.' - '.$sy->end_date }}</strong>?
+                        Are you sure you want to archive 
+                        <strong>{{ $sy->name ?? $sy->start_date.' - '.$sy->end_date }}</strong>?
+                        You can restore it anytime from the archived list.
                       </div>
                       <div class="modal-footer">
                         <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button class="btn btn-danger">Delete</button>
+                        <button class="btn btn-danger">Archive</button>
                       </div>
                     </div>
                   </form>

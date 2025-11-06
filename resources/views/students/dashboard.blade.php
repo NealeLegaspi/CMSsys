@@ -54,7 +54,7 @@
               {!! nl2br(e($a->content ?? 'No content available.')) !!}
             </p>
             <small class="text-secondary d-block">
-              <i class="bi bi-person-circle"></i> {{ e($a->user?->name ?? 'System') }}
+              <i class="bi bi-person-circle"></i> {{ e($a->user->role->name ?? 'System') }}: {{ e($a->user->profile->first_name ?? 'Unknown') }} {{ e($a->user->profile->last_name ?? 'Unknown') }}
               | <i class="bi bi-calendar3"></i> {{ $a->created_at?->format('M d, Y h:i A') ?? 'N/A' }}<br>
               <span class="badge bg-info text-dark mt-1">
                 {{ $a->section?->name ? 'Section: '.$a->section->name : 'All Sections' }}

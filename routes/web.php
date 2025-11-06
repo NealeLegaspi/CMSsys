@@ -74,6 +74,10 @@ Route::prefix('admin')->middleware(['auth', 'role:Admin'])->group(function () {
     Route::post('/schoolyear/{id}/close', [AdminController::class, 'closeSchoolYear'])->name('admins.schoolyear.close');
     Route::post('/schoolyears/{id}/activate', [AdminController::class, 'activateSchoolYear'])->name('admins.schoolyear.activate');
 
+    Route::delete('/schoolyear/{id}/archive', [App\Http\Controllers\AdminController::class, 'archiveSchoolYear'])->name('admins.schoolyear.archive');
+    Route::get('/schoolyear/archived', [App\Http\Controllers\AdminController::class, 'archivedSchoolYears'])->name('admins.schoolyear.archived');
+    Route::patch('/schoolyear/{id}/restore', [App\Http\Controllers\AdminController::class, 'restoreSchoolYear'])->name('admins.schoolyear.restore');
+
     Route::get('/student-records', [AdminController::class, 'studentRecords'])->name('admins.student-records');
 
     // Admin Student Records Export
@@ -118,9 +122,10 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
 
     Route::get('/sections', [RegistrarController::class, 'sections'])->name('registrars.sections');
     Route::post('/sections', [RegistrarController::class, 'storeSection'])->name('registrars.sections.store');
-    Route::get('/sections/{id}', [RegistrarController::class, 'showSection'])->name('registrars.sections.show');
     Route::put('/sections/{id}', [RegistrarController::class, 'updateSection'])->name('registrars.sections.update');
-    Route::delete('/sections/{id}', [RegistrarController::class, 'destroySection'])->name('registrars.sections.destroy');
+    Route::delete('/sections/{id}/archive', [App\Http\Controllers\RegistrarController::class, 'archiveSection'])->name('registrars.sections.archive');
+    Route::get('/sections/archived', [App\Http\Controllers\RegistrarController::class, 'archivedSections'])->name('registrars.sections.archived');
+    Route::put('/sections/{id}/restore', [App\Http\Controllers\RegistrarController::class, 'restoreSection'])->name('registrars.sections.restore');
 
     Route::get('/sections/{id}/subjects', [App\Http\Controllers\RegistrarController::class, 'sectionSubjects'])->name('registrars.sections.subjects');
     Route::post('/sections/{id}/subjects', [App\Http\Controllers\RegistrarController::class, 'storeSectionSubject'])->name('registrars.sections.subjects.store');
@@ -204,9 +209,10 @@ Route::get('/grades/export/pdf', [RegistrarController::class, 'exportGradesPDF']
 
     Route::get('/subjects', [RegistrarController::class, 'subjects'])->name('registrars.subjects');
     Route::post('/subjects', [RegistrarController::class, 'storeSubject'])->name('registrars.subjects.store');
-    Route::get('/subjects/{id}', [RegistrarController::class, 'showSubject'])->name('registrars.subjects.show');
     Route::put('/subjects/{id}', [RegistrarController::class, 'updateSubject'])->name('registrars.subjects.update');
-    Route::delete('/subjects/{id}', [RegistrarController::class, 'destroySubject'])->name('registrars.subjects.destroy');
+    Route::put('/subjects/{id}/archive', [RegistrarController::class, 'archiveSubject'])->name('registrars.subjects.archive');
+    Route::get('/subjects/archived', [RegistrarController::class, 'archivedSubjects'])->name('registrars.subjects.archived');
+    Route::put('/subjects/{id}/restore', [RegistrarController::class, 'restoreSubject'])->name('registrars.subjects.restore');
 });
 
 // -------------------- TEACHER ROUTES --------------------

@@ -18,7 +18,10 @@
         <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
         <a href="{{ route('registrars.sections') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Reset</a>
       </div>
-      <div class="col-md-6 d-flex justify-content-end">
+      <div class="col-md-6 d-flex justify-content-end gap-2">
+        <a href="{{ route('registrars.sections.archived') }}" class="btn btn-outline-dark me-2">
+          <i class="bi bi-archive"></i> View Archived
+        </a>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSectionModal">
           <i class="bi bi-plus-circle me-1"></i> Add Section
         </button>
@@ -50,19 +53,19 @@
               </td>
               <td>{{ $sec->capacity ?? '∞' }}</td>
               <td>{{ $sec->enrollments->count() }}</td>
-             <td>
+              <td>
                 <div class="d-flex justify-content-center gap-1">
-                <a href="{{ route('registrars.sections.subjects', ['id' => $sec->id]) }}" class="btn btn-sm btn-dark" title="Manage Subject Load">
-                    <i class="bi bi-journal-bookmark-fill"></i>
-                </a>
-                  <a href="{{ route('registrars.classlist', $sec->id) }}" class="btn btn-sm btn-info text-white">
+                  <a href="{{ route('registrars.sections.subjects', ['id' => $sec->id]) }}" class="btn btn-sm btn-dark" title="Manage Subject Load">
+                      <i class="bi bi-journal-bookmark-fill"></i>
+                  </a>
+                  <a href="{{ route('registrars.classlist', $sec->id) }}" class="btn btn-sm btn-info text-white" title="View Class List">
                     <i class="bi bi-people"></i>
                   </a>
                   <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editSectionModal{{ $sec->id }}">
                     <i class="bi bi-pencil"></i>
                   </button>
-                  <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteSectionModal{{ $sec->id }}">
-                    <i class="bi bi-trash"></i>
+                  <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#archiveSectionModal{{ $sec->id }}">
+                    <i class="bi bi-archive"></i>
                   </button>
                 </div>
               </td>
@@ -95,13 +98,7 @@
                       </div>
                       <div class="mb-3">
                         <label class="form-label">School Year</label>
-                        <select name="school_year_id" class="form-select" required>
-                          @foreach($schoolYears as $sy)
-                            <option value="{{ $sy->id }}" {{ $sec->school_year_id == $sy->id ? 'selected' : '' }}>
-                              {{ $sy->name }}
-                            </option>
-                          @endforeach
-                        </select>
+                        <input type="text" class="form-control" value="{{ $sec->schoolYear->name ?? 'N/A' }}" readonly>
                       </div>
                       <div class="mb-3">
                         <label class="form-label">Adviser</label>
@@ -115,8 +112,8 @@
                         </select>
                       </div>
                       <div class="mb-3">
-                        <label class="form-label">Capacity</label>
-                        <input type="number" name="capacity" value="{{ $sec->capacity }}" class="form-control" min="1">
+                        <label class="form-label">Capacity (Max: 30)</label>
+                        <input type="number" name="capacity" class="form-control" min="1" max="30" value="{{ $sec->capacity ?? 30 }}" required>
                       </div>
                     </div>
                     <div class="modal-footer">
@@ -128,27 +125,28 @@
               </div>
             </div>
 
-            <!-- Delete Confirmation Modal -->
-            <div class="modal fade" id="deleteSectionModal{{ $sec->id }}" tabindex="-1" aria-hidden="true">
+            <!-- Archive Confirmation Modal -->
+            <div class="modal fade" id="archiveSectionModal{{ $sec->id }}" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
-                  <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirm Deletion</h5>
+                  <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title"><i class="bi bi-archive me-2"></i>Archive Section</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                   </div>
                   <div class="modal-body text-center">
-                    <p>Are you sure you want to delete the section <strong class="text-danger">"{{ $sec->name }}"</strong>?</p>
+                    <p>Are you sure you want to archive the section <strong class="text-secondary">"{{ $sec->name }}"</strong>?</p>
                   </div>
                   <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <form action="{{ route('registrars.sections.destroy', $sec->id) }}" method="POST" class="d-inline">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form action="{{ route('registrars.sections.archive', $sec->id) }}" method="POST" class="d-inline">
                       @csrf @method('DELETE')
-                      <button type="submit" class="btn btn-danger">Delete</button>
+                      <button type="submit" class="btn btn-secondary">Archive</button>
                     </form>
                   </div>
                 </div>
               </div>
             </div>
+
           @empty
             <tr>
               <td colspan="7" class="text-center text-muted">No sections available.</td>
@@ -190,12 +188,8 @@
           </div>
           <div class="mb-3">
             <label class="form-label">School Year</label>
-            <select name="school_year_id" class="form-select" required>
-              <option value="">-- Select School Year --</option>
-              @foreach($schoolYears as $sy)
-                <option value="{{ $sy->id }}">{{ $sy->name }}</option>
-              @endforeach
-            </select>
+            <input type="text" class="form-control" value="{{ $currentSY->name ?? 'N/A' }}" readonly>
+            <input type="hidden" name="school_year_id" value="{{ $currentSY->id }}">
           </div>
           <div class="mb-3">
             <label class="form-label">Adviser</label>
@@ -209,8 +203,8 @@
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">Capacity</label>
-            <input type="number" name="capacity" class="form-control" min="1">
+            <label class="form-label">Capacity (Max: 30)</label>
+            <input type="number" name="capacity" class="form-control" min="1" max="30" value="30" required>
           </div>
         </div>
         <div class="modal-footer">
@@ -221,5 +215,4 @@
     </form>
   </div>
 </div>
-
 @endsection
