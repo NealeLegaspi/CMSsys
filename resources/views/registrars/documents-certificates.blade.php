@@ -26,7 +26,11 @@
         <div class="tab-content" id="documentCertTabsContent">
 
             <div class="tab-pane fade show active" id="documents-pane" role="tabpanel" aria-labelledby="documents-tab" tabindex="0">
-                
+
+                @php
+                    $syClosed = !$currentSY; // true if no active school year
+                @endphp
+
                 <form method="GET" action="{{ route('registrars.documents.all') }}" class="row g-2 mb-3">
                     <div class="col-md-4">
                         <input type="text" name="search" class="form-control" placeholder="Search by student name..." value="{{ request('search') }}">
@@ -35,7 +39,20 @@
                         <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
                         <a href="{{ route('registrars.documents.all') }}?tab=documents" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Reset</a>
                     </div>
+                    <div class="col-md-5 d-flex justify-content-end">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal"
+                            @if($syClosed) disabled title="Cannot upload document. No active school year." @endif>
+                            <i class="bi bi-plus-circle me-1"></i> Upload Document
+                        </button>
+                    </div>
                 </form>
+
+                @if($syClosed)
+                    <div class="alert alert-warning mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Cannot upload or manage documents because there is no active school year.
+                    </div>
+                @endif
 
                 <div class="table-responsive">
                     <table class="table table-bordered table-striped align-middle">
@@ -80,13 +97,15 @@
                                     <td>
                                         {{-- Verify Button --}}
                                         @if($doc->status !== 'Verified')
-                                            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#verifyModal{{ $doc->id }}">
+                                            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#verifyModal{{ $doc->id }}"
+                                                @if($syClosed) disabled title="Cannot verify. No active school year." @endif>
                                                 <i class="bi bi-check-circle"></i>
                                             </button>
                                         @endif
 
                                         {{-- Delete Button --}}
-                                        <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteDocModal{{ $doc->id }}">
+                                        <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteDocModal{{ $doc->id }}"
+                                            @if($syClosed) disabled title="Cannot delete. No active school year." @endif>
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </td>
@@ -113,7 +132,7 @@
                                                 <form action="{{ route('registrars.documents.verify', $doc->id) }}" method="POST" class="d-inline">
                                                     @csrf
                                                     @method('PUT')
-                                                    <button class="btn btn-success">Verify</button>
+                                                    <button class="btn btn-success" @if($syClosed) disabled @endif>Verify</button>
                                                 </form>
                                             </div>
                                         </div>
@@ -141,7 +160,7 @@
                                                 <form action="{{ route('registrars.documents.destroy', $doc->id) }}" method="POST" class="d-inline">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button class="btn btn-danger">Delete</button>
+                                                    <button class="btn btn-danger" @if($syClosed) disabled @endif>Delete</button>
                                                 </form>
                                             </div>
                                         </div>
@@ -158,11 +177,55 @@
                 <div class="d-flex justify-content-end">
                     {{ $documents->links('pagination::bootstrap-5') }}
                 </div>
-
             </div>
 
+            <!-- Upload Document Modal -->
+            <div class="modal fade" id="uploadDocumentModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <form method="POST" action="{{ route('registrars.documents.store', 0) }}" enctype="multipart/form-data">
+                        @csrf
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title"><i class="bi bi-file-earmark-text me-2"></i> Upload Document</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Student</label>
+                                    <select name="student_id" class="form-select" required @if($syClosed) disabled @endif>
+                                        <option value="">-- Select Student --</option>
+                                        @foreach($students as $s)
+                                            <option value="{{ $s->id }}">
+                                                {{ $s->user->profile->last_name }}, {{ $s->user->profile->first_name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Document Type</label>
+                                    <input type="text" name="type" class="form-control" required @if($syClosed) disabled @endif>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">File</label>
+                                    <input type="file" name="file" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required @if($syClosed) disabled @endif>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button class="btn btn-primary" @if($syClosed) disabled @endif>Upload</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+
             <div class="tab-pane fade" id="certificates-pane" role="tabpanel" aria-labelledby="certificates-tab" tabindex="0">
-                
+
+                @php
+                    $syClosed = !$currentSY; // true if no active school year
+                @endphp
+
                 <form method="GET" action="{{ route('registrars.certificates') }}" class="row g-2 mb-3">
                     <div class="col-md-4">
                         <input type="text" name="search" class="form-control" placeholder="Search by student name..." value="{{ request('search') }}">
@@ -172,11 +235,19 @@
                         <a href="{{ route('registrars.certificates') }}?tab=certificates" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Reset</a>
                     </div>
                     <div class="col-md-5 d-flex justify-content-end">
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#issueCertificateModal">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#issueCertificateModal"
+                            @if($syClosed) disabled title="Cannot issue certificate. No active school year." @endif>
                             <i class="bi bi-plus-circle me-1"></i> Issue Certificate
                         </button>
                     </div>
                 </form>
+
+                @if($syClosed)
+                    <div class="alert alert-warning mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Cannot issue certificates because there is no active school year.
+                    </div>
+                @endif
 
                 <div class="table-responsive">
                     <table class="table table-bordered align-middle">
@@ -233,7 +304,8 @@
                                             <div class="modal-footer">
                                                 <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                                 <form action="{{ route('registrars.certificates.destroy', $cert->id) }}" method="POST" class="d-inline">
-                                                    @csrf @method('DELETE')
+                                                    @csrf
+                                                    @method('DELETE')
                                                     <button type="submit" class="btn btn-danger">Delete</button>
                                                 </form>
                                             </div>
@@ -256,6 +328,7 @@
     </div>
 </div>
 
+<!-- Issue Certificate Modal -->
 <div class="modal fade" id="issueCertificateModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <form method="POST" action="{{ route('registrars.certificates.store') }}">
@@ -268,7 +341,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Student</label>
-                        <select name="student_id" class="form-select" required>
+                        <select name="student_id" class="form-select" required @if($syClosed) disabled @endif>
                             <option value="">-- Select Student --</option>
                             @foreach($students as $s)
                                 <option value="{{ $s->id }}">
@@ -279,7 +352,7 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Certificate Type</label>
-                        <select name="type" class="form-select" required>
+                        <select name="type" class="form-select" required @if($syClosed) disabled @endif>
                             <option value="">-- Select Type --</option>
                             <option value="Enrollment">Certificate of Enrollment</option>
                             <option value="Good Moral">Certificate of Good Moral Character</option>
@@ -288,12 +361,12 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Purpose / Remarks (optional)</label>
-                        <input type="text" name="purpose" class="form-control" placeholder="For employment, transfer, etc.">
+                        <input type="text" name="purpose" class="form-control" placeholder="For employment, transfer, etc." @if($syClosed) disabled @endif>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary">Issue</button>
+                    <button class="btn btn-primary" @if($syClosed) disabled @endif>Issue</button>
                 </div>
             </div>
         </form>

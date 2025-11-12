@@ -6,6 +6,10 @@
 @endsection
 
 @section('content')
+@php
+    $syClosed = !$currentSY; // true if no active school year
+@endphp
+
 <div class="card card-custom shadow-sm border-0">
   <div class="card-body">
     @include('partials.alerts')
@@ -27,6 +31,13 @@
         {{ strtoupper($assignment->grade_status ?? 'DRAFT') }}
       </span>
     </div>
+
+    @if($syClosed)
+      <div class="alert alert-warning mb-4">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        Cannot approve or return grades because there is no active school year.
+      </div>
+    @endif
 
     <!-- Grades Table -->
     <div class="table-responsive mb-4">
@@ -91,12 +102,15 @@
 
     <!-- Action Buttons -->
     <div class="d-flex justify-content-end gap-2">
-      <button type="button" class="btn btn-outline-warning px-4" data-bs-toggle="modal" data-bs-target="#returnModal">
+      <button type="button" class="btn btn-outline-warning px-4" data-bs-toggle="modal" data-bs-target="#returnModal"
+        @if($syClosed) disabled title="Cannot return grades. No active school year." @endif>
         <i class="bi bi-arrow-counterclockwise me-1"></i> Return to Teacher
       </button>
-        <button type="button" class="btn btn-outline-success px-4" data-bs-toggle="modal" data-bs-target="#approveModal">
-          <i class="bi bi-check-circle me-1"></i> Approve Grades
-        </button>
+
+      <button type="button" class="btn btn-outline-success px-4" data-bs-toggle="modal" data-bs-target="#approveModal"
+        @if($syClosed) disabled title="Cannot approve grades. No active school year." @endif>
+        <i class="bi bi-check-circle me-1"></i> Approve Grades
+      </button>
     </div>
   </div>
 </div>
@@ -120,7 +134,7 @@
           @csrf
           @method('PUT')
           <input type="hidden" name="status" value="returned">
-          <button type="submit" class="btn btn-warning">Confirm</button>
+          <button type="submit" class="btn btn-warning" @if($syClosed) disabled @endif>Confirm</button>
         </form>
       </div>
     </div>
@@ -146,7 +160,7 @@
           @csrf
           @method('PUT')
           <input type="hidden" name="status" value="approved">
-          <button type="submit" class="btn btn-success">Confirm</button>
+          <button type="submit" class="btn btn-success" @if($syClosed) disabled @endif>Confirm</button>
         </form>
       </div>
     </div>

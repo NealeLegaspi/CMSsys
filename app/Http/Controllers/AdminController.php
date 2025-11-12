@@ -635,22 +635,33 @@ class AdminController extends Controller
     {
         $sy = SchoolYear::findOrFail($id);
 
+        if ($sy->status === 'active') {
+            return back()->with('info', "{$sy->name} is already active.");
+        }
+
         SchoolYear::where('status', 'active')->update(['status' => 'closed']);
 
         $sy->update(['status' => 'active']);
 
-        Enrollment::where('school_year_id', '!=', $sy->id)->where('status', 'Enrolled')->update(['status' => 'Inactive']);
+        Enrollment::where('school_year_id', '!=', $sy->id)
+            ->where('status', 'Enrolled')
+            ->update(['status' => 'Inactive']);
 
-        Enrollment::where('school_year_id', $sy->id)->whereIn('status', ['Inactive', 'Pending'])->update(['status' => 'Enrolled']);
+        Enrollment::where('school_year_id', $sy->id)
+            ->whereIn('status', ['Inactive', 'Pending'])
+            ->update(['status' => 'Enrolled']);
 
         $this->logActivity(
-        'Activate School Year',
-        "Activated school year {$sy->name}, reactivated its enrollments, and inactivated previous years.");
+            'Activate School Year',
+            "Activated school year {$sy->name}, reactivated its enrollments, and inactivated previous years."
+        );
 
         return back()->with(
-        'success',
-        "School year {$sy->name} is now active. Related enrollments have been updated accordingly.");
+            'success',
+            "School year {$sy->name} is now active. Related enrollments have been updated."
+        );
     }
+
 
     public function updateSchoolYear(Request $request, $id)
     {
@@ -686,12 +697,20 @@ class AdminController extends Controller
     public function closeSchoolYear($id)
     {
         $sy = SchoolYear::findOrFail($id);
-        SchoolYear::where('status', 'active')->update(['status' => 'closed']);
-        $sy->update(['status' => 'active']);
 
-        $this->logActivity('Change Active School Year', "Changed active school year to {$sy->name}");
+        if ($sy->status !== 'active') {
+            return back()->with('error', 'Only the active school year can be closed.');
+        }
 
-        return back()->with('success', 'Active school year updated.');
+        $sy->update(['status' => 'closed']);
+
+        Enrollment::where('school_year_id', $sy->id)
+            ->where('status', 'Enrolled')
+            ->update(['status' => 'Inactive']);
+
+        $this->logActivity('Close School Year', "Closed school year {$sy->name}");
+
+        return back()->with('success', 'School year closed successfully.');
     }
 
     public function archivedSchoolYears(Request $request)

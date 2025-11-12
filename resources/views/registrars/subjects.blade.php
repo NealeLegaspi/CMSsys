@@ -6,6 +6,10 @@
 @endsection
 
 @section('content')
+@php
+    $syClosed = !$currentSY; // true if no active school year
+@endphp
+
 <div class="container-fluid my-4">
   <div class="card shadow-sm border-0">
     <div class="card-body">
@@ -40,7 +44,8 @@
           <a href="{{ route('registrars.subjects.archived') }}" class="btn btn-outline-dark">
             <i class="bi bi-archive"></i> View Archived
           </a>
-          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSubjectModal"
+              @if($syClosed) disabled title="Cannot add subjects. No active school year." @endif>
             <i class="bi bi-plus-circle me-1"></i> Add Subject
           </button>
         </div>
@@ -65,18 +70,21 @@
               <td>{{ $subj->gradeLevel->name ?? '-' }}</td>
               <td>
                 <div class="d-flex justify-content-center gap-2 flex-wrap">
+
                   {{-- ✏ Edit --}}
                   <button 
                     class="btn btn-sm btn-warning" 
                     data-bs-toggle="modal" 
-                    data-bs-target="#editSubjectModal{{ $subj->id }}">
+                    data-bs-target="#editSubjectModal{{ $subj->id }}"
+                    @if($syClosed) disabled title="Cannot edit subjects. SY is closed." @endif>
                     <i class="bi bi-pencil"></i>
                   </button>
 
                   {{-- 🗄 Archive --}}
                   <form id="archiveForm{{ $subj->id }}" action="{{ route('registrars.subjects.archive', $subj->id) }}" method="POST" style="display:inline;">
                     @csrf @method('PUT')
-                    <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#archiveModal{{ $subj->id }}">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#archiveModal{{ $subj->id }}"
+                      @if($syClosed) disabled title="Cannot archive subjects. SY is closed." @endif>
                       <i class="bi bi-archive"></i>
                     </button>
                   </form>
@@ -104,6 +112,7 @@
                       </div>
                     </div>
                   </div>
+
                 </div>
               </td>
             </tr>
@@ -121,11 +130,13 @@
                     <div class="modal-body">
                       <div class="mb-3">
                         <label class="form-label">Subject Name</label>
-                        <input type="text" name="name" value="{{ $subj->name }}" class="form-control" required>
+                        <input type="text" name="name" value="{{ $subj->name }}" class="form-control" required
+                          @if($syClosed) disabled @endif>
                       </div>
                       <div class="mb-3">
                         <label class="form-label">Grade Level</label>
-                        <select name="grade_level_id" class="form-select" required>
+                        <select name="grade_level_id" class="form-select" required
+                          @if($syClosed) disabled @endif>
                           <option value="">-- Select Grade Level --</option>
                           @foreach($gradeLevels as $gl)
                             <option value="{{ $gl->id }}" {{ $gl->id == $subj->grade_level_id ? 'selected' : '' }}>
@@ -137,7 +148,7 @@
                     </div>
                     <div class="modal-footer">
                       <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                      <button class="btn btn-warning">Update</button>
+                      <button class="btn btn-warning" @if($syClosed) disabled @endif>Update</button>
                     </div>
                   </div>
                 </form>
@@ -176,11 +187,12 @@
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">Subject Name</label>
-            <input type="text" name="name" value="{{ old('name') }}" class="form-control" required>
+            <input type="text" name="name" value="{{ old('name') }}" class="form-control" required
+              @if($syClosed) disabled @endif>
           </div>
           <div class="mb-3">
             <label class="form-label">Grade Level</label>
-            <select name="grade_level_id" class="form-select" required>
+            <select name="grade_level_id" class="form-select" required @if($syClosed) disabled @endif>
               <option value="">-- Select Grade Level --</option>
               @foreach($gradeLevels as $gl)
                 <option value="{{ $gl->id }}">{{ $gl->name }}</option>
@@ -190,7 +202,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button class="btn btn-primary">Save</button>
+          <button class="btn btn-primary" @if($syClosed) disabled @endif>Save</button>
         </div>
       </div>
     </form>

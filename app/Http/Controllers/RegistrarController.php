@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\StudentsExport;
 use App\Imports\StudentsImport;
@@ -280,13 +282,15 @@ public function printForm138($studentId)
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->whereHas('student.user.profile', function ($q) use ($search) {
-                $q->where('first_name', 'like', "%$search%")
-                ->orWhere('last_name', 'like', "%$search%");
-            })->orWhereHas('student', function ($q) use ($search) {
-                $q->where('student_number', 'like', "%$search%"); 
-            })->orWhereHas('section', function ($q) use ($search) {
-                $q->where('name', 'like', "%$search%");
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('student.user.profile', function ($q2) use ($search) {
+                    $q2->where('first_name', 'like', "%$search%")
+                       ->orWhere('last_name', 'like', "%$search%");
+                })->orWhereHas('student', function ($q2) use ($search) {
+                    $q2->where('student_number', 'like', "%$search%");
+                })->orWhereHas('section', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%$search%");
+                });
             });
         }
 
@@ -296,20 +300,20 @@ public function printForm138($studentId)
         
         $enrollments = $query->latest()->paginate(10);
 
-        return view('registrars.enrollment', compact('students', 'sections', 'schoolYears', 'enrollments'));
+        return view('registrars.enrollment', compact('students', 'sections', 'schoolYears', 'enrollments', 'activeSY'));
     }
 
     public function storeEnrollment(Request $request)
     {
+        $activeSY = SchoolYear::where('status', 'active')->first();
+        if (!$activeSY) {
+            return back()->withErrors(['school_year' => 'No active school year. Actions are disabled.']);
+        }
+
         $request->validate([
             'student_id' => 'required|exists:students,id',
             'section_id' => 'required|exists:sections,id',
         ]);
-
-        $activeSY = SchoolYear::where('status', 'active')->first();
-        if (!$activeSY) {
-            return back()->withErrors(['school_year' => 'No active school year found.']);
-        }
 
         $exists = Enrollment::where('student_id', $request->student_id)
             ->where('school_year_id', $activeSY->id)
@@ -336,9 +340,8 @@ public function printForm138($studentId)
         ]);
 
         Student::where('id', $request->student_id)->update(['section_id' => $request->section_id]);
-
         $studentName = $enrollment->student->user->profile->full_name ?? 'N/A';
-        $this->logActivity('Enroll Student', "Enrolled student {$studentName} ({$request->student_id}) in section {$section->name}");
+        $this->logActivity('Enroll Student', "Enrolled student {$studentName}");
 
         return back()->with('success', 'Student enrolled successfully!');
     }
@@ -346,11 +349,19 @@ public function printForm138($studentId)
     public function updateEnrollment(Request $request, $id)
     {
         $enrollment = Enrollment::findOrFail($id);
+        $activeSY = SchoolYear::where('status', 'active')->first();
+        if (!$activeSY) {
+            return back()->with('error', 'Cannot modify records. No active school year.');
+        }
 
         $request->validate([
             'section_id' => 'required|exists:sections,id',
             'school_year_id' => 'required|exists:school_years,id',
         ]);
+
+        if ($request->school_year_id != $activeSY->id) {
+            return back()->with('error', 'This school year is closed. No updates allowed.');
+        }
 
         $exists = Enrollment::where('student_id', $enrollment->student_id)
             ->where('school_year_id', $request->school_year_id)
@@ -385,6 +396,11 @@ public function printForm138($studentId)
 
     public function destroyEnrollment($id)
     {
+        $activeSY = SchoolYear::where('status', 'active')->first();
+        if (!$activeSY) {
+            return back()->with('error', 'Cannot delete records. School year is closed.');
+        }
+
         $enrollment = Enrollment::findOrFail($id);
         $enrollment->delete();
 
@@ -404,13 +420,18 @@ public function printForm138($studentId)
         return back()->with('success', 'Enrollment verified successfully.');
     }
 
-        public function exportCsv()
+    public function exportCsv()
     {
         return Excel::download(new EnrollmentsExport, 'enrollments.csv');
     }
 
     public function addStudent(Request $request)
     {
+        $currentSchoolYear = SchoolYear::where('status', 'active')->first();
+        if (!$currentSchoolYear) {
+            return back()->withErrors(['school_year' => 'No active school year found or all are closed. Actions are disabled.']);
+        }
+
         $request->validate([
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
@@ -422,11 +443,6 @@ public function printForm138($studentId)
             'address' => 'required|string|max:255',
             'section_id' => 'required|exists:sections,id',
         ]);
-
-        $currentSchoolYear = SchoolYear::where('status', 'active')->first();
-        if (!$currentSchoolYear) {
-            return back()->withErrors(['school_year' => 'No active school year found. Please set one first.']);
-        }
 
         $baseCode = '400655';
         $lastStudent = Student::orderBy('id', 'desc')->first();
@@ -476,7 +492,6 @@ public function printForm138($studentId)
         return back()->with('success', 'Student successfully added and enrolled! Student Number: ' . $studentNumber);
     }
 
-
     public function exportPdf()
     {
         $enrollments = Enrollment::with(['student.user.profile', 'section', 'schoolYear'])->get();
@@ -492,8 +507,9 @@ public function printForm138($studentId)
      */
     public function documentsAndCertificates(Request $request)
     {
-        $documentQuery = StudentDocument::with(['student.user.profile'])->latest();
+        $currentSY = SchoolYear::where('status', 'active')->first();
 
+        $documentQuery = StudentDocument::with(['student.user.profile'])->latest();
         if ($request->filled('search') && $request->input('tab') !== 'certificates') {
             $search = $request->search;
             $documentQuery->whereHas('student.user.profile', function ($q) use ($search) {
@@ -501,12 +517,10 @@ public function printForm138($studentId)
                 ->orWhere('last_name', 'like', "%{$search}%");
             });
         }
-
         $documents = $documentQuery->paginate(10, ['*'], 'doc_page')->withQueryString();
 
         $certificateQuery = StudentCertificate::with(['student.user.profile'])->latest();
-        $students = Student::with('user.profile')->get(); 
-
+        $students = Student::with('user.profile')->get();
         if ($request->filled('search') && $request->input('tab') === 'certificates') {
             $search = $request->search;
             $certificateQuery->whereHas('student.user.profile', function ($q) use ($search) {
@@ -514,10 +528,9 @@ public function printForm138($studentId)
                 ->orWhere('last_name', 'like', "%{$search}%");
             });
         }
-
         $certificates = $certificateQuery->paginate(10, ['*'], 'cert_page')->withQueryString();
 
-        return view('registrars.documents-certificates', compact('documents', 'certificates', 'students'));
+        return view('registrars.documents-certificates', compact('documents', 'certificates', 'students', 'currentSY'));
     }
 
     public function storeDocument(Request $request, $studentId)
@@ -644,14 +657,20 @@ public function printForm138($studentId)
             }])
             ->get();
 
-        return view('registrars.grade-view', compact('assignment', 'subject', 'section', 'students'));
+        $currentSY = SchoolYear::where('status', 'active')->first();
+
+        return view('registrars.grade-view', compact('assignment', 'subject', 'section', 'students', 'currentSY'));
     }
 
 
     public function updateStatus(Request $request, $id)
     {
-        $assignment = DB::table('subject_assignments')->where('id', $id)->first();
+        $currentSY = SchoolYear::where('status', 'active')->first();
+        if (!$currentSY) {
+            return back()->with('error', 'Cannot perform this action. No active school year.');
+        }
 
+        $assignment = DB::table('subject_assignments')->where('id', $id)->first();
         if (!$assignment) {
             return back()->with('error', 'Assignment not found.');
         }
@@ -675,7 +694,6 @@ public function printForm138($studentId)
                 return back()->with('error', 'Cannot approve. No grades submitted for this quarter.');
             }
 
-            // ✅ Lock only grades of this quarter
             DB::table('grades')
                 ->where('subject_id', $assignment->subject_id)
                 ->where('quarter', $currentQuarter)
@@ -684,7 +702,6 @@ public function printForm138($studentId)
                 })
                 ->update(['locked' => true]);
 
-            // ✅ Update only the status for this quarter, not overall subject
             DB::table('subject_assignments')
                 ->where('id', $id)
                 ->update([
@@ -695,9 +712,6 @@ public function printForm138($studentId)
             $this->logActivity('Approve Grades', "Approved {$currentQuarter} quarter grades for assignment #{$id}.");
             $message = "Quarter {$currentQuarter} grades approved successfully!";
         } else {
-            // Return to teacher (unlock current quarter)
-            $currentQuarter = SystemHelper::getActiveQuarter();
-
             DB::table('grades')
                 ->where('subject_id', $assignment->subject_id)
                 ->where('quarter', $currentQuarter)
@@ -720,13 +734,16 @@ public function printForm138($studentId)
         return back()->with('success', $message);
     }
 
+    public function returnGrades($assignment_id)
+    {
+        $currentSY = SchoolYear::where('status', 'active')->first();
+        if (!$currentSY) {
+            return back()->with('error', 'Cannot perform this action. No active school year.');
+        }
 
-        public function returnGrades($assignment_id)
-        {
-            $assignment = DB::table('subject_assignments')->where('id', $assignment_id)->first();
-
-            if (!$assignment) {
-                return back()->with('error', 'Assignment not found.');
+        $assignment = DB::table('subject_assignments')->where('id', $assignment_id)->first();
+        if (!$assignment) {
+            return back()->with('error', 'Assignment not found.');
         }
 
         DB::table('subject_assignments')
@@ -741,10 +758,13 @@ public function printForm138($studentId)
         return back()->with('info', 'Grades returned to teacher for revision.');
     }
 
+
     public function quarterSettings()
     {
+        $currentSY = SchoolYear::where('status', 'active')->first();
         $activeQuarter = SystemHelper::getActiveQuarter();
-        return view('registrars.quarter-settings', compact('activeQuarter'));
+
+        return view('registrars.quarter-settings', compact('activeQuarter', 'currentSY'));
     }
 
     public function updateQuarter(Request $request)
@@ -765,28 +785,53 @@ public function printForm138($studentId)
     {
         $currentSY = SchoolYear::where('status', 'active')->first();
 
+        $gradeLevels = GradeLevel::all();
+        $teachers    = User::where('role_id', 3)->with('profile')->get();
+        $subjects    = Subject::with('gradeLevel')->orderBy('grade_level_id')->orderBy('name')->get();
+
         if (!$currentSY) {
-            return back()->withErrors(['msg' => 'No active school year found. Please set one as active first.']);
+            $emptyCollection = collect([]);
+            $page = LengthAwarePaginator::resolveCurrentPage();
+            $perPage = 10;
+            $paginator = new LengthAwarePaginator(
+                $emptyCollection->forPage($page, $perPage),
+                $emptyCollection->count(),
+                $perPage,
+                $page,
+                ['path' => LengthAwarePaginator::resolveCurrentPath()]
+            );
+
+            return view('registrars.sections', [
+                'sections'    => $paginator,
+                'gradeLevels' => $gradeLevels,
+                'teachers'    => $teachers,
+                'subjects'    => $subjects,
+                'currentSY'   => null,
+            ]);
         }
 
         $query = Section::with(['gradeLevel', 'schoolYear', 'adviser.profile'])
                         ->where('school_year_id', $currentSY->id);
 
         if ($request->filled('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
+            $query->where(function($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->search . '%')
+                ->orWhereHas('adviser.profile', function($sub) use ($request) {
+                    $sub->where('first_name', 'like', '%' . $request->search . '%')
+                        ->orWhere('last_name', 'like', '%' . $request->search . '%');
+                });
+            });
         }
 
         if ($request->filled('gradelevel_id')) {
             $query->where('gradelevel_id', $request->gradelevel_id);
         }
 
-        $sections    = $query->paginate(10)->withQueryString();
-        $gradeLevels = GradeLevel::all();
-        $teachers    = User::where('role_id', 3)->with('profile')->get();
-        $subjects    = Subject::with('gradeLevel')->orderBy('grade_level_id')->orderBy('name')->get();
+        $sections = $query->paginate(10)->withQueryString();
 
         return view('registrars.sections', compact('sections', 'gradeLevels', 'teachers', 'subjects', 'currentSY'));
     }
+
 
     public function storeSection(Request $request)
     {
@@ -960,10 +1005,8 @@ public function printForm138($studentId)
             'purpose' => 'nullable|string|max:255',
         ]);
 
-        // Load student with profile directly via hasOneThrough
         $student = Student::with('profile')->findOrFail($request->student_id);
 
-        // Ensure profile exists
         if (!$student->profile) {
             return back()->with('error', 'This student has no linked user profile.');
         }
@@ -976,12 +1019,10 @@ public function printForm138($studentId)
             'issued_by' => Auth::id(),
         ]);
 
-        // Get registrar (issuer) name
         $issuer = Auth::user();
         $registrarName = trim(optional($issuer->profile)->first_name . ' ' . optional($issuer->profile)->last_name);
         $registrarName = $registrarName ?: 'The Registrar';
 
-        // Generate PDF
         $pdf = PDF::loadView('exports.certificates.completion', [
             'student' => $student,
             'certificate' => $certificate,
@@ -1318,47 +1359,61 @@ public function printForm138($studentId)
         return back()->with('success', 'Password changed successfully!');
     }
 
+    protected function getCurrentSY()
+    {
+        return SchoolYear::where('status', 'active')->first();
+    }
+
     public function subjects(Request $request)
     {
+        $currentSY = SchoolYear::where('status', 'active')->first();
+
         $subjects = Subject::with('gradeLevel')
             ->where('is_archived', false)
-            ->when($request->filled('search'), function ($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search . '%');
-            })
-            ->when($request->filled('grade_level_id'), function ($q) use ($request) {
-                $q->where('grade_level_id', $request->grade_level_id);
-            })
+            ->when($request->filled('search'), fn($q) => $q->where('name', 'like', '%' . $request->search . '%'))
+            ->when($request->filled('grade_level_id'), fn($q) => $q->where('grade_level_id', $request->grade_level_id))
             ->orderBy('grade_level_id')
             ->paginate(10);
 
         $gradeLevels = GradeLevel::all();
 
-        return view('registrars.subjects', compact('subjects', 'gradeLevels'));
+        return view('registrars.subjects', compact('subjects', 'gradeLevels', 'currentSY'));
     }
 
     public function storeSubject(Request $request)
     {
+        $currentSY = $this->getCurrentSY();
+        if (!$currentSY) {
+            return back()->withErrors(['msg' => 'Cannot add subjects. No active school year.']);
+        }
+
         $request->validate([
             'name' => [
                 'required',
                 'string',
                 'max:100',
-                Rule::unique('subjects')->where(function ($q) use ($request) {
-                    return $q->where('grade_level_id', $request->grade_level_id);
-                }),
+                Rule::unique('subjects')->where(fn($q) => $q->where('grade_level_id', $request->grade_level_id)),
             ],
             'grade_level_id' => 'required|exists:grade_levels,id',
         ]);
 
-        Subject::create($request->only('name', 'grade_level_id'));
+        Subject::create([
+            'name' => $request->name,
+            'grade_level_id' => $request->grade_level_id,
+            'school_year_id' => $currentSY->id, // optional, if your Subject model has this
+        ]);
 
         $this->logActivity('Add Subject', "Added subject {$request->name}");
-
         return back()->with('success', 'Subject added.');
     }
 
     public function updateSubject(Request $request, $id)
     {
+        $currentSY = $this->getCurrentSY();
+        if (!$currentSY) {
+            return back()->withErrors(['msg' => 'Cannot edit subjects. SY is closed.']);
+        }
+
         $subject = Subject::findOrFail($id);
 
         $request->validate([
@@ -1366,29 +1421,33 @@ public function printForm138($studentId)
                 'required',
                 'string',
                 'max:100',
-                Rule::unique('subjects')->where(function ($q) use ($request) {
-                    return $q->where('grade_level_id', $request->grade_level_id);
-                })->ignore($subject->id),
+                Rule::unique('subjects')->where(fn($q) => $q->where('grade_level_id', $request->grade_level_id))->ignore($subject->id),
             ],
             'grade_level_id' => 'required|exists:grade_levels,id',
         ]);
 
-        $subject->update($request->only('name', 'grade_level_id'));
+        $subject->update([
+            'name' => $request->name,
+            'grade_level_id' => $request->grade_level_id,
+        ]);
 
         $this->logActivity('Update Subject', "Updated subject {$subject->name}");
-
         return back()->with('success', 'Subject updated.');
     }
 
     public function archiveSubject($id)
     {
+        $currentSY = $this->getCurrentSY();
+        if (!$currentSY) {
+            return back()->withErrors(['msg' => 'Cannot archive subjects. SY is closed.']);
+        }
+
         $subject = Subject::findOrFail($id);
         $subject->update(['is_archived' => true]);
 
         $this->logActivity('Archive Subject', "Archived subject {$subject->name}");
-
         return back()->with('success', 'Subject archived.');
-    }
+}
 
     public function archivedSubjects(Request $request)
     {

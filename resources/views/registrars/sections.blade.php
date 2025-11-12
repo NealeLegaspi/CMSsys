@@ -10,9 +10,22 @@
   <div class="card-body">
     @include('partials.alerts')
 
+    {{-- Alert for Closed or Missing School Year --}}
+    @if(!$currentSY || $currentSY->status !== 'active')
+      <div class="alert alert-warning d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <div>
+          <strong>Note:</strong> No active school year detected.
+          All management actions are disabled until a school year is activated.
+        </div>
+      </div>
+    @endif
+
     <form method="GET" action="{{ route('registrars.sections') }}" class="row g-2 mb-3">
       <div class="col-md-4">
-        <input type="text" name="search" class="form-control" placeholder="Search section or adviser..." value="{{ request('search') }}">
+        <input type="text" name="search" class="form-control"
+               placeholder="Search section or adviser..."
+               value="{{ request('search') }}">
       </div>
       <div class="col-md-2">
         <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
@@ -22,7 +35,11 @@
         <a href="{{ route('registrars.sections.archived') }}" class="btn btn-outline-dark me-2">
           <i class="bi bi-archive"></i> View Archived
         </a>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSectionModal">
+
+        {{-- Add Section Button (Disabled if no active SY) --}}
+        <button type="button" class="btn btn-primary"
+                data-bs-toggle="modal" data-bs-target="#addSectionModal"
+                {{ (!$currentSY || $currentSY->status !== 'active') ? 'disabled' : '' }}>
           <i class="bi bi-plus-circle me-1"></i> Add Section
         </button>
       </div>
@@ -55,23 +72,38 @@
               <td>{{ $sec->enrollments->count() }}</td>
               <td>
                 <div class="d-flex justify-content-center gap-1">
-                  <a href="{{ route('registrars.sections.subjects', ['id' => $sec->id]) }}" class="btn btn-sm btn-dark" title="Manage Subject Load">
-                      <i class="bi bi-journal-bookmark-fill"></i>
+                  {{-- Manage Subjects --}}
+                  <a href="{{ route('registrars.sections.subjects', ['id' => $sec->id]) }}"
+                     class="btn btn-sm btn-dark {{ (!$currentSY || $currentSY->status !== 'active') ? 'disabled' : '' }}"
+                     title="Manage Subject Load">
+                    <i class="bi bi-journal-bookmark-fill"></i>
                   </a>
-                  <a href="{{ route('registrars.classlist', $sec->id) }}" class="btn btn-sm btn-info text-white" title="View Class List">
+
+                  {{-- View Class List (Still enabled even if closed) --}}
+                  <a href="{{ route('registrars.classlist', $sec->id) }}"
+                     class="btn btn-sm btn-info text-white"
+                     title="View Class List">
                     <i class="bi bi-people"></i>
                   </a>
-                  <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editSectionModal{{ $sec->id }}">
+
+                  {{-- Edit Section --}}
+                  <button class="btn btn-sm btn-warning"
+                          data-bs-toggle="modal" data-bs-target="#editSectionModal{{ $sec->id }}"
+                          {{ (!$currentSY || $currentSY->status !== 'active') ? 'disabled' : '' }}>
                     <i class="bi bi-pencil"></i>
                   </button>
-                  <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#archiveSectionModal{{ $sec->id }}">
+
+                  {{-- Archive Section --}}
+                  <button class="btn btn-sm btn-secondary"
+                          data-bs-toggle="modal" data-bs-target="#archiveSectionModal{{ $sec->id }}"
+                          {{ (!$currentSY || $currentSY->status !== 'active') ? 'disabled' : '' }}>
                     <i class="bi bi-archive"></i>
                   </button>
                 </div>
               </td>
             </tr>
 
-            <!-- Edit Section Modal -->
+            {{-- Edit Section Modal --}}
             <div class="modal fade" id="editSectionModal{{ $sec->id }}" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog">
                 <form method="POST" action="{{ route('registrars.sections.update', $sec->id) }}">
@@ -113,7 +145,8 @@
                       </div>
                       <div class="mb-3">
                         <label class="form-label">Capacity (Max: 30)</label>
-                        <input type="number" name="capacity" class="form-control" min="1" max="30" value="{{ $sec->capacity ?? 30 }}" required>
+                        <input type="number" name="capacity" class="form-control" min="1" max="30"
+                               value="{{ $sec->capacity ?? 30 }}" required>
                       </div>
                     </div>
                     <div class="modal-footer">
@@ -125,7 +158,7 @@
               </div>
             </div>
 
-            <!-- Archive Confirmation Modal -->
+            {{-- Archive Confirmation Modal --}}
             <div class="modal fade" id="archiveSectionModal{{ $sec->id }}" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
@@ -162,7 +195,7 @@
   </div>
 </div>
 
-<!-- Add Section Modal -->
+{{-- Add Section Modal --}}
 <div class="modal fade" id="addSectionModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <form method="POST" action="{{ route('registrars.sections.store') }}">
@@ -189,7 +222,7 @@
           <div class="mb-3">
             <label class="form-label">School Year</label>
             <input type="text" class="form-control" value="{{ $currentSY->name ?? 'N/A' }}" readonly>
-            <input type="hidden" name="school_year_id" value="{{ $currentSY->id }}">
+            <input type="hidden" name="school_year_id" value="{{ $currentSY->id ?? '' }}">
           </div>
           <div class="mb-3">
             <label class="form-label">Adviser</label>

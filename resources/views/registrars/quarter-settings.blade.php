@@ -6,6 +6,10 @@
 @endsection
 
 @section('content')
+@php
+    $syClosed = !$currentSY; // true if no active school year
+@endphp
+
 <div class="container-fluid">
 
     @include('partials.alerts')
@@ -25,6 +29,12 @@
                         The active quarter controls which grading period is <strong>open for teachers</strong>. 
                         Future quarters remain locked until activated.
                     </p>
+                    @if($syClosed)
+                        <div class="alert alert-warning mt-2 mb-0">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Cannot change quarter because there is no active school year.
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -33,7 +43,8 @@
 
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">Select Quarter</label>
-                    <select name="quarter" class="form-select form-select-lg shadow-sm" required>
+                    <select name="quarter" class="form-select form-select-lg shadow-sm" required
+                        @if($syClosed) disabled @endif>
                         @for($q = 1; $q <= 4; $q++)
                             <option value="{{ $q }}" {{ $activeQuarter == $q ? 'selected' : '' }}>
                                 Quarter {{ $q }}
@@ -43,7 +54,9 @@
                 </div>
 
                 <div class="col-md-4 d-flex align-items-end">
-                    <button type="button" class="btn btn-primary btn-lg w-100 shadow-sm" data-bs-toggle="modal" data-bs-target="#confirmQuarterModal">
+                    <button type="button" class="btn btn-primary btn-lg w-100 shadow-sm" 
+                            data-bs-toggle="modal" data-bs-target="#confirmQuarterModal"
+                            @if($syClosed) disabled title="Cannot change quarter. No active school year." @endif>
                         <i class="bi bi-save me-2"></i> Update Quarter
                     </button>
                 </div>
@@ -80,7 +93,9 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" onclick="document.getElementById('quarterForm').submit();">
+        <button type="button" class="btn btn-primary" 
+                onclick="document.getElementById('quarterForm').submit();"
+                @if($syClosed) disabled @endif>
           Yes, Proceed
         </button>
       </div>

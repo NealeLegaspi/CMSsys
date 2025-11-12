@@ -173,24 +173,29 @@
                 </div>
               </div>
 
-              {{-- ⚪ Close Modal --}}
+              {{-- 🔴 Close School Year Modal --}}
               <div class="modal fade" id="closeSchoolYearModal{{ $sy->id }}" tabindex="-1">
                 <div class="modal-dialog modal-dialog-centered">
                   <div class="modal-content">
-                    <div class="modal-header bg-secondary text-white">
-                      <h5 class="modal-title"><i class="bi bi-x-circle me-2"></i> Close School Year</h5>
+                    <div class="modal-header bg-danger text-white">
+                      <h5 class="modal-title">
+                        <i class="bi bi-x-circle me-2"></i> Close School Year
+                      </h5>
                       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
                       Are you sure you want to <strong>close</strong> 
                       <span class="text-danger">{{ $sy->name }}</span>?  
-                      Students will no longer be able to enroll under this school year.
+                      <br><br>
+                      <small class="text-muted">
+                        This will mark all current enrollments under this school year as “Inactive”.
+                      </small>
                     </div>
                     <div class="modal-footer">
                       <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                      <form method="POST" action="{{ route('admins.schoolyear.close',$sy->id) }}">
+                      <form method="POST" action="{{ route('admins.schoolyear.close', $sy->id) }}">
                         @csrf
-                        <button class="btn btn-secondary">Close</button>
+                        <button class="btn btn-danger">Confirm Close</button>
                       </form>
                     </div>
                   </div>

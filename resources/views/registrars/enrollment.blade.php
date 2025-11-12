@@ -10,6 +10,17 @@
   <div class="card-body">
     @include('partials.alerts')
 
+    @php
+      $isActive = isset($activeSY) && $activeSY->status === 'active';
+    @endphp
+
+    @if(!$isActive)
+      <div class="alert alert-warning d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <strong>Note:</strong> The current school year is closed. All actions are disabled.
+      </div>
+    @endif
+
     <!-- Search & Filter -->
     <form method="GET" action="{{ route('registrars.enrollment') }}" class="row g-2 mb-3">
       <div class="col-md-3">
@@ -34,15 +45,21 @@
         </a>
       </div>
       <div class="col-md-3 d-flex align-items-center justify-content-end">
-        <a href="{{ route('registrars.enrollment.export.csv') }}" class="btn btn-sm btn-success me-2 d-flex align-items-center justify-content-center">
+        <a href="{{ route('registrars.enrollment.export.csv') }}" class="btn btn-sm btn-success me-2">
             <i class="bi bi-file-earmark-excel me-1"></i> Excel
         </a>
-        <a href="{{ route('registrars.enrollment.export.pdf') }}" class="btn btn-sm btn-danger me-2 d-flex align-items-center justify-content-center">
+        <a href="{{ route('registrars.enrollment.export.pdf') }}" class="btn btn-sm btn-danger me-2">
             <i class="bi bi-file-earmark-pdf me-1"></i> PDF
         </a>
-        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addStudentModal">
-            <i class="bi bi-plus-circle me-1"></i> Add Student
-        </button>
+        @if($isActive)
+          <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+              <i class="bi bi-plus-circle me-1"></i> Add Student
+          </button>
+        @else
+          <button type="button" class="btn btn-sm btn-secondary" disabled>
+              <i class="bi bi-lock"></i> Add Student (Closed)
+          </button>
+        @endif
       </div>
     </form>
 
@@ -82,16 +99,21 @@
               <td>
 
               <a href="{{ route('registrars.student.record', $enrollment->student->id) }}" class="btn btn-sm btn-info text-white"> <i class="bi bi-eye"></i> </a>
-                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#docsModal{{ $enrollment->student->id }}">
-                  📎 Docs
-                </button>
-
-                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editEnrollmentModal{{ $enrollment->id }}">
-                  <i class="bi bi-pencil"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteEnrollmentModal{{ $enrollment->id }}">
-                  <i class="bi bi-trash"></i>
-                </button>
+                @if($isActive)
+                  <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#docsModal{{ $enrollment->student->id }}">
+                    📎 Docs
+                  </button>
+                  <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editEnrollmentModal{{ $enrollment->id }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteEnrollmentModal{{ $enrollment->id }}">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                @else
+                  <button class="btn btn-sm btn-secondary" disabled>
+                    <i class="bi bi-lock"></i> Locked
+                  </button>
+                @endif
               </td>
             </tr>
 
@@ -252,13 +274,23 @@
             </div>
 
             <div class="col-md-6">
-              <label class="form-label">Section</label>
-              <select name="section_id" class="form-select" required>
-                <option value="" disabled selected>-- Select Section --</option>
-                @foreach ($sections as $section)
-                  <option value="{{ $section->id }}">{{ $section->name }}</option>
-                @endforeach
-              </select>
+                <label class="form-label">Section</label>
+                <select name="section_id" class="form-select" required>
+                    <option value="" disabled selected>-- Select Section --</option>
+                    @php
+                        $sectionsByGrade = $sections->groupBy(function($section) {
+                            return $section->gradeLevel->name ?? 'No Grade';
+                        });
+                    @endphp
+
+                    @foreach ($sectionsByGrade as $gradeName => $sections)
+                        <optgroup label="{{ $gradeName }}">
+                            @foreach ($sections as $section)
+                                <option value="{{ $section->id }}">{{ $section->name }}</option>
+                            @endforeach
+                        </optgroup>
+                    @endforeach
+                </select>
             </div>
 
             <div class="col-md-6">
