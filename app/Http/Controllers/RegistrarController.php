@@ -652,15 +652,17 @@ public function printForm138($studentId)
     {
         $assignment = DB::table('subject_assignments')->where('id', $id)->first();
 
-        if (!$assignment) { 
-            return back()->with('error', 'Assignment not found.'); 
+        if (!$assignment) {
+            return back()->with('error', 'Assignment not found.');
         }
 
         $status = $request->input('status');
+        $currentQuarter = SystemHelper::getActiveQuarter();
 
-        if ($status === 'approved') { 
-            $hasGrades = DB::table('grades') 
-                ->where('subject_id', $assignment->subject_id) 
+        if ($status === 'approved') {
+            $hasGrades = DB::table('grades')
+                ->where('subject_id', $assignment->subject_id)
+                ->where('quarter', $currentQuarter)
                 ->whereExists(function ($query) use ($assignment) {
                     $query->select(DB::raw(1))
                         ->from('students')
@@ -669,23 +671,51 @@ public function printForm138($studentId)
                 })
                 ->exists();
 
-            if (!$hasGrades) { 
-                return back()->with('error', 'Cannot approve. No grades have been submitted yet.'); 
-            } 
+            if (!$hasGrades) {
+                return back()->with('error', 'Cannot approve. No grades submitted for this quarter.');
+            }
 
-            $this->logActivity('Approve Grades', "Approved grades for assignment #{$id}.");
-            $message = 'Grades approved successfully!'; 
-        } else { 
-            $this->logActivity('Return Grades', "Returned grades for assignment #{$id} to teacher.");
-            $message = 'Grades returned to teacher for revision.'; 
+            // ✅ Lock only grades of this quarter
+            DB::table('grades')
+                ->where('subject_id', $assignment->subject_id)
+                ->where('quarter', $currentQuarter)
+                ->whereIn('student_id', function ($q) use ($assignment) {
+                    $q->select('id')->from('students')->where('section_id', $assignment->section_id);
+                })
+                ->update(['locked' => true]);
+
+            // ✅ Update only the status for this quarter, not overall subject
+            DB::table('subject_assignments')
+                ->where('id', $id)
+                ->update([
+                    'grade_status' => 'approved',
+                    'updated_at' => now(),
+                ]);
+
+            $this->logActivity('Approve Grades', "Approved {$currentQuarter} quarter grades for assignment #{$id}.");
+            $message = "Quarter {$currentQuarter} grades approved successfully!";
+        } else {
+            // Return to teacher (unlock current quarter)
+            $currentQuarter = SystemHelper::getActiveQuarter();
+
+            DB::table('grades')
+                ->where('subject_id', $assignment->subject_id)
+                ->where('quarter', $currentQuarter)
+                ->whereIn('student_id', function ($q) use ($assignment) {
+                    $q->select('id')->from('students')->where('section_id', $assignment->section_id);
+                })
+                ->update(['locked' => false]);
+
+            DB::table('subject_assignments')
+                ->where('id', $id)
+                ->update([
+                    'grade_status' => 'returned',
+                    'updated_at' => now(),
+                ]);
+
+            $this->logActivity('Return Grades', "Returned {$currentQuarter} quarter grades for assignment #{$id} to teacher.");
+            $message = "Quarter {$currentQuarter} grades returned to teacher for revision.";
         }
-
-        DB::table('subject_assignments')
-            ->where('id', $id)
-            ->update([
-                'grade_status' => $status,
-                'updated_at' => now(),
-            ]);
 
         return back()->with('success', $message);
     }
@@ -1274,7 +1304,7 @@ public function printForm138($studentId)
 
         $request->validate([
             'current_password' => 'required',
-            'new_password'     => 'required|min:8|confirmed',
+            'new_password' => ['required', 'confirmed', 'min:8'],
         ]);
 
         if (!Hash::check($request->current_password, $registrar->password)) {

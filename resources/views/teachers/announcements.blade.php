@@ -149,6 +149,21 @@
                                                 <label class="form-label fw-semibold">Content</label>
                                                 <textarea name="content" class="form-control" rows="3" required>{{ $ann->content }}</textarea>
                                             </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-semibold">Section</label>
+                                                <select name="section_id" class="form-select" required>
+                                                    <option value="">-- Select Section --</option>
+                                                    @foreach($sections->groupBy('gradelevel_id') as $gradeId => $gradeSections)
+                                                        <optgroup label="{{ $gradeSections->first()->gradeLevel->name ?? 'N/A' }}">
+                                                            @foreach($gradeSections as $sec)
+                                                                <option value="{{ $sec->id }}" {{ $sec->id == $ann->section_id ? 'selected' : '' }}>
+                                                                    {{ $sec->name }}
+                                                                </option>
+                                                            @endforeach
+                                                        </optgroup>
+                                                    @endforeach
+                                                </select>
+                                            </div>
                                         </div>
                                         <div class="modal-footer">
                                             <button type="submit" class="btn btn-success shadow-sm"><i class="bi bi-save me-1"></i> Update</button>

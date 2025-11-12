@@ -132,7 +132,7 @@ class StudentController extends Controller
 
         $request->validate([
             'current_password' => ['required'],
-            'new_password'     => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::min(8)->mixedCase()->numbers()->symbols()],
+            'new_password' => ['required', 'confirmed', 'min:8'],
         ]);
 
         if (!\Hash::check($request->current_password, $student->password)) {

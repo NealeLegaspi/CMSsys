@@ -77,7 +77,7 @@
 
                     {{-- 🗃 Archive (only if closed) --}}
                     @if($sy->status !== 'active')
-                      <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#archiveSchoolYearModal{{ $sy->id }}">
+                      <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#archiveSchoolYearModal{{ $sy->id }}">
                         <i class="bi bi-archive"></i>
                       </button>
                     @endif
@@ -88,7 +88,7 @@
                         <i class="bi bi-check-circle"></i>
                       </button>
                     @else
-                      <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#closeSchoolYearModal{{ $sy->id }}">
+                      <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#closeSchoolYearModal{{ $sy->id }}">
                         <i class="bi bi-x-circle"></i>
                       </button>
                     @endif

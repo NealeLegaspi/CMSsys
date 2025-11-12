@@ -17,15 +17,6 @@
         </div>
     @endif
 
-    {{-- Main Tabs (Advisory Class & My Subjects) --}}
-    <ul class="nav nav-tabs mb-3 shadow-sm border-0" id="classlistTab" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active fw-semibold" id="advisory-tab" data-bs-toggle="tab" data-bs-target="#advisory" type="button" role="tab" aria-controls="advisory" aria-selected="true">
-                <i class="bi bi-people-fill text-primary me-1"></i> Advisory Class
-            </button>
-        </li>
-    </ul>
-
     <div class="tab-content" id="classlistTabContent">
 
         {{-- Advisory Class Tab Content --}}

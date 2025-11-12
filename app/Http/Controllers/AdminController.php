@@ -400,7 +400,10 @@ class AdminController extends Controller
     public function resetPassword($id)
     {
         $user = User::findOrFail($id);
-        $tempPassword = 'Password123!';
+        $lastName = $user->profile->last_name ?? 'User';
+        $firstName = $user->profile->first_name ?? 'X';
+
+        $tempPassword = ucfirst($lastName) . ucfirst($firstName) . $user->id;
 
         $user->password = Hash::make($tempPassword);
         $user->save();
@@ -756,20 +759,15 @@ class AdminController extends Controller
             $baseQuery->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $activeLogs = (clone $baseQuery)
-            ->where('is_archived', false)
-            ->paginate(20, ['*'], 'active_page')
-            ->appends($request->query());
-
-        $archivedLogs = (clone $baseQuery)
-            ->where('is_archived', true)
-            ->paginate(20, ['*'], 'archived_page')
-            ->appends($request->query());
+        $logs = $baseQuery->where('created_at', '>=', now()->subDays(30))
+                        ->paginate(20)
+                        ->appends($request->query());
 
         $users = User::orderBy('email')->get();
 
-        return view('admins.logs', compact('activeLogs', 'archivedLogs', 'users'));
+        return view('admins.logs', compact('logs', 'users'));
     }
+
 
     public function archiveLog($id)
     {
@@ -894,7 +892,7 @@ class AdminController extends Controller
 
         $request->validate([
             'current_password' => 'required',
-            'new_password'     => 'required|min:8|confirmed',
+            'new_password' => ['required', 'confirmed', 'min:8'],
         ]);
 
         if (!Hash::check($request->current_password, $admin->password)) {

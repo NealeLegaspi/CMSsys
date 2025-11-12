@@ -284,6 +284,8 @@ public function exportClassList()
         $students = collect();
         $subject = null;
         $section = null;
+        $activeQuarter = SystemHelper::getActiveQuarter();
+        $lockedQuarters = [];
 
         if ($request->filled('assignment_id')) {
             $assignmentId = (int) $request->assignment_id;
@@ -309,6 +311,15 @@ public function exportClassList()
                     ])
                     ->get()
                     ->sortBy(fn($s) => $s->user->profile->last_name ?? 'ZZZ');
+
+                // 🔐 Detect locked quarters for this subject-section
+                $lockedQuarters = DB::table('grades')
+                    ->where('subject_id', $subject->id)
+                    ->whereIn('quarter', ['1st', '2nd', '3rd', '4th'])
+                    ->where('locked', true)
+                    ->distinct()
+                    ->pluck('quarter')
+                    ->toArray();
             }
         }
 
@@ -318,8 +329,11 @@ public function exportClassList()
             'students'           => $students,
             'subject'            => $subject,
             'section'            => $section,
+            'activeQuarter'      => $activeQuarter,
+            'lockedQuarters'     => $lockedQuarters,
         ]);
     }
+
 
 
     public function encodeGrades($subjectId, $sectionId)
@@ -374,8 +388,19 @@ public function exportClassList()
             ->where('section_id', $request->section_id)
             ->first();
 
-        if ($assignment && $assignment->grade_status === 'approved') { 
-            return back()->with('error', 'Grades are already approved and locked.'); 
+        if ($assignment && $assignment->grade_status === 'approved') {
+            $locked = DB::table('grades')
+                ->where('subject_id', $request->subject_id)
+                ->where('quarter', SystemHelper::getActiveQuarter())
+                ->whereIn('student_id', function ($q) use ($request) {
+                    $q->select('id')->from('students')->where('section_id', $request->section_id);
+                })
+                ->where('locked', true)
+                ->exists();
+
+            if ($locked) {
+                return back()->with('error', 'This quarter’s grades are locked and cannot be modified.');
+            }
         }
 
         foreach ($request->grades as $studentId => $quarters) {
@@ -660,7 +685,7 @@ public function exportClassList()
 
         $request->validate([
             'current_password' => ['required'],
-            'new_password'     => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
+            'new_password' => ['required', 'confirmed', 'min:8'],
         ]);
 
         if (!Hash::check($request->current_password, $teacher->password)) {

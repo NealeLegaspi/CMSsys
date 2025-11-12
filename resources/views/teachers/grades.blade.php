@@ -114,8 +114,7 @@
                           value="{{ old('grades.'.$student->id.'.'.$q, $grades[$q]) }}"
                           class="form-control text-center grade-input"
                           min="0" max="100" step="1"
-                          onchange="validateAndCompute(this)"
-                          {{ $selectedAssignment->grade_status === 'approved' ? 'readonly disabled' : '' }}>
+                          {{ in_array($q, $lockedQuarters ?? []) ? 'readonly disabled' : '' }}>
                       </td>
                     @endforeach
                     <td>
