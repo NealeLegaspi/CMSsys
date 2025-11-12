@@ -195,7 +195,7 @@
                       <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
                       <form method="POST" action="{{ route('admins.schoolyear.close', $sy->id) }}">
                         @csrf
-                        <button class="btn btn-danger">Confirm Close</button>
+                        <button class="btn btn-danger">Close</button>
                       </form>
                     </div>
                   </div>

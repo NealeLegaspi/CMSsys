@@ -6,6 +6,18 @@
 @endsection
 
 @section('content')
+
+@php
+    $syClosed = $syClosed ?? false;
+@endphp
+
+@if($syClosed)
+    <div class="alert alert-danger shadow-sm">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        The School Year is closed. Creating, editing, and deleting announcements are disabled.
+    </div>
+@endif
+
 <div class="container-fluid my-4">
 
     @if(session('success'))
@@ -42,6 +54,7 @@
                     {{-- Assuming $sections is available to the view --}}
                     <form method="POST" action="{{ route('teachers.announcements.store') }}">
                         @csrf
+                        <fieldset {{ $syClosed ? 'disabled' : '' }}>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Title</label>
@@ -70,6 +83,7 @@
                                 <i class="bi bi-send me-1"></i> Post Announcement
                             </button>
                         </div>
+                        </fieldset>
                     </form>
                 </div>
             </div>
@@ -120,10 +134,16 @@
                                     <i class="bi bi-people me-1"></i> Section: <strong>{{ $ann->section->name ?? 'N/A' }}</strong>
                                 </small>
                                 <div class="mt-3 d-flex gap-2">
-                                    <button class="btn btn-sm btn-outline-warning shadow-sm" data-bs-toggle="modal" data-bs-target="#editModal{{ $ann->id }}">
+                                    <button class="btn btn-sm btn-outline-warning shadow-sm" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#editModal{{ $ann->id }}"
+                                            {{ $syClosed ? 'disabled' : '' }}>
                                         <i class="bi bi-pencil"></i> Edit
                                     </button>
-                                    <button class="btn btn-sm btn-outline-danger shadow-sm" data-bs-toggle="modal" data-bs-target="#deleteModal{{ $ann->id }}">
+                                    <button class="btn btn-sm btn-outline-danger shadow-sm" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#deleteModal{{ $ann->id }}"
+                                            {{ $syClosed ? 'disabled' : '' }}>
                                         <i class="bi bi-trash"></i> Delete
                                     </button>
                                 </div>

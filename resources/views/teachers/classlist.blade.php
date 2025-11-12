@@ -7,6 +7,18 @@
 @endsection
 
 @section('content')
+
+@php
+    $syClosed = $syClosed ?? false;
+@endphp
+
+@if($syClosed)
+    <div class="alert alert-danger shadow-sm mb-4">
+        <i class="bi bi-lock-fill me-2"></i>
+        The School Year is closed. Class lists is temporarily disabled.
+    </div>
+@endif
+
 <div class="container-fluid my-4">
 
     {{-- Export Error Message --}}

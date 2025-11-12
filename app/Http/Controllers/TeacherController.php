@@ -73,7 +73,9 @@ class TeacherController extends Controller
     {
         $teacher = Auth::user();
 
-        // ---- My Announcements (posted by this teacher) ----
+        $currentSY = SchoolYear::where('status', 'active')->first();
+        $syClosed = !$currentSY; 
+
         $myQuery = Announcement::where('user_id', $teacher->id)
             ->with(['section', 'user'])
             ->orderBy('created_at', 'desc');
@@ -89,10 +91,8 @@ class TeacherController extends Controller
             $myQuery->where('section_id', $request->section_filter);
         }
 
-        // Paginate para consistent sa global tab
         $myAnnouncements = $myQuery->paginate(5, ['*'], 'my_page')->withQueryString();
 
-        // ---- Global Announcements (from admin or other teachers) ----
         $globalQuery = Announcement::with(['section', 'user.profile'])
             ->whereIn('target_type', ['Global', 'Teacher'])
             ->when($request->filled('search'), function ($q) use ($request) {
@@ -107,7 +107,6 @@ class TeacherController extends Controller
 
         $globalAnnouncements = $globalQuery->paginate(5, ['*'], 'global_page')->withQueryString();
 
-        // ---- Sections for create form ----
         $sections = Section::with('gradeLevel')
             ->whereIn('id', function ($q) use ($teacher) {
                 $q->select('section_id')
@@ -120,10 +119,11 @@ class TeacherController extends Controller
             'teacher',
             'sections',
             'myAnnouncements',
-            'globalAnnouncements'
+            'globalAnnouncements',
+            'currentSY',
+            'syClosed'
         ));
     }
-
 
     public function storeAnnouncement(Request $request)
     {
@@ -188,6 +188,10 @@ class TeacherController extends Controller
     public function classlist()
     {
         $teacher = Auth::user();
+
+        $currentSY = SchoolYear::where('status', 'active')->first();
+        $syClosed = !$currentSY; 
+
         $advisorySection = Section::where('adviser_id', $teacher->id)->first();
 
         if (!$advisorySection) {
@@ -196,6 +200,8 @@ class TeacherController extends Controller
                 'studentsMale' => collect(),
                 'studentsFemale' => collect(),
                 'mySubjects' => collect(),
+                'currentSY' => $currentSY,
+                'syClosed' => $syClosed,
             ]);
         }
 
@@ -224,41 +230,46 @@ class TeacherController extends Controller
             )
             ->get();
 
-        return view('teachers.classlist', compact('section', 'studentsMale', 'studentsFemale', 'mySubjects'));}
-
-public function exportClassList()
-{
-    $teacher = Auth::user();
-    $section = Section::where('adviser_id', $teacher->id)->first();
-
-    if (!$section) {
-        return back()->withErrors('You have no advisory section.');
+        return view('teachers.classlist', compact(
+            'section', 'studentsMale', 'studentsFemale', 'mySubjects', 'currentSY', 'syClosed'
+        ));
     }
 
-    // Students grouped by gender
-    $studentsMale = $section->students()
-        ->whereHas('profile', fn($q) => $q->where('sex', 'Male'))
-        ->with('profile')
-        ->get();
 
-    $studentsFemale = $section->students()
-        ->whereHas('profile', fn($q) => $q->where('sex', 'Female'))
-        ->with('profile')
-        ->get();
+    public function exportClassList()
+    {
+        $currentSY = SchoolYear::where('status', 'active')->first();
+        if (!$currentSY) {
+            return back()->withErrors('Export is disabled because the School Year is closed.');
+        }
 
-    // Load view
-    $pdf = Pdf::loadView('teachers.reports.classlist-pdf', [
-        'section' => $section,
-        'studentsMale' => $studentsMale,
-        'studentsFemale' => $studentsFemale,
-    ])->setPaper('A4', 'portrait');
+        $teacher = Auth::user();
+        $section = Section::where('adviser_id', $teacher->id)->first();
 
-    // Log activity (optional)
-    $this->logActivity('Export Class List', "Exported class list for section {$section->name}");
+        if (!$section) {
+            return back()->withErrors('You have no advisory section.');
+        }
 
-    return $pdf->download("{$section->name}_classlist.pdf");
-}
+        $studentsMale = $section->students()
+            ->whereHas('profile', fn($q) => $q->where('sex', 'Male'))
+            ->with('profile')
+            ->get();
 
+        $studentsFemale = $section->students()
+            ->whereHas('profile', fn($q) => $q->where('sex', 'Female'))
+            ->with('profile')
+            ->get();
+
+        $pdf = Pdf::loadView('teachers.reports.classlist-pdf', [
+            'section' => $section,
+            'studentsMale' => $studentsMale,
+            'studentsFemale' => $studentsFemale,
+        ])->setPaper('A4', 'portrait');
+
+        $this->logActivity('Export Class List', "Exported class list for section {$section->name}");
+
+        return $pdf->download("{$section->name}_classlist.pdf");
+    }
 
     // ---------------- GRADES ----------------
     public function grades(Request $request)
