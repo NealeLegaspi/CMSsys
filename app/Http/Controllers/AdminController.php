@@ -399,11 +399,19 @@ class AdminController extends Controller
 
     public function resetPassword($id)
     {
-        $user = User::findOrFail($id);
-        $lastName = $user->profile->last_name ?? 'User';
+        $user = User::with('profile')->findOrFail($id);
+
+        $lastName  = $user->profile->last_name ?? 'User';
         $firstName = $user->profile->first_name ?? 'X';
 
-        $tempPassword = ucfirst($lastName) . ucfirst($firstName) . $user->id;
+        $lastName  = preg_replace('/\s+/', '', ucfirst($lastName));
+        $firstName = preg_replace('/\s+/', '', ucfirst($firstName));
+
+        $birthYear = $user->profile->birthdate 
+            ? date('Y', strtotime($user->profile->birthdate)) 
+            : rand(1000, 9999);
+
+        $tempPassword = "{$lastName}{$firstName}{$birthYear}";
 
         $user->password = Hash::make($tempPassword);
         $user->save();
@@ -412,6 +420,7 @@ class AdminController extends Controller
 
         return back()->with('success', "Password has been reset to the default: {$tempPassword}");
     }
+
 
     public function destroyUser($id)
     {
