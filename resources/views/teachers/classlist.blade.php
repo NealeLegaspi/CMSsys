@@ -13,7 +13,7 @@
 @endphp
 
 @if($syClosed)
-    <div class="alert alert-danger shadow-sm mb-4">
+    <div class="alert alert-warning shadow-sm mb-4">
         <i class="bi bi-lock-fill me-2"></i>
         The School Year is closed. Class lists is temporarily disabled.
     </div>

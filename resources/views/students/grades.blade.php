@@ -6,6 +6,15 @@
 @endsection
 
 @section('content')
+
+@if(isset($noActiveSY) && $noActiveSY)
+  <div class="alert alert-warning text-center py-4">
+    <i class="bi bi-exclamation-triangle fs-4"></i>
+    <p class="mt-2 mb-0 fw-semibold">
+      The current school year is closed. Grades are unavailable until a new school year starts.
+    </p>
+  </div>
+@else
 <div class="container my-4">
   <div class="card border-0 shadow-sm p-4">
     
@@ -67,4 +76,6 @@
     @endif
   </div>
 </div>
+@endif
+
 @endsection

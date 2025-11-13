@@ -27,6 +27,14 @@ class TeacherController extends Controller
     public function dashboard()
     {
         $teacher = Auth::user();
+        $activeSY = SchoolYear::where('status', 'active')->first();
+
+        if (!$activeSY) {
+            return view('teachers.dashboard', [
+                'noActiveSY' => true,
+                'announcements' => collect(),
+            ]);
+        }
 
         $sections = Section::where('adviser_id', $teacher->id)->pluck('name', 'id')->toArray();
         $sectionCount = count($sections);
@@ -50,12 +58,11 @@ class TeacherController extends Controller
             ->whereIn('target_type', ['Global', 'Teacher'])
             ->where(function ($q) {
                 $q->whereNull('expires_at')
-                  ->orWhere('expires_at', '>', now());
+                ->orWhere('expires_at', '>', now());
             })
             ->latest()
             ->take(5)
             ->get();
-
 
         return view('teachers.dashboard', [
             'teacher'      => $teacher,
@@ -65,8 +72,10 @@ class TeacherController extends Controller
             'genderLabels' => ['Male', 'Female'],
             'genderData'   => [$male, $female],
             'announcements'=> $announcements,
+            'activeSY'     => $activeSY,
         ]);
     }
+
 
     // ---------------- ANNOUNCEMENTS ----------------
     public function announcements(Request $request)
@@ -276,6 +285,9 @@ class TeacherController extends Controller
     {
         $teacherId = Auth::id();
 
+        $currentSY = SchoolYear::where('status', 'active')->first();
+        $syClosed = !$currentSY || $currentSY->status === 'closed';
+
         $assignments = SubjectAssignment::with(['subject', 'section.gradeLevel'])
             ->where('teacher_id', $teacherId)
             ->get()
@@ -323,7 +335,6 @@ class TeacherController extends Controller
                     ->get()
                     ->sortBy(fn($s) => $s->user->profile->last_name ?? 'ZZZ');
 
-                // 🔐 Detect locked quarters for this subject-section
                 $lockedQuarters = DB::table('grades')
                     ->where('subject_id', $subject->id)
                     ->whereIn('quarter', ['1st', '2nd', '3rd', '4th'])
@@ -342,10 +353,10 @@ class TeacherController extends Controller
             'section'            => $section,
             'activeQuarter'      => $activeQuarter,
             'lockedQuarters'     => $lockedQuarters,
+            'syClosed'           => $syClosed,
+            'currentSY'          => $currentSY,
         ]);
     }
-
-
 
     public function encodeGrades($subjectId, $sectionId)
     {
@@ -376,6 +387,11 @@ class TeacherController extends Controller
 
     public function storeGrades(Request $request)
     {
+        $activeSY = SchoolYear::where('status', 'active')->first();
+        if (!$activeSY || $activeSY->status === 'closed') {
+            return back()->with('error', 'The school year is closed. Grade encoding is disabled.');
+        }
+
         $request->validate([
             'grades'     => 'required|array',
             'subject_id' => 'required|exists:subjects,id',
@@ -416,22 +432,19 @@ class TeacherController extends Controller
 
         foreach ($request->grades as $studentId => $quarters) {
             foreach ($quarters as $quarter => $gradeValue) {
-
                 if ((int)$quarter > $currentQuarter) continue;
 
                 if (is_numeric($gradeValue) && $gradeValue >= 60 && $gradeValue <= 100) {
-
-                Grade::updateOrCreate(
-                    [
-                        'student_id' => (int)$studentId,
-                        'subject_id' => (int)$request->subject_id,
-                        'quarter'    => $quarter,
-                    ],
-                    [
-                        'grade'    => (int)$gradeValue,
-                    ]
-                );
-
+                    Grade::updateOrCreate(
+                        [
+                            'student_id' => (int)$studentId,
+                            'subject_id' => (int)$request->subject_id,
+                            'quarter'    => $quarter,
+                        ],
+                        [
+                            'grade'    => (int)$gradeValue,
+                        ]
+                    );
                     $savedCount++;
                 } elseif (empty($gradeValue)) {
                     Grade::where('student_id', (int)$studentId)
@@ -457,6 +470,11 @@ class TeacherController extends Controller
 
     public function submitGrades(Request $request)
     {
+        $activeSY = SchoolYear::where('status', 'active')->first();
+        if (!$activeSY || $activeSY->status === 'closed') {
+            return back()->with('error', 'The school year is closed. Grade submission is disabled.');
+        }
+
         $request->validate([
             'subject_id' => 'required|exists:subjects,id',
             'section_id' => 'required|exists:sections,id',
@@ -552,20 +570,22 @@ class TeacherController extends Controller
     public function reports()
     {
         $students = $this->getTeacherAssignedStudents();
-        
+
         $gradeLevelIds = $students->pluck('activeEnrollment.section.gradelevel_id')
-                              ->unique()
-                              ->filter();
+                            ->unique()
+                            ->filter();
         $sectionIds = $students->pluck('activeEnrollment.section.id')
-                              ->unique()
-                              ->filter();
+                            ->unique()
+                            ->filter();
 
         $gradeLevels = GradeLevel::whereIn('id', $gradeLevelIds)->get();
         $sections = Section::whereIn('id', $sectionIds)->with('gradeLevel')->get();
-        
         $schoolYears = SchoolYear::pluck('name')->toArray(); 
 
-        return view('teachers.reports', compact('gradeLevels', 'sections', 'schoolYears', 'students'));
+        $currentSY = SchoolYear::where('status', 'active')->first();
+        $syClosed = !$currentSY || $currentSY->status === 'closed'; // 🔒 Detect closed SY
+
+        return view('teachers.reports', compact('gradeLevels', 'sections', 'schoolYears', 'students', 'currentSY', 'syClosed'));
     }
 
     public function filterReports(Request $request)
@@ -595,16 +615,23 @@ class TeacherController extends Controller
 
         $gradeLevelIds = $students->pluck('activeEnrollment.section.gradelevel_id')->unique()->filter();
         $sectionIds = $students->pluck('activeEnrollment.section_id')->unique()->filter();
-    
         $gradeLevels = GradeLevel::whereIn('id', $gradeLevelIds)->get();
         $sections = Section::whereIn('id', $sectionIds)->with('gradeLevel')->get();
         $schoolYears = SchoolYear::pluck('name')->toArray(); 
 
-        return view('teachers.reports', compact('students', 'gradeLevels', 'sections', 'schoolYears'));
+        $currentSY = SchoolYear::where('status', 'active')->first();
+        $syClosed = !$currentSY || $currentSY->status === 'closed'; // 🔒
+
+        return view('teachers.reports', compact('students', 'gradeLevels', 'sections', 'schoolYears', 'currentSY', 'syClosed'));
     }
 
     public function exportReportsPDF(Request $request)
     {
+        $currentSY = SchoolYear::where('status', 'active')->first();
+        if (!$currentSY || $currentSY->status === 'closed') {
+            return back()->with('error', 'The school year is closed. Report export is disabled.');
+        }
+
         $studentIds = $this->getTeacherAssignedStudents()->pluck('id');
 
         $query = Student::whereIn('id', $studentIds)
@@ -630,12 +657,13 @@ class TeacherController extends Controller
 
         $pdf = \App::make('dompdf.wrapper'); 
         $pdf->loadView('teachers.reports_pdf', compact('students'))
-                 ->setPaper('a4', 'landscape');
+                ->setPaper('a4', 'landscape');
 
         $this->logActivity('Export Reports', "Exported reports for {$students->count()} students");
 
         return $pdf->download('students_report.pdf');
     }
+
 
     // ---------------- SETTINGS ----------------
     public function settings()

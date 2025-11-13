@@ -50,18 +50,28 @@ class RegistrarController extends Controller
      */
     public function dashboard()
     {
+        $activeSY = SchoolYear::where('status', 'active')->first();
+
+        if (!$activeSY) {
+            return view('registrars.dashboard', [
+                'noActiveSY' => true,
+                'sections' => collect(),
+                'genderLabels' => [],
+                'genderData' => [],
+            ]);
+        }
+
         $studentCount = User::where('role_id', 4)->count();
         $teacherCount = User::where('role_id', 3)->count();
         $sectionCount = Section::count();
-        $activeSY = SchoolYear::where('status', 'active')->first();
 
-        // Students per Section (for bar chart)
+        // Students per Section
         $sections = Section::pluck('name');
         $totals   = $sections->map(fn($sec) =>
             Enrollment::whereHas('section', fn($q) => $q->where('name', $sec))->count()
         );
 
-        // Gender distribution (for pie chart)
+        // Gender Distribution
         $genderLabels = ['Male', 'Female'];
         $genderData   = [
             UserProfile::where('sex', 'Male')->count(),
@@ -73,6 +83,7 @@ class RegistrarController extends Controller
             'sections', 'totals', 'genderLabels', 'genderData', 'activeSY'
         ));
     }
+
 
     /**
      * Student Records
@@ -1233,12 +1244,15 @@ public function printForm138($studentId)
 
         $schoolYears = SchoolYear::orderBy('id', 'desc')->get();
 
+        $selectedSY = SchoolYear::find($schoolYearId);
+        $syClosed = !$activeSY || $activeSY->status === 'closed'; 
+
         // Enrollment summary
         $totalEnrolled = Enrollment::where('school_year_id', $schoolYearId)->count();
         $maleCount = Enrollment::whereHas('student.user.profile', fn($q) => $q->where('sex', 'Male'))
-                            ->where('school_year_id', $schoolYearId)->count();
+            ->where('school_year_id', $schoolYearId)->count();
         $femaleCount = Enrollment::whereHas('student.user.profile', fn($q) => $q->where('sex', 'Female'))
-                                ->where('school_year_id', $schoolYearId)->count();
+            ->where('school_year_id', $schoolYearId)->count();
 
         // Enrollment by Grade Level
         $byGradeLevel = Enrollment::select('grade_levels.name as grade', DB::raw('COUNT(enrollments.id) as total'))
@@ -1253,6 +1267,8 @@ public function printForm138($studentId)
             'schoolYears',
             'schoolYearId',
             'activeSY',
+            'selectedSY',
+            'syClosed',
             'totalEnrolled',
             'maleCount',
             'femaleCount',
@@ -1260,17 +1276,22 @@ public function printForm138($studentId)
         ));
     }
 
-    // Export summary to PDF
     public function exportReportsPDF(Request $request)
     {
+        $activeSY = SchoolYear::where('status', 'active')->first();
+
+        if (!$activeSY || $activeSY->status === 'closed') {
+            return back()->with('error', 'The school year is closed. Report export is disabled.');
+        }
+
         $schoolYearId = $request->get('school_year_id');
         $schoolYear = SchoolYear::find($schoolYearId);
 
         $totalEnrolled = Enrollment::where('school_year_id', $schoolYearId)->count();
         $maleCount = Enrollment::whereHas('student.user.profile', fn($q) => $q->where('sex', 'Male'))
-                            ->where('school_year_id', $schoolYearId)->count();
+            ->where('school_year_id', $schoolYearId)->count();
         $femaleCount = Enrollment::whereHas('student.user.profile', fn($q) => $q->where('sex', 'Female'))
-                                ->where('school_year_id', $schoolYearId)->count();
+            ->where('school_year_id', $schoolYearId)->count();
 
         $byGradeLevel = Enrollment::select('grade_levels.name as grade', DB::raw('COUNT(enrollments.id) as total'))
             ->join('sections', 'sections.id', '=', 'enrollments.section_id')
@@ -1290,6 +1311,7 @@ public function printForm138($studentId)
 
         return $pdf->download('Enrollment_Report_'.$schoolYear->name.'.pdf');
     }
+
 
     /**
      * Settings

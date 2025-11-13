@@ -12,7 +12,7 @@
 @endphp
 
 @if($syClosed)
-    <div class="alert alert-danger shadow-sm">
+    <div class="alert alert-warning shadow-sm">
         <i class="bi bi-exclamation-triangle me-2"></i>
         The School Year is closed. Creating, editing, and deleting announcements are disabled.
     </div>

@@ -8,12 +8,22 @@
 @section('content')
 <div class="card shadow-sm border-0">
   <div class="card-body">
+
+  @if($syClosed)
+    <div class="alert alert-warning d-flex align-items-center" role="alert">
+      <i class="bi bi-lock-fill me-2 fs-5"></i>
+      <div>
+        The school year <strong>{{ $activeSY->name ?? 'N/A' }}</strong> is closed. Report actions are disabled.
+      </div>
+    </div>
+  @endif
+
     @include('partials.alerts')
 
     <form method="GET" class="row g-2 mb-4">
       <div class="col-md-4">
         <label class="form-label fw-bold">School Year</label>
-        <select name="school_year_id" class="form-select" onchange="this.form.submit()">
+        <select name="school_year_id" class="form-select" onchange="this.form.submit()" {{ $syClosed ? 'disabled' : '' }}>
           @foreach($schoolYears as $sy)
             <option value="{{ $sy->id }}" {{ $schoolYearId == $sy->id ? 'selected' : '' }}>
               {{ $sy->name }}
@@ -22,11 +32,13 @@
         </select>
       </div>
       <div class="col-md-8 d-flex align-items-end justify-content-end">
-        <a href="{{ route('registrars.reports.pdf', ['school_year_id' => $schoolYearId]) }}" class="btn btn-danger">
+        <a href="{{ route('registrars.reports.pdf', ['school_year_id' => $schoolYearId]) }}"
+          class="btn btn-danger {{ $syClosed ? 'disabled' : '' }}">
           <i class="bi bi-file-earmark-pdf"></i> Export PDF
         </a>
       </div>
     </form>
+
 
     <div class="row g-4 mb-4">
       <div class="col-md-4">

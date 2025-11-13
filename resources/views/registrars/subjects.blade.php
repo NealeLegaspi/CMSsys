@@ -15,6 +15,16 @@
     <div class="card-body">
       @include('partials.alerts')
 
+      @if(!$currentSY || $currentSY->status !== 'active')
+        <div class="alert alert-warning d-flex align-items-center">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <div>
+            <strong>Note:</strong> No active school year detected.
+            All management actions are disabled until a school year is activated.
+          </div>
+        </div>
+      @endif
+
       {{-- 🔍 Search & Filter --}}
       <form method="GET" action="{{ route('registrars.subjects') }}" class="row g-2 align-items-end mb-4">
         <div class="col-md-4">

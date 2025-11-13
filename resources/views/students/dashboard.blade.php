@@ -6,6 +6,15 @@
 @endsection
 
 @section('content')
+
+@if(isset($noActiveSY) && $noActiveSY)
+  <div class="alert alert-warning text-center py-5">
+    <i class="bi bi-exclamation-triangle fs-4"></i>
+    <p class="mt-2 mb-0 fw-semibold">
+      The current school year is closed. Dashboard features are unavailable until a new school year starts.
+    </p>
+  </div>
+@else
 <div class="container my-4">
 
   <!-- 🔹 Quick Summary Cards -->
@@ -54,7 +63,9 @@
               {!! nl2br(e($a->content ?? 'No content available.')) !!}
             </p>
             <small class="text-secondary d-block">
-              <i class="bi bi-person-circle"></i> {{ e($a->user->role->name ?? 'System') }}: {{ e($a->user->profile->first_name ?? 'Unknown') }} {{ e($a->user->profile->last_name ?? 'Unknown') }}
+              <i class="bi bi-person-circle"></i>
+              {{ e($a->user->role->name ?? 'System') }}:
+              {{ e($a->user->profile->first_name ?? 'Unknown') }} {{ e($a->user->profile->last_name ?? 'Unknown') }}
               | <i class="bi bi-calendar3"></i> {{ $a->created_at?->format('M d, Y h:i A') ?? 'N/A' }}<br>
               <span class="badge bg-info text-dark mt-1">
                 {{ $a->section?->name ? 'Section: '.$a->section->name : 'All Sections' }}
@@ -135,18 +146,12 @@
     options: {
       responsive: true,
       scales: {
-        y: {
-          beginAtZero: true,
-          max: 100,
-          ticks: { stepSize: 10 }
-        }
+        y: { beginAtZero: true, max: 100, ticks: { stepSize: 10 } }
       },
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: true }
-      }
+      plugins: { legend: { display: false } }
     }
   });
 </script>
+@endif
 @endif
 @endsection

@@ -10,6 +10,7 @@ use App\Models\Announcement;
 use App\Models\Grade;
 use App\Models\SubjectAssignment;
 use App\Models\Assignment;
+use App\Models\SchoolYear;
 use App\Helpers\SystemHelper;
 
 class StudentController extends Controller
@@ -17,6 +18,17 @@ class StudentController extends Controller
     public function dashboard()
     {
         $user = Auth::user();
+        $activeSY = SchoolYear::where('status', 'active')->first();
+
+        if (!$activeSY) {
+            return view('students.dashboard', [
+                'noActiveSY' => true,
+                'announcements' => collect(),
+                'grades' => collect(),
+                'activeQuarter' => null,
+            ]);
+        }
+
         $activeQuarter = SystemHelper::getActiveQuarter();
 
         $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
@@ -25,7 +37,7 @@ class StudentController extends Controller
             ->whereIn('target_type', ['Global', 'Student'])
             ->where(function ($q) {
                 $q->whereNull('expires_at')
-                  ->orWhere('expires_at', '>', now());
+                ->orWhere('expires_at', '>', now());
             })
             ->latest()
             ->take(5)
@@ -39,28 +51,46 @@ class StudentController extends Controller
             })
             ->get();
 
-        return view('students.dashboard', compact('announcements', 'grades', 'activeQuarter'));
+        return view('students.dashboard', compact('announcements', 'grades', 'activeQuarter', 'activeSY'));
     }
 
     public function announcements()
     {
         $user = Auth::user();
 
+        $activeSY = SchoolYear::where('status', 'active')->first();
+
+        if (!$activeSY) {
+            return view('students.announcements', [
+                'announcements' => collect(),
+                'noActiveSY' => true,
+            ]);
+        }
+
         $announcements = Announcement::with('user.profile')
             ->whereIn('target_type', ['Global', 'Student'])
             ->where(function ($q) {
                 $q->whereNull('expires_at')
-                  ->orWhere('expires_at', '>', now());
+                ->orWhere('expires_at', '>', now());
             })
             ->latest()
             ->get();
 
-        return view('students.announcements', compact('announcements'));
+        return view('students.announcements', compact('announcements', 'activeSY'));
     }
+
 
     public function grades()
     {
         $user = Auth::user();
+        $activeSY = SchoolYear::where('status', 'active')->first();
+
+        if (!$activeSY) {
+            return view('students.grades', [
+                'grades' => collect(),
+                'noActiveSY' => true,
+            ]);
+        }
 
         $grades = Grade::with('subject')
             ->where('student_id', $user->student?->id)
@@ -70,8 +100,9 @@ class StudentController extends Controller
             ->get()
             ->groupBy('subject.name');
 
-        return view('students.grades', compact('grades'));
+        return view('students.grades', compact('grades', 'activeSY'));
     }
+
 
 
     public function settings()

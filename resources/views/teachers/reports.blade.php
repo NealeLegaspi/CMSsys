@@ -8,6 +8,15 @@
 @section('content')
 <div class="container-fluid my-4">
 
+@if($syClosed)
+  <div class="alert alert-warning d-flex align-items-center" role="alert">
+    <i class="bi bi-lock-fill me-2 fs-5"></i>
+    <div>
+      The school year <strong>{{ $currentSY->name ?? 'N/A' }}</strong> is closed. Report actions are disabled.
+    </div>
+  </div>
+@endif
+
   {{-- 🔍 Filters --}}
   <div class="card shadow-sm border-0 mb-4">
     <div class="card-body">
@@ -55,10 +64,10 @@
 
         {{-- Buttons --}}
         <div class="col-md-3 d-flex justify-content-end flex-wrap gap-2">
-          <button type="submit" class="btn btn-outline-primary">
+          <button type="submit" class="btn btn-outline-primary" {{ $syClosed ? 'disabled' : '' }}>
             <i class="bi bi-search me-1"></i> Search
           </button>
-          <a href="{{ route('teachers.reports') }}" class="btn btn-outline-secondary">
+          <a href="{{ route('teachers.reports') }}" class="btn btn-outline-secondary {{ $syClosed ? 'disabled' : '' }}">
             <i class="bi bi-arrow-clockwise me-1"></i> Reset
           </a>
         </div>
@@ -106,9 +115,10 @@
 
       {{-- Export Buttons --}}
       <div class="btn-group">
-        <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">
+        <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" {{ $syClosed ? 'disabled' : '' }}>
           <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export
         </button>
+        @if(!$syClosed)
         <ul class="dropdown-menu shadow-sm">
           <li>
             <button class="dropdown-item" type="button" onclick="exportTableToCSV('students_report.csv')">
@@ -122,6 +132,7 @@
             </form>
           </li>
         </ul>
+        @endif
       </div>
     </div>
 
@@ -143,7 +154,6 @@
                 <th>Age</th>
                 <th>Contact</th>
                 <th>Grade / Section</th>
-                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -162,11 +172,6 @@
                   <td>{{ $profile->birthdate ? \Carbon\Carbon::parse($profile->birthdate)->age : '—' }}</td>
                   <td>{{ $profile->contact_number ?? '—' }}</td>
                   <td>{{ $gradeName }} / {{ $sectionName }}</td>
-                  <td>
-                    <span class="badge rounded-pill bg-{{ ($student->status ?? 'Enrolled') == 'Enrolled' ? 'success' : 'danger' }}">
-                      {{ $student->status ?? 'Enrolled' }}
-                    </span>
-                  </td>
                 </tr>
               @endforeach
             </tbody>

@@ -6,6 +6,17 @@
 @endsection
 
 @section('content')
+
+
+@if(isset($noActiveSY) && $noActiveSY)
+  <div class="alert alert-warning text-center py-5">
+    <i class="bi bi-exclamation-triangle fs-4"></i>
+    <p class="mt-2 mb-0 fw-semibold">
+      The current school year is closed. Dashboard features are unavailable until a new school year starts.
+    </p>
+  </div>
+@else
+
 <div class="container-fluid my-4">
 
   <!-- Overview Cards -->
@@ -188,5 +199,6 @@ new Chart(ctx2, {
   }
 });
 </script>
+@endif
 @endif
 @endsection

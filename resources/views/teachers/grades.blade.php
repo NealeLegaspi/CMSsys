@@ -6,6 +6,17 @@
 @endsection
 
 @section('content')
+
+@if($syClosed)
+  <div class="alert alert-warning d-flex align-items-center" role="alert">
+    <i class="bi bi-lock-fill me-2 fs-5"></i>
+    <div>
+      The school year <strong>{{ $currentSY->name ?? 'N/A' }}</strong> is closed.
+      Grade encoding and submission are disabled.
+    </div>
+  </div>
+@endif
+
 <div class="container-fluid my-4">
 
   {{-- Success & Error Alerts --}}
@@ -114,6 +125,7 @@
                           value="{{ old('grades.'.$student->id.'.'.$q, $grades[$q]) }}"
                           class="form-control text-center grade-input"
                           min="0" max="100" step="1"
+                          {{ $syClosed ? 'readonly disabled' : '' }}
                           {{ in_array($q, $lockedQuarters ?? []) ? 'readonly disabled' : '' }}>
                       </td>
                     @endforeach
@@ -140,14 +152,17 @@
 
           {{-- Action Buttons --}}
           <div class="text-end mt-4">
-            @if(in_array($selectedAssignment->grade_status ?? 'draft', ['draft','returned']))
+            @if(!$syClosed && in_array($selectedAssignment->grade_status ?? 'draft', ['draft','returned']))
               <div class="d-flex justify-content-end gap-2">
-                {{-- Submit Button with Modal --}}
                 <button type="button" class="btn btn-outline-success px-4 btn-lg shadow-sm"
                         data-bs-toggle="modal" data-bs-target="#confirmSubmitModal">
                   <i class="bi bi-send-check me-1"></i> Submit Grades
                 </button>
               </div>
+            @elseif($syClosed)
+              <button type="button" class="btn btn-secondary px-4 btn-lg" disabled>
+                <i class="bi bi-lock me-1"></i> School Year Closed
+              </button>
             @else
               <button type="button" class="btn btn-secondary px-4 btn-lg" disabled>
                 <i class="bi bi-lock me-1"></i> Grades Locked

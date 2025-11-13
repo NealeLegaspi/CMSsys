@@ -2,10 +2,19 @@
 
 @section('title','Registrar Dashboard')
 @section('header')
-    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+  <i class="bi bi-speedometer2 me-2"></i> Dashboard
 @endsection
 
 @section('content')
+
+@if(isset($noActiveSY) && $noActiveSY)
+  <div class="alert alert-warning text-center py-5">
+    <i class="bi bi-exclamation-triangle fs-4"></i>
+    <p class="mt-2 mb-0 fw-semibold">
+      The current school year is closed. Dashboard features are unavailable until a new school year starts.
+    </p>
+  </div>
+@else
 <div class="row g-3">
   <!-- Quick Cards -->
   <div class="col-md-3">
@@ -83,7 +92,7 @@
   </div>
 </div>
 
-<!-- Chart.js -->
+<!-- Chart.js scripts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 @if(!empty($sections) && count($sections) > 0)
 <script>
@@ -118,5 +127,6 @@
     options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
   });
 </script>
+@endif
 @endif
 @endsection
