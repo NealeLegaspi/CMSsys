@@ -244,7 +244,7 @@
                                 <i class="bi bi-person-circle"></i>
                                 <strong>
                                     @if($ann->user)
-                                        {{ e($ann->user->role->name ?? 'System') }}: {{ e($a->user->profile->first_name ?? 'Unknown') }} {{ e($a->user->profile->last_name ?? 'Unknown') }}
+                                        {{ e($ann->user->role->name ?? 'System') }}: {{ e($ann->user->profile->first_name ?? 'Unknown') }} {{ e($ann->user->profile->last_name ?? 'Unknown') }}
                                     @else
                                         System
                                     @endif
