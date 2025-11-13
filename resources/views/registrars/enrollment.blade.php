@@ -10,6 +10,14 @@
   <div class="card-body">
     @include('partials.alerts')
 
+    @if(session('temp_password'))
+      <div class="alert alert-info alert-dismissible fade show shadow-sm mt-2">
+        <i class="bi bi-key me-2"></i>
+        <strong>Temporary Password:</strong> {{ session('temp_password') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    @endif
+
     @php
       $isActive = isset($activeSY) && $activeSY->status === 'active';
     @endphp
@@ -17,12 +25,12 @@
     @if(!$isActive)
       <div class="alert alert-warning d-flex align-items-center">
         <i class="bi bi-exclamation-triangle me-2"></i>
-        <strong>Note:</strong> The current school year is closed. All actions are disabled.
+        <strong>Note: </strong> The current school year is closed. All actions are disabled.
       </div>
     @endif
 
     <!-- Search & Filter -->
-    <form method="GET" action="{{ route('registrars.enrollment') }}" class="row g-2 mb-3">
+    <form method="GET" action="{{ route('registrars.enrollment') }}" class="row g-2 mb-3 align-items-center">
       <div class="col-md-3">
         <input type="text" name="search" class="form-control" value="{{ request('search') }}" placeholder="Search Name or Section...">
       </div>
@@ -36,32 +44,51 @@
           @endforeach
         </select>
       </div>
-      <div class="col-md-4">
-        <button type="submit" class="btn btn-outline-primary">
+
+      <div class="col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary flex-fill">
           <i class="bi bi-search"></i> Search
         </button>
-        <a href="{{ route('registrars.enrollment') }}" class="btn btn-outline-secondary">
+        <a href="{{ route('registrars.enrollment') }}" class="btn btn-outline-secondary flex-fill">
           <i class="bi bi-arrow-clockwise"></i> Reset
         </a>
       </div>
-      <div class="col-md-3 d-flex align-items-center justify-content-end">
-        <a href="{{ route('registrars.enrollment.export.csv') }}" class="btn btn-sm btn-success me-2">
-            <i class="bi bi-file-earmark-excel me-1"></i> Excel
-        </a>
-        <a href="{{ route('registrars.enrollment.export.pdf') }}" class="btn btn-sm btn-danger me-2">
-            <i class="bi bi-file-earmark-pdf me-1"></i> PDF
-        </a>
-        @if($isActive)
-          <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addStudentModal">
-              <i class="bi bi-plus-circle me-1"></i> Add Student
-          </button>
-        @else
-          <button type="button" class="btn btn-sm btn-secondary" disabled>
-              <i class="bi bi-lock"></i> Add Student (Closed)
-          </button>
-        @endif
+
+      <div class="col-md-4">
+        <div class="d-flex flex-wrap justify-content-end gap-2">
+            <div class="btn-group">
+              <button type="button" class="btn btn-outline-success btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export
+              </button>
+              <ul class="dropdown-menu shadow-sm">
+                <li>
+                  <a class="dropdown-item" href="{{ route('registrars.enrollment.export.csv') }}">
+                    <i class="bi bi-file-earmark-excel me-2 text-success"></i> Excel
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ route('registrars.enrollment.export.pdf') }}">
+                    <i class="bi bi-file-earmark-pdf me-2 text-danger"></i> PDF
+                  </a>
+                </li>
+              </ul>
+            </div>
+          <a href="{{ route('registrars.enrollment.archived') }}" class="btn btn-outline-dark btn-sm">
+              <i class="bi bi-archive me-1"></i> Archived
+          </a>
+          @if($isActive)
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+                <i class="bi bi-plus-circle me-1"></i> Add Student
+            </button>
+          @else
+            <button type="button" class="btn btn-secondary btn-sm" disabled>
+                <i class="bi bi-lock me-1"></i> Add Student (Closed)
+            </button>
+          @endif
+        </div>
       </div>
     </form>
+
 
     <div class="table-responsive">
       <table class="table table-bordered table-striped align-middle">
@@ -106,9 +133,40 @@
                   <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editEnrollmentModal{{ $enrollment->id }}">
                     <i class="bi bi-pencil"></i>
                   </button>
-                  <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteEnrollmentModal{{ $enrollment->id }}">
-                    <i class="bi bi-trash"></i>
-                  </button>
+
+                  {{-- 🗄 Archive --}}
+                  <form id="archiveForm{{ $enrollment->id }}" 
+                        action="{{ route('registrars.enrollment.archive', $enrollment->id) }}" 
+                        method="POST" style="display:inline;">
+                    @csrf
+                    @method('PUT')
+
+                    <button type="button" class="btn btn-sm btn-secondary" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#archiveEnrollmentModal{{ $enrollment->id }}">
+                      <i class="bi bi-archive"></i>
+                    </button>
+
+                    <div class="modal fade" id="archiveEnrollmentModal{{ $enrollment->id }}" tabindex="-1" aria-hidden="true">
+                      <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                          <div class="modal-header bg-secondary text-white">
+                            <h5 class="modal-title"><i class="bi bi-archive me-2"></i> Archive</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                          </div>
+                          <div class="modal-body text-center">
+                            Are you sure you want to archive this enrollment record for 
+                            <strong>{{ $enrollment->student->user->profile->full_name ?? 'N/A' }}</strong>?
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-secondary">Archive</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+
                 @else
                   <button class="btn btn-sm btn-secondary" disabled>
                     <i class="bi bi-lock"></i> Locked
@@ -117,7 +175,7 @@
               </td>
             </tr>
 
-                        <!-- ✅ Edit Modal -->
+            <!-- Edit Modal -->
             <div class="modal fade" id="editEnrollmentModal{{ $enrollment->id }}" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog">
                 <form method="POST" action="{{ route('registrars.enrollment.update', $enrollment->id) }}">
@@ -132,11 +190,24 @@
                       <div class="mb-3">
                         <label class="form-label">Section</label>
                         <select name="section_id" class="form-select" required>
-                          @foreach ($sections as $section)
-                            <option value="{{ $section->id }}" {{ $enrollment->section_id == $section->id ? 'selected' : '' }}>
-                              {{ $section->name }}
-                            </option>
-                          @endforeach
+                            <option value="" disabled>-- Select Section --</option>
+                            @php
+                                $sectionsByGrade = $sections->groupBy(function($section) {
+                                    return $section->gradeLevel->name ?? 'No Grade';
+                                });
+                            @endphp
+
+                            @foreach ($sectionsByGrade as $gradeName => $gradeSections)
+                                <optgroup label="{{ $gradeName }}">
+                                    @foreach ($gradeSections as $section)
+                                        <option 
+                                            value="{{ $section->id }}" 
+                                            {{ $enrollment->section_id == $section->id ? 'selected' : '' }}>
+                                            {{ $section->name }}
+                                        </option>
+                                    @endforeach
+                                </optgroup>
+                            @endforeach
                         </select>
                       </div>
                       <div class="mb-3">
@@ -156,31 +227,6 @@
                     </div>
                   </div>
                 </form>
-              </div>
-            </div>
-
-            <!-- ✅ Delete Modal -->
-            <div class="modal fade" id="deleteEnrollmentModal{{ $enrollment->id }}" tabindex="-1" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                  <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirm Delete</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                  </div>
-                  <div class="modal-body">
-                    <p>Are you sure you want to delete this enrollment for 
-                      <strong>{{ $enrollment->student->user->profile->full_name ?? 'N/A' }}</strong>?
-                    </p>
-                  </div>
-                  <div class="modal-footer">
-                    <form action="{{ route('registrars.enrollment.destroy', $enrollment->id) }}" method="POST">
-                      @csrf
-                      @method('DELETE')
-                      <button type="submit" class="btn btn-danger">Delete</button>
-                    </form>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                  </div>
-                </div>
               </div>
             </div>
 

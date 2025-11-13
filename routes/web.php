@@ -138,7 +138,15 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::get('/enrollment', [RegistrarController::class, 'enrollment'])->name('registrars.enrollment');
     Route::post('/enrollment', [RegistrarController::class, 'storeEnrollment'])->name('registrars.enrollment.store');
     Route::put('/enrollment/{id}/update', [RegistrarController::class, 'updateEnrollment'])->name('registrars.enrollment.update');
-    Route::delete('/enrollment/{id}', [RegistrarController::class, 'destroyEnrollment'])->name('registrars.enrollment.destroy');
+    Route::put('/enrollment/{id}/archive', [RegistrarController::class, 'archive'])
+        ->name('registrars.enrollment.archive');
+
+    Route::get('/enrollment/archived', [RegistrarController::class, 'archivedList'])
+        ->name('registrars.enrollment.archived');
+
+    Route::put('/enrollment/{id}/restore', [RegistrarController::class, 'restore'])
+        ->name('registrars.enrollment.restore');
+
     Route::post('/enrollments/import', [RegistrarController::class, 'importEnrollments'])->name('registrars.enrollments.import');
     Route::get('/enrollments/export', [RegistrarController::class, 'exportEnrollments'])->name('registrars.enrollments.export');
     Route::get('registrar/enrollment/export/csv', [RegistrarController::class, 'exportCsv'])->name('registrars.enrollment.export.csv');

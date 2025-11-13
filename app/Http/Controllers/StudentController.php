@@ -31,10 +31,16 @@ class StudentController extends Controller
 
         $activeQuarter = SystemHelper::getActiveQuarter();
 
-        $sectionIds = $user->student?->enrollments?->pluck('section_id') ?? collect();
+        $sectionIds = $user->student?->enrollments?->pluck('section_id')->filter()->toArray() ?? [];
 
-        $announcements = Announcement::with('user.profile')
-            ->whereIn('target_type', ['Global', 'Student'])
+        $announcements = Announcement::with(['user.profile', 'section'])
+            ->where(function ($q) use ($sectionIds) {
+                $q->whereIn('target_type', ['Global'])
+                ->orWhere(function ($sub) use ($sectionIds) {
+                    $sub->where('target_type', 'Student')
+                        ->whereIn('section_id', $sectionIds);
+                });
+            })
             ->where(function ($q) {
                 $q->whereNull('expires_at')
                 ->orWhere('expires_at', '>', now());
@@ -57,7 +63,6 @@ class StudentController extends Controller
     public function announcements()
     {
         $user = Auth::user();
-
         $activeSY = SchoolYear::where('status', 'active')->first();
 
         if (!$activeSY) {
@@ -67,8 +72,16 @@ class StudentController extends Controller
             ]);
         }
 
-        $announcements = Announcement::with('user.profile')
-            ->whereIn('target_type', ['Global', 'Student'])
+        $sectionIds = $user->student?->enrollments?->pluck('section_id')->filter()->toArray() ?? [];
+
+        $announcements = Announcement::with(['user.profile', 'section'])
+            ->where(function ($q) use ($sectionIds) {
+                $q->whereIn('target_type', ['Global'])
+                ->orWhere(function ($sub) use ($sectionIds) {
+                    $sub->where('target_type', 'Student')
+                        ->whereIn('section_id', $sectionIds);
+                });
+            })
             ->where(function ($q) {
                 $q->whereNull('expires_at')
                 ->orWhere('expires_at', '>', now());

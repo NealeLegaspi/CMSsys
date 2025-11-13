@@ -10,7 +10,8 @@ class Enrollment extends Model
         'student_id',
         'section_id',
         'school_year_id',
-        'status'
+        'status',
+        'archived',
     ];
 
     public function student()

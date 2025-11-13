@@ -39,12 +39,6 @@
                         <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
                         <a href="{{ route('registrars.documents.all') }}?tab=documents" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Reset</a>
                     </div>
-                    <div class="col-md-5 d-flex justify-content-end">
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal"
-                            @if($syClosed) disabled title="Cannot upload document. No active school year." @endif>
-                            <i class="bi bi-plus-circle me-1"></i> Upload Document
-                        </button>
-                    </div>
                 </form>
 
                 @if($syClosed)
@@ -201,10 +195,19 @@
                                         @endforeach
                                     </select>
                                 </div>
+
                                 <div class="mb-3">
                                     <label class="form-label">Document Type</label>
-                                    <input type="text" name="type" class="form-control" required @if($syClosed) disabled @endif>
+                                    <select name="type" class="form-select" required @if($syClosed) disabled @endif>
+                                        <option value="">-- Select Document Type --</option>
+                                        <option value="Birth Certificate">Birth Certificate</option>
+                                        <option value="Form 137">Form 137</option>
+                                        <option value="Good Moral">Good Moral</option>
+                                        <option value="Report Card">Report Card</option>
+                                        <option value="Transfer Credentials">Transfer Credentials</option>
+                                    </select>
                                 </div>
+
                                 <div class="mb-3">
                                     <label class="form-label">File</label>
                                     <input type="file" name="file" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required @if($syClosed) disabled @endif>
@@ -218,6 +221,7 @@
                     </form>
                 </div>
             </div>
+
 
 
             <div class="tab-pane fade" id="certificates-pane" role="tabpanel" aria-labelledby="certificates-tab" tabindex="0">
@@ -284,7 +288,8 @@
                                             type="button" 
                                             class="btn btn-sm btn-danger" 
                                             data-bs-toggle="modal" 
-                                            data-bs-target="#deleteCertModal{{ $cert->id }}">
+                                            data-bs-target="#deleteCertModal{{ $cert->id }}"
+                                            @if($syClosed) disabled title="Cannot delete. No active school year." @endif>
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </td>

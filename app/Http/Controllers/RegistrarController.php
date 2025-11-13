@@ -289,14 +289,15 @@ public function printForm138($studentId)
         $schoolYears = SchoolYear::all();
         $sections = Section::with('gradeLevel', 'enrollments')->get(); 
 
-        $query = Enrollment::with(['student.user.profile', 'section', 'schoolYear']);
+        $query = Enrollment::with(['student.user.profile', 'section', 'schoolYear'])
+            ->where('archived', false);
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->whereHas('student.user.profile', function ($q2) use ($search) {
                     $q2->where('first_name', 'like', "%$search%")
-                       ->orWhere('last_name', 'like', "%$search%");
+                    ->orWhere('last_name', 'like', "%$search%");
                 })->orWhereHas('student', function ($q2) use ($search) {
                     $q2->where('student_number', 'like', "%$search%");
                 })->orWhereHas('section', function ($q2) use ($search) {
@@ -313,6 +314,7 @@ public function printForm138($studentId)
 
         return view('registrars.enrollment', compact('students', 'sections', 'schoolYears', 'enrollments', 'activeSY'));
     }
+
 
     public function storeEnrollment(Request $request)
     {
@@ -419,6 +421,41 @@ public function printForm138($studentId)
 
         return back()->with('success', 'Enrollment record deleted.');
     }
+
+    public function archive($id)
+    {
+        $enrollment = Enrollment::findOrFail($id);
+        $enrollment->update(['archived' => true]);
+
+        return redirect()->back()->with('success', 'Enrollment successfully archived.');
+    }
+
+    public function archivedList(Request $request)
+    {
+        $search = $request->input('search');
+
+        $archived = Enrollment::where('archived', true)
+            ->when($search, function ($q) use ($search) {
+                $q->whereHas('student.user.profile', function ($sub) use ($search) {
+                    $sub->where('lastname', 'like', "%$search%")
+                        ->orWhere('firstname', 'like', "%$search%");
+                });
+            })
+            ->with(['student.user.profile', 'section', 'schoolYear'])
+            ->paginate(10);
+
+        return view('registrars.enrollment_archived', compact('archived', 'search'));
+    }
+
+    public function restore($id)
+    {
+        $enrollment = Enrollment::findOrFail($id);
+        $enrollment->update(['archived' => false]);
+
+        return redirect()->back()->with('success', 'Enrollment successfully restored.');
+    }
+
+
     
     public function verifyEnrollment($id)
     {
@@ -467,9 +504,12 @@ public function printForm138($studentId)
         }
 
         DB::transaction(function () use ($request, $currentSchoolYear, $studentNumber, $email) {
+            $lastFour = substr($studentNumber, -4);
+            $tempPassword = ucfirst($request->last_name) . ucfirst($request->first_name) . $lastFour;
+
             $user = User::create([
                 'email' => $email,
-                'password' => Hash::make('password'),
+                'password' => Hash::make($tempPassword),
                 'role_id' => 4,
                 'status' => 'active',
             ]);
