@@ -40,29 +40,41 @@
                 </tr>
               </thead>
               <tbody class="text-center">
+                
                 @foreach($records->sortBy('quarter') as $g)
                 <tr>
                   <td>{{ e($g->quarter ?? '-') }}</td>
+
                   <td>
-                    <span class="fw-semibold {{ $g->grade < 75 ? 'text-danger' : 'text-success' }}">
-                      {{ e($g->grade ?? '-') }}
-                    </span>
+                    @if($g->grade !== null)
+                      <span class="fw-semibold {{ $g->grade < 75 ? 'text-danger' : 'text-success' }}">
+                        {{ number_format($g->grade, 2) }}
+                      </span>
+                    @else
+                      -
+                    @endif
                   </td>
+
                   <td>
-                    {{ $g->grade >= 75 ? 'PASSED' : 'FAILED' }}
+                    @if($g->grade !== null)
+                      {{ $g->grade >= 75 ? 'PASSED' : 'FAILED' }}
+                    @else
+                      -
+                    @endif
                   </td>
                 </tr>
                 @endforeach
 
                 @if($final !== null)
                 <tr class="fw-bold table-light">
-                  <td colspan="1" class="text-end">Final Average:</td>
+                  <td class="text-end" colspan="1">Final Average:</td>
                   <td>{{ number_format($final, 2) }}</td>
                   <td class="{{ $remarks === 'PASSED' ? 'text-success' : 'text-danger' }}">
                     {{ $remarks }}
                   </td>
                 </tr>
                 @endif
+
               </tbody>
             </table>
           </div>
@@ -77,5 +89,4 @@
   </div>
 </div>
 @endif
-
 @endsection

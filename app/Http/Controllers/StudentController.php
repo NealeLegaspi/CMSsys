@@ -107,8 +107,9 @@ class StudentController extends Controller
 
         $grades = Grade::with('subject')
             ->where('student_id', $user->student?->id)
-            ->whereHas('subject.subjectAssignments', function ($q) {
-                $q->where('grade_status', 'approved');
+            ->whereHas('subject.subjectAssignments', function ($q) use ($activeSY) {
+                $q->where('grade_status', 'approved')
+                ->where('school_year_id', $activeSY->id);
             })
             ->get()
             ->groupBy('subject.name');

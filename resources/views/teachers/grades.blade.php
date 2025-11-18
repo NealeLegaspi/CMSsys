@@ -66,12 +66,14 @@
   @if(isset($selectedAssignment))
     <div class="card shadow-sm border-0 rounded-3">
       <div class="card-body">
+
         @if($selectedAssignment->grade_status === 'approved')
         <div class="alert alert-success d-flex align-items-center">
             <i class="bi bi-lock-fill me-2"></i>
             Grades for this subject have been approved and are now locked.
         </div>
         @endif
+
         <div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
           <h5 class="fw-bold mb-2">
             <i class="bi bi-journal-text text-primary me-2"></i>
@@ -107,16 +109,23 @@
                       $gradeRecord = $student->grades->firstWhere('quarter',$q);
                       $grades[$q] = $gradeRecord?->grade;
                     }
-                    $valid = array_filter($grades, fn($g)=>is_numeric($g)&&$g>=0&&$g<=100);
-                    $final = count($valid)==4 ? round(array_sum($valid)/4) : null;
-                    $remarks = $final ? ($final>=75?'PASSED':'FAILED') : null;
+
+                    $valid = array_filter($grades, fn($g)=>is_numeric($g) && $g >= 0 && $g <= 100);
+
+                    $final = count($valid) == 4
+                      ? number_format(array_sum($valid) / 4, 2, '.', '')
+                      : null;
+
+                    $remarks = $final !== null ? ($final >= 75 ? 'PASSED' : 'FAILED') : null;
                   @endphp
+
                   <tr>
                     <td class="text-start ps-3 fw-semibold">
                       {{ $student->user->profile->last_name ?? '' }}, 
                       {{ $student->user->profile->first_name ?? '' }}
                       <input type="hidden" name="students[]" value="{{ $student->id }}">
                     </td>
+
                     @foreach(['1st','2nd','3rd','4th'] as $q)
                       <td>
                         <input 
@@ -124,26 +133,29 @@
                           name="grades[{{ $student->id }}][{{ $q }}]"
                           value="{{ old('grades.'.$student->id.'.'.$q, $grades[$q]) }}"
                           class="form-control text-center grade-input"
-                          min="0" max="100" step="1"
+                          min="0" max="100" step="0.01"
                           {{ $syClosed ? 'readonly disabled' : '' }}
                           {{ in_array($q, $lockedQuarters ?? []) ? 'readonly disabled' : '' }}>
                       </td>
                     @endforeach
+
                     <td>
                       <input type="text"
                         class="form-control text-center fw-bold final-grade"
                         value="{{ $final ?? '' }}" readonly>
                     </td>
+
                     <td class="fw-bold remarks">
                       <span class="badge rounded-pill px-3 py-2 
-                            {{ $remarks == 'PASSED' 
-                                ? 'bg-success-subtle text-success border border-success-subtle' 
-                                : ($remarks == 'FAILED' 
-                                    ? 'bg-danger-subtle text-danger border border-danger-subtle' 
-                                    : '') }}">
+                          {{ $remarks == 'PASSED' 
+                              ? 'bg-success-subtle text-success border border-success-subtle' 
+                              : ($remarks == 'FAILED' 
+                                  ? 'bg-danger-subtle text-danger border border-danger-subtle' 
+                                  : '') }}">
                         {{ $remarks ?? '' }}
                       </span>
                     </td>
+
                   </tr>
                 @endforeach
               </tbody>
@@ -212,35 +224,42 @@
 {{-- JS --}}
 <script>
 function validateAndCompute(input) {
-  const row = input.closest('tr');
-  const gradeInputs = row.querySelectorAll('.grade-input');
-  const finalInput = row.querySelector('.final-grade');
-  const remarksSpan = row.querySelector('.remarks span');
+    const row = input.closest('tr');
+    const gradeInputs = row.querySelectorAll('.grade-input');
+    const finalInput = row.querySelector('.final-grade');
+    const remarksSpan = row.querySelector('.remarks span');
 
-  let val = parseFloat(input.value);
-  if (!isNaN(val)) {
-    if (val > 100) input.value = 100;
-    if (val < 0) input.value = 0;
-  } else input.value = '';
+    let val = parseFloat(input.value);
+    if (!isNaN(val)) {
+        if (val > 100) input.value = 100;
+        if (val < 0) input.value = 0;
+    } else {
+        input.value = '';
+    }
 
-  let grades = [];
-  gradeInputs.forEach(g => {
-    let gVal = parseFloat(g.value);
-    if (!isNaN(gVal) && gVal >= 0 && gVal <= 100) grades.push(gVal);
-  });
+    let grades = [];
+    gradeInputs.forEach(g => {
+        let gVal = parseFloat(g.value);
+        if (!isNaN(gVal) && gVal >= 0 && gVal <= 100) {
+            grades.push(gVal);
+        }
+    });
 
-  if (grades.length === 4) {
-    const avg = Math.round(grades.reduce((a,b)=>a+b,0)/4);
-    finalInput.value = avg;
-    remarksSpan.textContent = avg >= 75 ? 'PASSED' : 'FAILED';
-    remarksSpan.className = `badge rounded-pill px-3 py-2 ${avg >= 75 
-      ? 'bg-success-subtle text-success border border-success-subtle' 
-      : 'bg-danger-subtle text-danger border border-danger-subtle'}`;
-  } else {
-    finalInput.value = '';
-    remarksSpan.textContent = '';
-    remarksSpan.className = '';
-  }
+    if (grades.length === 4) {
+        const avg = (grades.reduce((a, b) => a + b, 0) / 4).toFixed(2);
+        finalInput.value = avg;
+        remarksSpan.textContent = avg >= 75 ? 'PASSED' : 'FAILED';
+        remarksSpan.className = `badge rounded-pill px-3 py-2 ${
+            avg >= 75 
+            ? 'bg-success-subtle text-success border border-success-subtle' 
+            : 'bg-danger-subtle text-danger border border-danger-subtle'
+        }`;
+    } else {
+        finalInput.value = '';
+        remarksSpan.textContent = '';
+        remarksSpan.className = '';
+    }
 }
 </script>
+
 @endsection

@@ -60,8 +60,18 @@
               foreach (['1st','2nd','3rd','4th'] as $q) {
                   $grades[$q] = $s->grades->firstWhere('quarter', $q)?->grade;
               }
+
+              // collect valid numeric grades
               $valid = array_filter($grades, fn($g) => is_numeric($g));
-              $final = count($valid) == 4 ? round(array_sum($valid) / 4) : null;
+
+              // FINAL GRADE (2 decimal places)
+              $final = count($valid) == 4
+                  ? number_format(array_sum($valid) / 4, 2, '.', '')
+                  : null;
+
+              $remarks = $final !== null
+                  ? ($final >= 75 ? 'PASSED' : 'FAILED')
+                  : null;
             @endphp
 
             <tr>
@@ -70,24 +80,28 @@
                 {{ optional($s->user->profile)->first_name ?? '' }}
                 {{ optional($s->user->profile)->middle_name ?? '' }}
               </td>
+
               @foreach(['1st','2nd','3rd','4th'] as $q)
-                <td>{{ $grades[$q] ?? '-' }}</td>
+                <td>{{ $grades[$q] !== null ? $grades[$q] : '-' }}</td>
               @endforeach
-              <td class="fw-bold {{ $final >= 75 ? 'text-success' : 'text-danger' }}">
+
+              <td class="fw-bold {{ $final !== null && $final >= 75 ? 'text-success' : 'text-danger' }}">
                 {{ $final ?? '-' }}
               </td>
+
               <td>
-                @if ($final)
+                @if ($final !== null)
                   <span class="badge rounded-pill px-3 py-2 
-                        {{ $final >= 75 
-                            ? 'bg-success-subtle text-success border border-success-subtle' 
-                            : 'bg-danger-subtle text-danger border border-danger-subtle' }}">
-                    {{ $final >= 75 ? 'PASSED' : 'FAILED' }}
+                      {{ $final >= 75 
+                          ? 'bg-success-subtle text-success border border-success-subtle'
+                          : 'bg-danger-subtle text-danger border border-danger-subtle' }}">
+                    {{ $remarks }}
                   </span>
                 @else
                   <span class="text-muted">–</span>
                 @endif
               </td>
+
             </tr>
           @empty
             <tr>

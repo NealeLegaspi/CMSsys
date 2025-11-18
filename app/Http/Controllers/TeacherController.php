@@ -418,7 +418,7 @@ class TeacherController extends Controller
         if ($assignment && $assignment->grade_status === 'approved') {
             $locked = DB::table('grades')
                 ->where('subject_id', $request->subject_id)
-                ->where('quarter', SystemHelper::getActiveQuarter())
+                ->where('quarter', $currentQuarter)
                 ->whereIn('student_id', function ($q) use ($request) {
                     $q->select('id')->from('students')->where('section_id', $request->section_id);
                 })
@@ -432,6 +432,7 @@ class TeacherController extends Controller
 
         foreach ($request->grades as $studentId => $quarters) {
             foreach ($quarters as $quarter => $gradeValue) {
+
                 if ((int)$quarter > $currentQuarter) continue;
 
                 if (is_numeric($gradeValue) && $gradeValue >= 60 && $gradeValue <= 100) {
@@ -442,11 +443,12 @@ class TeacherController extends Controller
                             'quarter'    => $quarter,
                         ],
                         [
-                            'grade'    => (int)$gradeValue,
+                            'grade' => number_format((float)$gradeValue, 2, '.', ''), // ✔ FIX HERE
                         ]
                     );
                     $savedCount++;
-                } elseif (empty($gradeValue)) {
+                } 
+                elseif (empty($gradeValue)) {
                     Grade::where('student_id', (int)$studentId)
                         ->where('subject_id', (int)$request->subject_id)
                         ->where('quarter', $quarter)
@@ -467,6 +469,7 @@ class TeacherController extends Controller
             ->route('teachers.grades', ['assignment_id' => $assignment->id ?? null])
             ->with('success', "Grades successfully saved for Quarter {$currentQuarter}!");
     }
+
 
     public function submitGrades(Request $request)
     {

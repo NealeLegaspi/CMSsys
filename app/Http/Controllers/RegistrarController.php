@@ -733,12 +733,11 @@ public function printForm138($studentId)
             $hasGrades = DB::table('grades')
                 ->where('subject_id', $assignment->subject_id)
                 ->where('quarter', $currentQuarter)
-                ->whereExists(function ($query) use ($assignment) {
-                    $query->select(DB::raw(1))
-                        ->from('students')
-                        ->whereColumn('students.id', 'grades.student_id')
-                        ->where('students.section_id', $assignment->section_id);
+                ->whereIn('student_id', function ($q) use ($assignment) {
+                    $q->select('id')->from('students')->where('section_id', $assignment->section_id);
                 })
+                ->whereNotNull('grade')
+                ->whereRaw('grade REGEXP "^[0-9]+(\\.[0-9]{1,2})?$"')
                 ->exists();
 
             if (!$hasGrades) {
