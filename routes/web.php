@@ -122,6 +122,7 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
 
     Route::get('/sections', [RegistrarController::class, 'sections'])->name('registrars.sections');
     Route::post('/sections', [RegistrarController::class, 'storeSection'])->name('registrars.sections.store');
+    Route::post('/sections/reuse', [RegistrarController::class, 'reuseSections'])->name('registrars.sections.reuse');
     Route::put('/sections/{id}', [RegistrarController::class, 'updateSection'])->name('registrars.sections.update');
     Route::delete('/sections/{id}/archive', [App\Http\Controllers\RegistrarController::class, 'archiveSection'])->name('registrars.sections.archive');
     Route::get('/sections/archived', [App\Http\Controllers\RegistrarController::class, 'archivedSections'])->name('registrars.sections.archived');
@@ -217,6 +218,7 @@ Route::get('/grades/export/pdf', [RegistrarController::class, 'exportGradesPDF']
 
     Route::get('/subjects', [RegistrarController::class, 'subjects'])->name('registrars.subjects');
     Route::post('/subjects', [RegistrarController::class, 'storeSubject'])->name('registrars.subjects.store');
+    Route::post('/subjects/reuse', [RegistrarController::class, 'reuseSubjects'])->name('registrars.subjects.reuse');
     Route::put('/subjects/{id}', [RegistrarController::class, 'updateSubject'])->name('registrars.subjects.update');
     Route::put('/subjects/{id}/archive', [RegistrarController::class, 'archiveSubject'])->name('registrars.subjects.archive');
     Route::get('/subjects/archived', [RegistrarController::class, 'archivedSubjects'])->name('registrars.subjects.archived');

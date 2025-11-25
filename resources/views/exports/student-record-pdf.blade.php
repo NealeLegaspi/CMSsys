@@ -97,12 +97,34 @@
     <tbody>
       @forelse($documents as $doc)
         <tr>
-          <td>{{ $doc->document_type ?? 'N/A' }}</td>
+          <td>{{ $doc->type ?? $doc->document_type ?? 'N/A' }}</td>
           <td>{{ $doc->status ?? 'N/A' }}</td>
           <td>{{ $doc->created_at?->format('M d, Y') ?? 'N/A' }}</td>
         </tr>
       @empty
         <tr><td colspan="3" align="center">No documents uploaded.</td></tr>
+      @endforelse
+    </tbody>
+  </table>
+
+  <div class="section-title">Issued Certificates</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Purpose / Remarks</th>
+        <th>Date Issued</th>
+      </tr>
+    </thead>
+    <tbody>
+      @forelse($certificates as $cert)
+        <tr>
+          <td>{{ $cert->type ?? 'N/A' }}</td>
+          <td>{{ $cert->purpose ?? $cert->remarks ?? 'N/A' }}</td>
+          <td>{{ $cert->created_at?->format('M d, Y') ?? 'N/A' }}</td>
+        </tr>
+      @empty
+        <tr><td colspan="3" align="center">No certificates issued.</td></tr>
       @endforelse
     </tbody>
   </table>

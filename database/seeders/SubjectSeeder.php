@@ -2,6 +2,7 @@
 namespace Database\Seeders;
 
 use App\Models\GradeLevel;
+use App\Models\SchoolYear;
 use App\Models\Subject;
 use Illuminate\Database\Seeder;
 
@@ -19,6 +20,10 @@ class SubjectSeeder extends Seeder
             'Grade 6'      => ['Filipino', 'English', 'Mathematics', 'Science', 'Araling Panlipunan', 'Edukasyon sa Pagpapakatao (EsP)', 'Edukasyong Pantahanan at Pangkabuhayan (EPP)', 'MAPEH'],
         ];
 
+        $targetSchoolYearId = SchoolYear::where('status', 'active')->value('id') 
+            ?? SchoolYear::orderByDesc('start_date')->value('id')
+            ?? SchoolYear::value('id');
+
         foreach ($subjectsByGrade as $gradeName => $subjects) {
             $gradeLevel = GradeLevel::where('name', $gradeName)->first();
             if ($gradeLevel) {
@@ -26,6 +31,7 @@ class SubjectSeeder extends Seeder
                     Subject::firstOrCreate([
                         'name'           => $sub,
                         'grade_level_id' => $gradeLevel->id,
+                        'school_year_id' => $targetSchoolYearId,
                     ]);
                 }
             }

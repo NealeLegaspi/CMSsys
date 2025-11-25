@@ -5,10 +5,21 @@ use Illuminate\Database\Eloquent\Model;
 
 class StudentDocument extends Model
 {
-    protected $fillable = ['student_id', 'type', 'file_path', 'status'];
+    protected $fillable = [
+        'student_id',
+        'school_year_id',
+        'type',
+        'file_path',
+        'status',
+    ];
 
     public function student()
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function schoolYear()
+    {
+        return $this->belongsTo(SchoolYear::class);
     }
 }

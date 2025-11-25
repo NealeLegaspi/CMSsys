@@ -84,7 +84,13 @@
     <hr>
 
     <!-- Documents -->
-    <h6 class="fw-bold text-primary mb-3"><i class="bi bi-folder2"></i> Submitted Documents</h6>
+    <h6 class="fw-bold text-primary mb-3">
+      <i class="bi bi-folder2"></i>
+      Submitted Documents
+      @if($currentSY)
+        <span class="badge bg-success ms-2">{{ $currentSY->name }}</span>
+      @endif
+    </h6>
     <div class="table-responsive mb-4">
       <table class="table table-bordered align-middle">
         <thead class="table-light">
@@ -98,7 +104,7 @@
         <tbody>
           @forelse($documents as $doc)
             <tr>
-              <td>{{ $doc->document_type ?? 'N/A' }}</td>
+              <td>{{ $doc->type ?? $doc->document_type ?? 'N/A' }}</td>
               <td>
                 <span class="badge 
                   @if($doc->status === 'Verified') bg-success
@@ -120,6 +126,49 @@
             </tr>
           @empty
             <tr><td colspan="4" class="text-center text-muted">No documents uploaded.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+
+    <hr>
+
+    <!-- Certificates -->
+    <h6 class="fw-bold text-primary mb-3">
+      <i class="bi bi-award"></i>
+      Issued Certificates
+      @if($currentSY)
+        <span class="badge bg-success ms-2">{{ $currentSY->name }}</span>
+      @endif
+    </h6>
+    <div class="table-responsive mb-4">
+      <table class="table table-bordered align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Type</th>
+            <th>Purpose</th>
+            <th>Issued On</th>
+            <th>File</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse($certificates as $cert)
+            <tr>
+              <td>{{ $cert->type ?? 'N/A' }}</td>
+              <td>{{ $cert->purpose ?? $cert->remarks ?? 'N/A' }}</td>
+              <td>{{ $cert->created_at?->format('M d, Y h:i A') ?? 'N/A' }}</td>
+              <td>
+                @if($cert->file_path)
+                  <a href="{{ asset('storage/' . $cert->file_path) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-file-earmark-pdf"></i> View
+                  </a>
+                @else
+                  <span class="text-muted">No file</span>
+                @endif
+              </td>
+            </tr>
+          @empty
+            <tr><td colspan="4" class="text-center text-muted">No certificates issued for this school year.</td></tr>
           @endforelse
         </tbody>
       </table>

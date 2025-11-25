@@ -6,24 +6,44 @@
 @endsection
 
 @section('content')
+@php
+    $syClosed = !$currentSY || $currentSY->status !== 'active';
+@endphp
+
 <div class="card card-custom shadow-sm border-0">
   <div class="card-body">
     @include('partials.alerts')
+
+    @if($syClosed)
+      <div class="alert alert-warning d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <div>
+          <strong>Note:</strong> No active school year detected. Grade approvals are disabled until an admin activates a school year.
+        </div>
+      </div>
+    @endif
 
     <!-- Filters -->
     <form method="GET" action="{{ route('registrars.grades') }}" class="row g-2 mb-3">
       <div class="col-md-6">
         <input type="text" name="search" class="form-control" 
               placeholder="Search by teacher or subject"
-              value="{{ request('search') }}">
+              value="{{ request('search') }}"
+              @if($syClosed) disabled @endif>
       </div>
-      <div class="col-md-6">
-        <button type="submit" class="btn btn-outline-primary">
+      <div class="col-md-6 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary" @if($syClosed) disabled @endif>
           <i class="bi bi-search"></i> Search
         </button>
-        <a href="{{ route('registrars.grades') }}" class="btn btn-outline-secondary">
-          <i class="bi bi-arrow-clockwise"></i> Reset
-        </a>
+        @if($syClosed)
+          <button type="button" class="btn btn-outline-secondary" disabled>
+            <i class="bi bi-arrow-clockwise"></i> Reset
+          </button>
+        @else
+          <a href="{{ route('registrars.grades') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-clockwise"></i> Reset
+          </a>
+        @endif
       </div>
     </form>
 

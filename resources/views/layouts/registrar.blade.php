@@ -50,7 +50,7 @@
       request()->routeIs('registrars.certificates') 
       ? 'active' : '' 
     }}">
-    <i class="bi bi-file-earmark-ruled-fill me-2"></i> Documents
+    <i class="bi bi-file-earmark-ruled-fill me-2"></i> Student Profile
     </a>
     <!----<a href="{{ route('registrars.students') }}" 
        class="nav-link {{ request()->routeIs('registrars.students*') ? 'active' : '' }}">
@@ -58,7 +58,7 @@
     </a>---->
     <a href="{{ route('registrars.enrollment') }}" 
        class="nav-link {{ request()->routeIs('registrars.enrollment') ? 'active' : '' }}">
-       <i class='bx bx-edit me-2'></i> Student Records
+       <i class='bx bx-edit me-2'></i> Student Registration
     </a>
     <a href="{{ route('registrars.quarterSettings') }}" 
       class="nav-link {{ request()->routeIs('registrars.quarterSettings') ? 'active' : '' }}">

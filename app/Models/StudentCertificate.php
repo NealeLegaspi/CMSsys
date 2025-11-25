@@ -11,6 +11,7 @@ class StudentCertificate extends Model
 
     protected $fillable = [
         'student_id',
+        'school_year_id',
         'type',
         'purpose',
         'remarks',
@@ -26,5 +27,10 @@ class StudentCertificate extends Model
     public function issuer()
     {
         return $this->belongsTo(User::class, 'issued_by');
+    }
+
+    public function schoolYear()
+    {
+        return $this->belongsTo(SchoolYear::class);
     }
 }

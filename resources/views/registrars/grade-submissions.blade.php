@@ -6,9 +6,22 @@
 @endsection
 
 @section('content')
+@php
+    $syClosed = !$currentSY || $currentSY->status !== 'active';
+@endphp
+
 <div class="container-fluid my-4">
 
     @include('partials.alerts')
+
+    @if($syClosed)
+        <div class="alert alert-warning d-flex align-items-center">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>
+            <div>
+                <strong>Heads up:</strong> No active school year detected. Grade submissions are hidden until an admin activates the new school year.
+            </div>
+        </div>
+    @endif
 
     <div class="d-flex flex-wrap gap-3 mb-3">
         <div class="badge bg-info text-dark fs-6 shadow-sm p-2 px-3">
@@ -28,10 +41,11 @@
     <form method="GET" action="{{ route('registrars.gradeSubmissions') }}" class="row g-2 mb-4">
         <div class="col-md-4">
             <input type="text" name="search" class="form-control" placeholder="Search by teacher or subject"
-                   value="{{ request('search') }}">
+                   value="{{ request('search') }}"
+                   @if($syClosed) disabled @endif>
         </div>
         <div class="col-md-3">
-            <select name="status" class="form-select">
+            <select name="status" class="form-select" @if($syClosed) disabled @endif>
                 <option value="">All Status</option>
                 <option value="submitted" {{ request('status') == 'submitted' ? 'selected' : '' }}>Submitted</option>
                 <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Approved</option>
@@ -39,12 +53,18 @@
             </select>
         </div>
         <div class="col-md-3 d-flex gap-2">
-            <button type="submit" class="btn btn-outline-primary">
+            <button type="submit" class="btn btn-outline-primary" @if($syClosed) disabled @endif>
                 <i class="bi bi-search"></i> Filter
             </button>
-            <a href="{{ route('registrars.gradeSubmissions') }}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-clockwise"></i> Reset
-            </a>
+            @if($syClosed)
+                <button type="button" class="btn btn-outline-secondary" disabled>
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            @else
+                <a href="{{ route('registrars.gradeSubmissions') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </a>
+            @endif
         </div>
     </form>
 
@@ -80,8 +100,9 @@
                                 {{ $s->updated_at ? \Carbon\Carbon::parse($s->updated_at)->format('M d, Y h:i A') : '—' }}
                             </td>
                             <td>
-                                <a href="{{ route('registrar.viewSubmission', $s->id) }}" 
-                                   class="btn btn-sm btn-outline-primary">
+                                <a href="{{ route('registrars.viewSubmission', $s->id) }}" 
+                                   class="btn btn-sm btn-outline-primary @if($syClosed) disabled @endif"
+                                   @if($syClosed) aria-disabled="true" tabindex="-1" @endif>
                                    <i class="bi bi-eye"></i> View
                                 </a>
                             </td>

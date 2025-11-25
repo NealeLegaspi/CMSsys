@@ -10,6 +10,7 @@ class Subject extends Model
         'description',
         'grade_level_id',
         'is_archived',
+        'school_year_id',
     ];
 
     public function grades()
@@ -39,6 +40,11 @@ class Subject extends Model
     public function gradeLevel()
     {
         return $this->belongsTo(GradeLevel::class, 'grade_level_id');
+    }
+
+    public function schoolYear()
+    {
+        return $this->belongsTo(SchoolYear::class);
     }
 
     public function subjectAssignments()

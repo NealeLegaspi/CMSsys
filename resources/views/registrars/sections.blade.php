@@ -21,6 +21,10 @@
       </div>
     @endif
 
+    @php
+        $canReuseSections = $currentSY && $reusableSchoolYears->isNotEmpty();
+    @endphp
+
     <form method="GET" action="{{ route('registrars.sections') }}" class="row g-2 mb-3">
       <div class="col-md-4">
         <input type="text" name="search" class="form-control"
@@ -31,10 +35,18 @@
         <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button>
         <a href="{{ route('registrars.sections') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Reset</a>
       </div>
-      <div class="col-md-6 d-flex justify-content-end gap-2">
+      <div class="col-md-6 d-flex justify-content-end gap-2 flex-wrap">
         <a href="{{ route('registrars.sections.archived') }}" class="btn btn-outline-dark me-2">
           <i class="bi bi-archive"></i> View Archived
         </a>
+
+        <button type="button"
+                class="btn btn-outline-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#reuseSectionsModal"
+                {{ $canReuseSections ? '' : 'disabled' }}>
+          <i class="bi bi-arrow-counterclockwise me-1"></i> Reuse Previous
+        </button>
 
         {{-- Add Section Button (Disabled if no active SY) --}}
         <button type="button" class="btn btn-primary"
@@ -243,6 +255,51 @@
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button class="btn btn-primary">Save</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{-- Reuse Sections Modal --}}
+<div class="modal fade" id="reuseSectionsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ route('registrars.sections.reuse') }}">
+      @csrf
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title"><i class="bi bi-arrow-counterclockwise me-2"></i>Reuse Sections</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          @if(!$canReuseSections)
+            <div class="alert alert-warning mb-0">
+              No previous school years available to reuse.
+            </div>
+          @else
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Source School Year</label>
+              <select name="source_school_year_id" class="form-select" required>
+                <option value="">-- Select School Year --</option>
+                @foreach($reusableSchoolYears as $sy)
+                  <option value="{{ $sy->id }}">{{ $sy->name }} ({{ ucfirst($sy->status) }})</option>
+                @endforeach
+              </select>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" value="1" name="include_subject_assignments" id="include_subject_assignments">
+              <label class="form-check-label" for="include_subject_assignments">
+                Include subject-teacher assignments
+              </label>
+            </div>
+            <small class="text-muted d-block">
+              Existing sections with the same name and grade level will be updated with the selected year's details.
+            </small>
+          @endif
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-info text-white" {{ $canReuseSections ? '' : 'disabled' }}>Reuse</button>
         </div>
       </div>
     </form>
