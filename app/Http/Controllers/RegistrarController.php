@@ -217,11 +217,20 @@ class RegistrarController extends Controller
 
     public function importStudents(Request $request)
     {
-        $request->validate(['file'=>'required|mimes:xlsx,csv']);
-        Excel::import(new StudentsImport, $request->file('file'));
-        $this->logActivity('Import Students','Imported student list');
-        return back()->with('success','Students imported successfully.');
+        $request->validate([
+            'import_file' => 'required|mimes:xlsx,xls'
+        ]);
+
+        try {
+            Excel::import(new StudentsImport, $request->file('import_file'));
+            $this->logActivity('Import Students', "Imported student list via Excel.");
+
+            return back()->with('success', 'Students successfully imported and enrolled!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Import failed: ' . $e->getMessage());
+        }
     }
+
 
     public function viewStudentRecord($id)
     {
@@ -1259,6 +1268,7 @@ public function printForm138($studentId)
 
         return back()->with('success', 'Subject assignment removed successfully.');
     }
+
 
     public function classList($id)
     {

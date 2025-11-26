@@ -155,7 +155,7 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
 
     Route::post('/enrollment/{id}/verify', [RegistrarController::class, 'verifyEnrollment'])->name('registrars.enrollment.verify');
     Route::post('/enrollment/add-student', [RegistrarController::class, 'addStudent'])->name('registrars.enrollment.addStudent');
-    Route::post('/enrollments/import', [RegistrarController::class, 'importExcel'])->name('registrars.enrollment.import');
+    Route::post('/enrollments/import', [RegistrarController::class, 'importStudents'])->name('registrars.enrollment.import');
 
 
     Route::get('/documents', [App\Http\Controllers\RegistrarController::class, 'documentsAndCertificates'])

@@ -137,6 +137,9 @@
                   <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStudentModal">
                     <i class="bi bi-person-plus me-1"></i> Add / Register Student
                   </button>
+                  <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#importModal">
+                    <i class="bi bi-upload me-1"></i> Import Excel
+                  </button>
                 </div>
               </div>
 
@@ -321,6 +324,30 @@
 </div>
 
 {{-- ----------------------------- MODALS ----------------------------- --}}
+
+<div class="modal fade" id="importModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ route('registrars.enrollment.import') }}" enctype="multipart/form-data" class="modal-content">
+      @csrf
+
+      <div class="modal-header">
+        <h5 class="modal-title">Import Students (Excel)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <p class="small text-muted">Upload an Excel file (.xlsx/.xls) with the correct column format.</p>
+
+        <input type="file" name="import_file" class="form-control" required>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary"><i class="bi bi-upload me-1"></i> Upload</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {{-- Add Student Modal --}}
 <div class="modal fade" id="addStudentModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
