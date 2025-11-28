@@ -20,6 +20,11 @@ use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Hash;
+use Maatwebsite\Excel\Facades\Excel;
+use Maatwebsite\Excel\HeadingRowImport;
+use App\Exports\GradeTemplateExport;
+use App\Imports\GradeImport;
+
 
 class TeacherController extends Controller
 {
@@ -546,6 +551,114 @@ class TeacherController extends Controller
             ->route('teachers.grades', ['assignment_id' => $assignment->id])
             ->with('success', "Grades successfully submitted for Quarter {$currentQuarter}. Pending registrar approval.");
     }
+
+    public function downloadImportTemplate()
+    {
+        $content = "student_number,1st,2nd,3rd,4th\n";
+
+        return response($content)
+            ->header('Content-Type', 'text/csv')
+            ->header('Content-Disposition', 'attachment; filename="grade_import_template.csv"');
+    }
+
+    public function importGrades(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:csv,txt',
+            'subject_id' => 'required|exists:subjects,id',
+            'section_id' => 'required|exists:sections,id',
+        ]);
+
+        $subjectId = $request->subject_id;
+        $sectionId = $request->section_id;
+        $teacherId = Auth::id();
+        $currentQuarter = SystemHelper::getActiveQuarter();
+
+        $assignment = DB::table('subject_assignments')
+            ->where('teacher_id', $teacherId)
+            ->where('subject_id', $subjectId)
+            ->where('section_id', $sectionId)
+            ->first();
+
+        if (!$assignment) {
+            return back()->with('error', 'Unauthorized subject assignment.');
+        }
+
+        // Check locked quarter
+        $locked = DB::table('grades')
+            ->where('subject_id', $subjectId)
+            ->where('quarter', $currentQuarter)
+            ->where('locked', true)
+            ->exists();
+
+        if ($locked) {
+            return back()->with('error', 'This quarter is locked. You cannot import grades.');
+        }
+
+        $file = fopen($request->file('file'), 'r');
+        $header = fgetcsv($file); // skip header row
+
+        $rowsImported = 0;
+
+        while (($row = fgetcsv($file)) !== false) {
+
+            $studentNumber = $row[0] ?? null;
+
+            $student = Student::where('student_number', $studentNumber)->first();
+
+            if (!$student) {
+                continue; 
+            }
+
+            $studentId = $student->id; 
+
+            $q1 = $row[1] ?? null;
+            $q2 = $row[2] ?? null;
+            $q3 = $row[3] ?? null;
+            $q4 = $row[4] ?? null;
+
+            // Only update quarters up to active quarter
+            $quarters = [
+                '1st' => $q1,
+                '2nd' => $q2,
+                '3rd' => $q3,
+                '4th' => $q4,
+            ];
+
+            foreach ($quarters as $quarter => $value) {
+
+                // Don't allow future quarter
+                if ($quarter === '2nd' && $currentQuarter < 2) continue;
+                if ($quarter === '3rd' && $currentQuarter < 3) continue;
+                if ($quarter === '4th' && $currentQuarter < 4) continue;
+
+                if (is_numeric($value) && $value >= 60 && $value <= 100) {
+                    Grade::updateOrCreate(
+                        [
+                            'student_id' => $studentId,
+                            'subject_id' => $subjectId,
+                            'quarter' => $quarter
+                        ],
+                        [
+                            'grade' => number_format((float)$value, 2, '.', '')
+                        ]
+                    );
+
+                    $rowsImported++;
+                }
+            }
+        }
+
+        fclose($file);
+
+        $this->logActivity(
+            'Import Grades',
+            "Imported {$rowsImported} grade entries for subject {$subjectId} section {$sectionId}"
+        );
+
+        return back()->with('success', "Successfully imported {$rowsImported} grade entries!");
+    }
+
 
 
     protected function getTeacherAssignedStudents()

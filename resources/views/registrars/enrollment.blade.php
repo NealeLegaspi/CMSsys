@@ -335,6 +335,12 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
 
+      <a href="{{ route('registrars.enrollment.template') }}" 
+        class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-arrow-down me-1"></i> Download Template
+      </a>
+
+
       <div class="modal-body">
         <p class="small text-muted">Upload an Excel file (.xlsx/.xls) with the correct column format.</p>
 
@@ -390,11 +396,6 @@
             <div class="col-md-6">
               <label class="form-label small">Contact Number</label>
               <input name="contact_number" class="form-control" required>
-            </div>
-
-            <div class="col-md-6">
-              <label class="form-label small">Guardian Name</label>
-              <input name="guardian_name" class="form-control" required>
             </div>
 
             <div class="col-12">

@@ -170,6 +170,14 @@
                         data-bs-toggle="modal" data-bs-target="#confirmSubmitModal">
                   <i class="bi bi-send-check me-1"></i> Submit Grades
                 </button>
+
+                <button type="button" 
+                        class="btn btn-outline-dark btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#importGradesModal">
+                    <i class="bi bi-upload me-1"></i> Import Grades
+                </button>
+
               </div>
             @elseif($syClosed)
               <button type="button" class="btn btn-secondary px-4 btn-lg" disabled>
@@ -220,6 +228,43 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="importGradesModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title"><i class="bi bi-upload me-1"></i> Import Grades</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <p>You can upload a CSV file containing student grades for this subject.</p>
+
+        <a href="{{ route('teachers.grades.import.template') }}"
+           class="btn btn-sm btn-outline-primary mb-3">
+           <i class="bi bi-download"></i> Download Template
+        </a>
+
+        @if($subject && $section)
+        <form action="{{ route('teachers.grades.import') }}" method="POST" enctype="multipart/form-data">
+            @csrf
+
+            <input type="hidden" name="subject_id" value="{{ $subject->id }}">
+            <input type="hidden" name="section_id" value="{{ $section->id }}">
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Upload CSV File</label>
+                <input type="file" name="file" class="form-control" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Import Grades</button>
+        </form>
+        @endif
+      </div>
+    </div>
+  </div>
+</div>
+
 
 {{-- JS --}}
 <script>

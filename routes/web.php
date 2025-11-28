@@ -155,7 +155,9 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
 
     Route::post('/enrollment/{id}/verify', [RegistrarController::class, 'verifyEnrollment'])->name('registrars.enrollment.verify');
     Route::post('/enrollment/add-student', [RegistrarController::class, 'addStudent'])->name('registrars.enrollment.addStudent');
-    Route::post('/enrollments/import', [RegistrarController::class, 'importStudents'])->name('registrars.enrollment.import');
+    Route::post('/enrollment/import', [RegistrarController::class, 'importStudents'])->name('registrars.enrollment.import');
+    Route::get('/enrollment/template', [RegistrarController::class, 'downloadTemplate'])->name('registrars.enrollment.template');
+
 
 
     Route::get('/documents', [App\Http\Controllers\RegistrarController::class, 'documentsAndCertificates'])
@@ -245,6 +247,12 @@ Route::prefix('teacher')->middleware(['auth', 'role:Teacher'])->group(function (
     Route::get('/grades/{subject}/edit', [TeacherController::class, 'editGrades'])->name('teachers.grades.edit');
     Route::put('/grades/{subject}', [TeacherController::class, 'updateGrades'])->name('teachers.grades.update');
     Route::delete('/grades/{subject}', [TeacherController::class, 'destroyGrades'])->name('teachers.grades.destroy');
+
+    // Import Grades
+    Route::post('/grades/import', [TeacherController::class, 'importGrades'])->name('teachers.grades.import');
+
+    Route::get('/grades/import-template', [TeacherController::class, 'downloadImportTemplate'])->name('teachers.grades.import.template');
+
 
     Route::post('/grades/submit', [TeacherController::class, 'submitGrades'])->name('teachers.grades.submit');
 

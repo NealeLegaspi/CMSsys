@@ -30,6 +30,7 @@ use App\Exports\StudentsExport;
 use App\Imports\StudentsImport;
 use App\Exports\EnrollmentsExport;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\StudentTemplateExport;
 
 class RegistrarController extends Controller
 {
@@ -218,8 +219,9 @@ class RegistrarController extends Controller
     public function importStudents(Request $request)
     {
         $request->validate([
-            'import_file' => 'required|mimes:xlsx,xls'
+            'import_file' => 'required|mimes:xlsx,xls,csv,txt'
         ]);
+
 
         try {
             Excel::import(new StudentsImport, $request->file('import_file'));
@@ -229,6 +231,11 @@ class RegistrarController extends Controller
         } catch (\Exception $e) {
             return back()->with('error', 'Import failed: ' . $e->getMessage());
         }
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new StudentTemplateExport, 'student_import_template.xlsx');
     }
 
 
