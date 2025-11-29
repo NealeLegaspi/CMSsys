@@ -398,6 +398,11 @@
               <input name="contact_number" class="form-control" required>
             </div>
 
+            <div class="col-md-6">
+              <label class="form-label small">Guardian Name</label>
+              <input name="guardian_name" class="form-control" required>
+            </div>
+
             <div class="col-12">
               <label class="form-label small">Address</label>
               <input name="address" class="form-control" required>
