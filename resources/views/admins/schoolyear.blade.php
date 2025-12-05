@@ -163,10 +163,10 @@
                       This will automatically close the currently active school year.
                     </div>
                     <div class="modal-footer">
-                      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                      <form method="POST" action="{{ route('admins.schoolyear.activate',$sy->id) }}">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      <form method="POST" action="{{ route('admins.schoolyear.activate',$sy->id) }}" style="display: inline;">
                         @csrf
-                        <button class="btn btn-success">Activate</button>
+                        <button type="submit" class="btn btn-success">Activate</button>
                       </form>
                     </div>
                   </div>
@@ -188,7 +188,7 @@
                       <span class="text-danger">{{ $sy->name }}</span>?  
                       <br><br>
                       <small class="text-muted">
-                        This will mark all current enrollments under this school year as “Inactive”.
+                        This will mark all current enrollments under this school year as "Inactive".
                       </small>
                     </div>
                     <div class="modal-footer">

@@ -28,6 +28,7 @@ use App\Exports\EnrollmentReportExport;
 use App\Exports\GradingReportExport;
 use App\Exports\PDF\EnrollmentReportPDF;
 use App\Exports\PDF\GradingReportPDF;
+use Carbon\Carbon;
 
 class AdminController extends Controller
 {
@@ -597,6 +598,61 @@ class AdminController extends Controller
      */
     public function schoolYears(Request $request)
     {
+        // --- Auto-maintenance for school years ---
+        $today = Carbon::today();
+
+        // 1) Auto-archive closed school years 3 weeks after their end date
+        $archiveCutoff = $today->copy()->subWeeks(3);
+
+        $toArchive = SchoolYear::whereNull('deleted_at')
+            ->where('status', 'closed')
+            ->whereDate('end_date', '<', $archiveCutoff->toDateString())
+            ->get();
+
+        foreach ($toArchive as $sy) {
+            $name = $sy->name;
+            $sy->delete(); // soft-delete = archive
+            $this->logActivity('Archive School Year', "Auto-archived school year {$name} after grace period.");
+        }
+
+        // 2) Auto-activate upcoming school year 1 month before its start date
+        $activeSY = SchoolYear::where('status', 'active')->first();
+
+        if (!$activeSY) {
+            $upcoming = SchoolYear::whereNull('deleted_at')
+                ->where('status', 'closed')
+                ->orderBy('start_date')
+                ->get();
+
+            foreach ($upcoming as $candidate) {
+                $start = Carbon::parse($candidate->start_date);
+                $activationWindowStart = $start->copy()->subMonth();
+
+                if ($today->greaterThanOrEqualTo($activationWindowStart) && $today->lessThanOrEqualTo($start)) {
+                    // Close any other active years just in case
+                    SchoolYear::where('status', 'active')->update(['status' => 'closed']);
+
+                    $candidate->update(['status' => 'active']);
+
+                    // Sync enrollments like manual activation
+                    Enrollment::where('school_year_id', '!=', $candidate->id)
+                        ->where('status', 'Enrolled')
+                        ->update(['status' => 'Inactive']);
+
+                    Enrollment::where('school_year_id', $candidate->id)
+                        ->whereIn('status', ['Inactive', 'Pending'])
+                        ->update(['status' => 'Enrolled']);
+
+                    $this->logActivity(
+                        'Activate School Year',
+                        "Auto-activated school year {$candidate->name} one month before start date."
+                    );
+
+                    break;
+                }
+            }
+        }
+
         $search = $request->input('search');
         $status = $request->input('status');
 
@@ -616,12 +672,39 @@ class AdminController extends Controller
             'name'       => 'nullable|string|max:100|unique:school_years,name',
         ]);
 
+        $start = Carbon::parse($request->start_date);
+        $end   = Carbon::parse($request->end_date);
+
+        // Enforce maximum length of a school year (e.g. 15 months)
+        $maxMonths = 15;
+        if ($start->diffInMonths($end) > $maxMonths) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'end_date' => "The school year spans too long. Please limit it to about {$maxMonths} months.",
+                ]);
+        }
+
+        // Prevent overlapping date ranges with existing school years
+        $overlap = SchoolYear::where(function ($q) use ($start, $end) {
+                $q->where('start_date', '<=', $end->toDateString())
+                  ->where('end_date', '>=', $start->toDateString());
+            })
+            ->first();
+
+        if ($overlap) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'start_date' => "These dates overlap with existing school year: {$overlap->name}.",
+                ]);
+        }
+
         $name = $request->name ?? $request->start_date . ' - ' . $request->end_date;
 
         if (SchoolYear::where('name', $name)->exists()) {
             return back()->withErrors(['name' => 'School year already exists.']);
         }
-
         $status = $request->has('set_active') ? 'active' : 'closed';
 
         if ($status === 'active') {
@@ -680,6 +763,35 @@ class AdminController extends Controller
             'start_date' => 'required|date',
             'end_date'   => 'required|date|after_or_equal:start_date',
         ]);
+
+        $start = Carbon::parse($request->start_date);
+        $end   = Carbon::parse($request->end_date);
+
+        // Enforce maximum school year length (same rule as store)
+        $maxMonths = 15;
+        if ($start->diffInMonths($end) > $maxMonths) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'end_date' => "The school year spans too long. Please limit it to about {$maxMonths} months.",
+                ]);
+        }
+
+        // Prevent overlapping dates with any *other* school year
+        $overlap = SchoolYear::where('id', '!=', $sy->id)
+            ->where(function ($q) use ($start, $end) {
+                $q->where('start_date', '<=', $end->toDateString())
+                  ->where('end_date', '>=', $start->toDateString());
+            })
+            ->first();
+
+        if ($overlap) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'start_date' => "These dates overlap with existing school year: {$overlap->name}.",
+                ]);
+        }
 
         $sy->update([
             'start_date' => $request->start_date,

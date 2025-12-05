@@ -15,6 +15,7 @@ use App\Models\ActivityLog;
 use App\Models\StudentDocument; 
 use App\Models\StudentCertificate; 
 use App\Models\SubjectAssignment;
+use App\Models\Curriculum;
 use App\Helpers\SystemHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -330,8 +331,95 @@ public function printForm138($studentId)
             ->where('school_year_id', $activeSYId)
             ->get();
 
+        /**
+         * Promotion safety logic for Student Tools
+         * ---------------------------------------
+         * For each student who is not yet enrolled in the active SY:
+         *  - Find their last enrollment (latest school year).
+         *  - Compute the year gap between last enrollment SY and active SY.
+         *  - Allow sections only in:
+         *      gap = 1 → same grade + next grade
+         *      gap >=2 → same grade + next 2 grades (if they exist)
+         *  - If no previous enrollment or no active SY: allow all sections.
+         */
+        $studentUpgradeInfo = [];
+
+        if ($activeSY && $studentsNotEnrolled->isNotEmpty()) {
+            // Map school years into an ordered index so we can compute the gap.
+            $orderedSchoolYears = SchoolYear::orderBy('start_date')->get();
+            $syIndex = [];
+            foreach ($orderedSchoolYears as $index => $sy) {
+                $syIndex[$sy->id] = $index;
+            }
+
+            // Ordered grade levels for progression.
+            $orderedGrades = GradeLevel::orderBy('id')->get();
+            $gradeIndex = [];
+            foreach ($orderedGrades as $index => $gl) {
+                $gradeIndex[$gl->id] = $index;
+            }
+
+            $studentIds = $studentsNotEnrolled->pluck('id');
+
+            $lastEnrollments = Enrollment::with(['section.gradeLevel', 'schoolYear'])
+                ->whereIn('student_id', $studentIds)
+                ->where('archived', false)
+                ->get()
+                ->sortByDesc(function ($enr) use ($syIndex) {
+                    return $syIndex[$enr->school_year_id] ?? -1;
+                })
+                ->groupBy('student_id')
+                ->map->first();
+
+            foreach ($studentsNotEnrolled as $student) {
+                $info = [
+                    'last_sy_name'         => null,
+                    'last_grade_name'      => null,
+                    'allowed_grade_names'  => [],
+                    'allowed_section_ids'  => $sections->pluck('id')->all(), // default: all sections
+                ];
+
+                $last = $lastEnrollments->get($student->id);
+
+                if ($last && isset($syIndex[$last->school_year_id]) && isset($syIndex[$activeSYId])) {
+                    $lastIndex   = $syIndex[$last->school_year_id];
+                    $activeIndex = $syIndex[$activeSYId];
+                    $gap         = max(0, $activeIndex - $lastIndex); // how many SYs have passed
+
+                    $info['last_sy_name']    = optional($last->schoolYear)->name;
+                    $info['last_grade_name'] = optional(optional($last->section)->gradeLevel)->name;
+
+                    $lastGradeId = optional($last->section)->gradelevel_id;
+
+                    if ($gap > 0 && $lastGradeId && isset($gradeIndex[$lastGradeId])) {
+                        $maxAdvance = min($gap, 2); // at most 2 grade levels ahead
+                        $startIdx  = $gradeIndex[$lastGradeId];
+                        $endIdx    = min($startIdx + $maxAdvance, $orderedGrades->count() - 1);
+
+                        $allowedGradeIds   = [];
+                        $allowedGradeNames = [];
+
+                        for ($i = $startIdx; $i <= $endIdx; $i++) {
+                            $allowedGradeIds[]   = $orderedGrades[$i]->id;
+                            $allowedGradeNames[] = $orderedGrades[$i]->name;
+                        }
+
+                        $info['allowed_grade_names'] = $allowedGradeNames;
+
+                        // Restrict sections to only those grade levels in the active SY
+                        $info['allowed_section_ids'] = $sections
+                            ->whereIn('gradelevel_id', $allowedGradeIds)
+                            ->pluck('id')
+                            ->all();
+                    }
+                }
+
+                $studentUpgradeInfo[$student->id] = $info;
+            }
+        }
+
         // --- Active SY Enrollments (for the Student Registration tab) ---
-        $activeQuery = Enrollment::with(['student.user.profile', 'section.gradeLevel', 'schoolYear'])
+        $activeQuery = Enrollment::with(['student.user.profile', 'section.gradeLevel', 'section.adviser.profile', 'schoolYear'])
             ->when($activeSYId, fn($q) => $q->where('school_year_id', $activeSYId))
             ->where('archived', false);
 
@@ -383,6 +471,88 @@ public function printForm138($studentId)
 
         $archivedEnrollments = $archivedQuery->latest()->paginate(10, ['*'], 'archived_page');
 
+        // Get teachers for adviser dropdown
+        $teachers = User::where('role_id', 3)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', '!=', 'inactive');
+            })
+            ->with('profile')
+            ->get();
+
+        // Get all subjects (from current curriculum) by grade level and their assignments for each section (for displaying in modal)
+        $sectionSubjectAssignments = [];
+        if ($activeSYId) {
+            // Get all sections with their grade levels
+            $sectionsWithGrades = Section::where('school_year_id', $activeSYId)
+                ->with('gradeLevel')
+                ->get();
+
+            // Determine the current curriculum for this school year
+            $currentCurriculum = Curriculum::where('school_year_id', $activeSYId)
+                ->where('is_template', false)
+                ->orderByDesc('id')
+                ->first();
+
+            // Get all subjects from the current curriculum, grouped by grade level
+            $allSubjects = collect();
+            if ($currentCurriculum) {
+                $allSubjects = $currentCurriculum->subjects()
+                    ->where('is_archived', false)
+                    ->with('gradeLevel')
+                    ->get()
+                    ->groupBy('grade_level_id');
+            }
+
+            // Get all subject assignments (section_id, subject_id, teacher info)
+            $allAssignments = DB::table('subject_teacher')
+                ->join('sections', 'subject_teacher.section_id', '=', 'sections.id')
+                ->join('subjects', 'subject_teacher.subject_id', '=', 'subjects.id')
+                ->join('users', 'subject_teacher.teacher_id', '=', 'users.id')
+                ->join('profiles', 'users.id', '=', 'profiles.user_id')
+                ->where('sections.school_year_id', $activeSYId)
+                ->select(
+                    'subject_teacher.section_id',
+                    'subject_teacher.subject_id',
+                    'subjects.name as subject_name',
+                    'profiles.first_name',
+                    'profiles.last_name'
+                )
+                ->get()
+                ->groupBy('section_id')
+                ->map(function($group) {
+                    return $group->keyBy('subject_id');
+                });
+
+            // For each section, get all subjects for its grade level
+            foreach ($sectionsWithGrades as $section) {
+                $gradeLevelId = $section->gradelevel_id;
+                $sectionId = (string)$section->id;
+                
+                // Get all subjects for this grade level
+                $gradeSubjects = $allSubjects->get($gradeLevelId, collect());
+                
+                // Build the subject list with assignment info
+                $sectionSubjectAssignments[$sectionId] = $gradeSubjects->map(function($subject) use ($allAssignments, $sectionId) {
+                    $sectionAssignments = $allAssignments->get($sectionId);
+
+                    // Prefer exact subject_id match; if not found, fall back to same-name match within this section
+                    $assignment = $sectionAssignments?->get($subject->id);
+                    if (!$assignment && $sectionAssignments) {
+                        $assignment = $sectionAssignments->firstWhere('subject_name', $subject->name);
+                    }
+
+                    return [
+                        'subject_id' => $subject->id,
+                        'subject_name' => $subject->name,
+                        'teacher_name' => $assignment 
+                            ? trim(($assignment->first_name ?? '') . ' ' . ($assignment->last_name ?? ''))
+                            : 'Not Assigned'
+                    ];
+                })->values()->toArray();
+            }
+        }
+
         return view('registrars.enrollment', compact(
             'studentsNotEnrolled',
             'sections',
@@ -390,7 +560,10 @@ public function printForm138($studentId)
             'activeSY',
             'activeEnrollments',
             'historyEnrollments',
-            'archivedEnrollments'
+            'archivedEnrollments',
+            'studentUpgradeInfo',
+            'teachers',
+            'sectionSubjectAssignments'
         ));
     }
 
@@ -404,6 +577,17 @@ public function printForm138($studentId)
         $request->validate([
             'student_id' => 'required|exists:students,id',
             'section_id' => 'required|exists:sections,id',
+            'first_name' => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'sex' => 'required|string',
+            'birthdate' => 'required|date',
+            'contact_number' => 'required|string|max:20',
+            'guardian_first_name' => 'required|string|max:255',
+            'guardian_middle_name' => 'nullable|string|max:255',
+            'guardian_last_name' => 'required|string|max:255',
+            'address' => 'required|string|max:255',
+            'adviser_id' => 'nullable|exists:users,id',
         ]);
 
         $exists = Enrollment::where('student_id', $request->student_id)
@@ -423,6 +607,27 @@ public function printForm138($studentId)
             }
         }
 
+        $student = Student::with('user.profile')->findOrFail($request->student_id);
+
+        // Update student profile if provided
+        if ($student->user && $student->user->profile) {
+            // Concatenate guardian name fields
+            $guardianName = trim($request->guardian_first_name . ' ' . 
+                ($request->guardian_middle_name ? $request->guardian_middle_name . ' ' : '') . 
+                $request->guardian_last_name);
+
+            $student->user->profile->update([
+                'first_name' => $request->first_name,
+                'middle_name' => $request->middle_name,
+                'last_name' => $request->last_name,
+                'sex' => $request->sex,
+                'birthdate' => $request->birthdate,
+                'contact_number' => $request->contact_number,
+                'guardian_name' => $guardianName,
+                'address' => $request->address,
+            ]);
+        }
+
         $enrollment = Enrollment::create([
             'student_id'     => $request->student_id,
             'section_id'     => $request->section_id,
@@ -431,6 +636,13 @@ public function printForm138($studentId)
         ]);
 
         Student::where('id', $request->student_id)->update(['section_id' => $request->section_id]);
+
+        // Update section adviser if provided
+        if ($request->filled('adviser_id')) {
+            $section = Section::findOrFail($request->section_id);
+            $section->update(['adviser_id' => $request->adviser_id]);
+        }
+
         $studentName = $enrollment->student->user->profile->full_name ?? 'N/A';
         $this->logActivity('Enroll Student', "Enrolled student {$studentName}");
 
@@ -565,9 +777,12 @@ public function printForm138($studentId)
             'sex' => 'required|string',
             'birthdate' => 'required|date',
             'contact_number' => 'required|string|max:20',
-            'guardian_name' => 'required|string|max:255',
+            'guardian_first_name' => 'required|string|max:255',
+            'guardian_middle_name' => 'nullable|string|max:255',
+            'guardian_last_name' => 'required|string|max:255',
             'address' => 'required|string|max:255',
             'section_id' => 'required|exists:sections,id',
+            'adviser_id' => 'nullable|exists:users,id',
         ]);
 
         $baseCode = '400655';
@@ -592,6 +807,11 @@ public function printForm138($studentId)
                 'status' => 'active',
             ]);
 
+            // Concatenate guardian name fields
+            $guardianName = trim($request->guardian_first_name . ' ' . 
+                ($request->guardian_middle_name ? $request->guardian_middle_name . ' ' : '') . 
+                $request->guardian_last_name);
+
             UserProfile::create([
                 'user_id' => $user->id,
                 'first_name' => $request->first_name,
@@ -601,7 +821,7 @@ public function printForm138($studentId)
                 'birthdate' => $request->birthdate, 
                 'address' => $request->address,
                 'contact_number' => $request->contact_number,
-                'guardian_name' => $request->guardian_name,
+                'guardian_name' => $guardianName,
             ]);
 
             $student = Student::create([
@@ -616,6 +836,12 @@ public function printForm138($studentId)
                 'school_year_id' => $currentSchoolYear->id,
                 'status' => 'Enrolled',
             ]);
+
+            // Update section adviser if provided
+            if ($request->filled('adviser_id')) {
+                $section = Section::findOrFail($request->section_id);
+                $section->update(['adviser_id' => $request->adviser_id]);
+            }
         });
 
         return back()->with('success', 'Student successfully added and enrolled! Student Number: ' . $studentNumber);
@@ -1002,7 +1228,20 @@ public function printForm138($studentId)
 
         SystemHelper::setActiveQuarter($request->quarter);
 
-        return back()->with('success', 'Active quarter updated successfully!');
+        // When switching to a new quarter, reset grade workflows for the active school year
+        $currentSY = SchoolYear::where('status', 'active')->first();
+        if ($currentSY) {
+            DB::table('subject_assignments')
+                ->where('school_year_id', $currentSY->id)
+                ->update([
+                    'grade_status' => 'draft',
+                    'updated_at'   => now(),
+                ]);
+        }
+
+        $this->logActivity('Update Quarter', "Set active grading quarter to Q{$request->quarter} and reset grade workflows.");
+
+        return back()->with('success', 'Active quarter updated successfully! All subject loads have been reset to Draft for the new quarter.');
     }
 
     /**
@@ -1014,11 +1253,29 @@ public function printForm138($studentId)
 
         $gradeLevels = GradeLevel::all();
         $teachers    = User::where('role_id', 3)->with('profile')->get();
-        $subjects    = Subject::with('gradeLevel')->orderBy('grade_level_id')->orderBy('name')->get();
+        $subjects    = Subject::with('gradeLevel')
+            ->when($currentSY, function ($q) use ($currentSY) {
+                $q->where('school_year_id', $currentSY->id);
+            })
+            ->where('is_archived', false)
+            ->orderBy('grade_level_id')
+            ->orderBy('name')
+            ->get();
         $reusableSchoolYears = SchoolYear::query()
             ->when($currentSY, fn($q) => $q->where('id', '!=', $currentSY->id))
             ->orderBy('start_date', 'desc')
             ->get();
+
+        $assignedAdviserIds = $currentSY
+            ? Section::where('school_year_id', $currentSY->id)
+                ->whereNotNull('adviser_id')
+                ->pluck('adviser_id')
+                ->toArray()
+            : [];
+
+        $availableAdvisers = $teachers->filter(function ($teacher) use ($assignedAdviserIds) {
+            return !in_array($teacher->id, $assignedAdviserIds);
+        })->values();
 
         if (!$currentSY) {
             $emptyCollection = collect([]);
@@ -1039,6 +1296,9 @@ public function printForm138($studentId)
                 'subjects'    => $subjects,
                 'currentSY'   => null,
                 'reusableSchoolYears' => $reusableSchoolYears,
+                'allSectionsForDropdown' => collect(),
+                'availableAdvisers' => $availableAdvisers,
+                'sectionSubjectAssignments' => [],
             ]);
         }
 
@@ -1061,13 +1321,55 @@ public function printForm138($studentId)
 
         $sections = $query->paginate(10)->withQueryString();
 
+        $allSectionsForDropdown = Section::where('school_year_id', $currentSY->id)
+            ->orderBy('gradelevel_id')
+            ->orderBy('name')
+            ->with(['adviser'])
+            ->get();
+
+        // Get current subject assignments for each section (for edit modal)
+        $sectionSubjectAssignments = [];
+        // Get teachers assigned to each subject (for filtering dropdowns)
+        $subjectTeachers = [];
+        if ($currentSY) {
+            $assignments = DB::table('subject_teacher')
+                ->join('sections', 'subject_teacher.section_id', '=', 'sections.id')
+                ->where('sections.school_year_id', $currentSY->id)
+                ->select('subject_teacher.section_id', 'subject_teacher.subject_id', 'subject_teacher.teacher_id')
+                ->get()
+                ->groupBy('section_id');
+            
+            foreach ($assignments as $sectionId => $sectionAssignments) {
+                $sectionSubjectAssignments[$sectionId] = $sectionAssignments
+                    ->keyBy('subject_id')
+                    ->map(fn($a) => $a->teacher_id);
+            }
+
+            // Get all teachers assigned to each subject (across all sections in active SY)
+            $allSubjectAssignments = DB::table('subject_teacher')
+                ->join('sections', 'subject_teacher.section_id', '=', 'sections.id')
+                ->where('sections.school_year_id', $currentSY->id)
+                ->select('subject_teacher.subject_id', 'subject_teacher.teacher_id')
+                ->distinct()
+                ->get()
+                ->groupBy('subject_id');
+
+            foreach ($allSubjectAssignments as $subjectId => $teacherAssignments) {
+                $subjectTeachers[$subjectId] = $teacherAssignments->pluck('teacher_id')->toArray();
+            }
+        }
+
         return view('registrars.sections', compact(
             'sections',
             'gradeLevels',
             'teachers',
             'subjects',
             'currentSY',
-            'reusableSchoolYears'
+            'reusableSchoolYears',
+            'allSectionsForDropdown',
+            'availableAdvisers',
+            'sectionSubjectAssignments',
+            'subjectTeachers'
         ));
     }
 
@@ -1077,11 +1379,19 @@ public function printForm138($studentId)
         $currentSY = SchoolYear::where('status', 'active')->firstOrFail();
 
         $request->validate([
-            'name'          => 'required|string|max:100|unique:sections,name',
+            'name'          => 'required|string|max:100',
             'gradelevel_id' => 'required|exists:grade_levels,id',
             'adviser_id'    => 'nullable|exists:users,id',
             'capacity'      => 'required|integer|min:1|max:30',
         ]);
+
+        // If an adviser is selected, clear any existing advisory for this adviser
+        // in the active school year so they only handle ONE section.
+        if ($request->filled('adviser_id')) {
+            Section::where('school_year_id', $currentSY->id)
+                ->where('adviser_id', $request->adviser_id)
+                ->update(['adviser_id' => null]);
+        }
 
         Section::create([
             'name'           => $request->name,
@@ -1165,23 +1475,102 @@ public function printForm138($studentId)
 
     public function updateSection(Request $request, $id)
     {
-        $section = Section::findOrFail($id);
+        $originalSection = Section::findOrFail($id);
+        $currentSY = SchoolYear::where('status', 'active')->firstOrFail();
+
+        $selectedSectionId = $request->input('selected_section_id', $id);
+        $sectionToUpdate   = Section::findOrFail($selectedSectionId);
 
         $request->validate([
-            'name'          => 'required|string|max:100|unique:sections,name,' . $section->id,
-            'gradelevel_id' => 'required|exists:grade_levels,id',
+            'selected_section_id' => [
+                'required',
+                Rule::exists('sections', 'id')->where(fn ($q) => $q->where('school_year_id', $currentSY->id)),
+            ],
             'adviser_id'    => 'nullable|exists:users,id',
             'capacity'      => 'required|integer|min:1|max:30',
+            'subject_teachers' => 'nullable|array',
+            'subject_teachers.*' => 'nullable|exists:users,id',
         ]);
 
-        $section->update([
-            'name'          => $request->name,
-            'gradelevel_id' => $request->gradelevel_id,
+        // If the user selected a different section, clear the adviser from the original section
+        if ($sectionToUpdate->id !== $originalSection->id) {
+            $originalSection->update(['adviser_id' => null]);
+        }
+
+        // Ensure only one advisory per school year
+        if ($request->filled('adviser_id')) {
+            Section::where('school_year_id', $sectionToUpdate->school_year_id)
+                ->where('adviser_id', $request->adviser_id)
+                ->where('id', '!=', $sectionToUpdate->id)
+                ->update(['adviser_id' => null]);
+        }
+
+        $sectionToUpdate->update([
             'adviser_id'    => $request->adviser_id,
             'capacity'      => $request->capacity,
         ]);
 
-        $this->logActivity('Update Section', "Updated section {$section->name}");
+        // Handle subject-teacher assignments
+        $gradeLevelId = $sectionToUpdate->gradelevel_id;
+        $subjectsForGrade = Subject::where('grade_level_id', $gradeLevelId)
+            ->where('school_year_id', $currentSY->id)
+            ->where('is_archived', false)
+            ->get();
+
+        // Get valid teacher IDs to filter out any invalid submissions
+        $validTeacherIds = User::where('role_id', 3)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', '!=', 'inactive');
+            })
+            ->pluck('id')
+            ->toArray();
+
+        foreach ($subjectsForGrade as $subject) {
+            $teacherId = $request->input("subject_teachers.{$subject->id}");
+            
+            // Only process if teacher ID is valid
+            if ($teacherId && in_array($teacherId, $validTeacherIds)) {
+                // Insert into subject_teacher pivot table
+                DB::table('subject_teacher')->updateOrInsert(
+                    [
+                        'section_id' => $sectionToUpdate->id,
+                        'subject_id' => $subject->id,
+                    ],
+                    [
+                        'teacher_id' => $teacherId,
+                        'updated_at' => now(),
+                        'created_at' => DB::raw('COALESCE(created_at, NOW())'),
+                    ]
+                );
+
+                // Sync SubjectAssignment
+                SubjectAssignment::updateOrCreate(
+                    [
+                        'teacher_id'     => $teacherId,
+                        'section_id'     => $sectionToUpdate->id,
+                        'subject_id'     => $subject->id,
+                        'school_year_id' => $currentSY->id,
+                    ],
+                    [
+                        'grade_status'   => 'draft',
+                    ]
+                );
+            } else {
+                // Remove assignment if teacher is cleared
+                DB::table('subject_teacher')
+                    ->where('section_id', $sectionToUpdate->id)
+                    ->where('subject_id', $subject->id)
+                    ->delete();
+
+                SubjectAssignment::where('section_id', $sectionToUpdate->id)
+                    ->where('subject_id', $subject->id)
+                    ->where('school_year_id', $currentSY->id)
+                    ->delete();
+            }
+        }
+
+        $this->logActivity('Update Section', "Updated section {$sectionToUpdate->name}");
 
         return back()->with('success', 'Section updated successfully.');
     }
@@ -1405,20 +1794,117 @@ public function printForm138($studentId)
      */
     public function teachers(Request $request)
     {
-        $search = $request->input('search');
+        $search    = $request->input('search');
+        $currentSY = SchoolYear::where('status', 'active')->first();
 
+        // Active / non-archived teachers
         $teachers = User::where('role_id', 3)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', '!=', 'inactive');
+            })
             ->with('profile')
             ->when($search, function ($query, $search) {
                 $query->whereHas('profile', function ($q) use ($search) {
                     $q->where('first_name', 'like', "%$search%")
-                    ->orWhere('middle_name', 'like', "%$search%")
-                    ->orWhere('last_name', 'like', "%$search%");
+                      ->orWhere('middle_name', 'like', "%$search%")
+                      ->orWhere('last_name', 'like', "%$search%");
                 })->orWhere('email', 'like', "%$search%");
             })
             ->paginate(10);
 
-        return view('registrars.teachers', compact('teachers'));
+        // Sections (active SY only)
+        $sections = $currentSY
+            ? Section::with('gradeLevel')
+                ->where('school_year_id', $currentSY->id)
+                ->orderBy('gradelevel_id')
+                ->orderBy('name')
+                ->get()
+            : collect();
+
+        // Subjects should come from the current curriculum for the active school year
+        $subjects = collect();
+        if ($currentSY) {
+            // Pick the curriculum defined for this school year (if multiple, take the latest one)
+            $currentCurriculum = Curriculum::where('school_year_id', $currentSY->id)
+                ->where('is_template', false)
+                ->orderByDesc('id')
+                ->first();
+
+            if ($currentCurriculum) {
+                $subjects = $currentCurriculum->subjects()
+                    ->with('gradeLevel')
+                    ->where('is_archived', false)
+                    ->orderBy('grade_level_id')
+                    ->orderBy('name')
+                    ->get();
+            }
+        }
+
+        $gradeLevels = GradeLevel::pluck('name', 'id');
+
+        // Advisory sections per teacher (active SY)
+        $advisoriesByTeacher = $currentSY
+            ? Section::where('school_year_id', $currentSY->id)
+                ->whereNotNull('adviser_id')
+                ->with('gradeLevel')
+                ->get()
+                ->groupBy('adviser_id')
+            : collect();
+
+        // Teaching load per teacher from subject_teacher pivot (active SY)
+        $teachingLoads = $currentSY
+            ? \DB::table('subject_teacher')
+                ->join('sections', 'subject_teacher.section_id', '=', 'sections.id')
+                ->join('subjects', 'subject_teacher.subject_id', '=', 'subjects.id')
+                ->whereNull('sections.deleted_at')
+                ->where('sections.school_year_id', $currentSY->id)
+                ->select(
+                    'subject_teacher.teacher_id',
+                    'sections.id as section_id',
+                    'sections.name as section_name',
+                    'sections.gradelevel_id',
+                    'subjects.id as subject_id',
+                    'subjects.name as subject_name'
+                )
+                ->orderBy('sections.gradelevel_id')
+                ->orderBy('sections.name')
+                ->orderBy('subjects.name')
+                ->get()
+                ->groupBy('teacher_id')
+            : collect();
+
+        return view('registrars.teachers', compact(
+            'teachers',
+            'currentSY',
+            'sections',
+            'subjects',
+            'gradeLevels',
+            'advisoriesByTeacher',
+            'teachingLoads'
+        ));
+    }
+
+    /**
+     * Archived teachers (status = inactive)
+     */
+    public function archivedTeachers(Request $request)
+    {
+        $search = $request->input('search');
+
+        $teachers = User::where('role_id', 3)
+            ->where('status', 'inactive')
+            ->with('profile')
+            ->when($search, function ($query, $search) {
+                $query->whereHas('profile', function ($q) use ($search) {
+                    $q->where('first_name', 'like', "%$search%")
+                      ->orWhere('middle_name', 'like', "%$search%")
+                      ->orWhere('last_name', 'like', "%$search%");
+                })->orWhere('email', 'like', "%$search%");
+            })
+            ->paginate(10);
+
+        return view('registrars.teachers_archived', compact('teachers'));
     }
 
     public function storeTeacher(Request $request)
@@ -1492,18 +1978,106 @@ public function printForm138($studentId)
 
         $teacherName = $teacher->name;
 
-        $teacher->profile()->delete();
-        $teacher->delete();
+        // Archive instead of hard delete
+        $teacher->update(['status' => 'inactive']);
 
-        $this->logActivity('Delete Teacher', "Deleted teacher {$teacherName}");
+        $this->logActivity('Archive Teacher', "Archived teacher {$teacherName}");
 
-        return back()->with('success', 'Teacher deleted successfully.');
+        return back()->with('success', 'Teacher archived successfully.');
+    }
+
+    /**
+     * Restore (unarchive) a teacher from archived list.
+     */
+    public function restoreTeacher($id)
+    {
+        $teacher = User::where('role_id', 3)
+            ->where('status', 'inactive')
+            ->findOrFail($id);
+
+        $teacher->update(['status' => 'active']);
+
+        $this->logActivity('Restore Teacher', "Restored teacher {$teacher->name}");
+
+        return back()->with('success', 'Teacher restored successfully.');
     }
 
     public function showTeacher($id)
     {
         $teacher = User::where('role_id', 3)->with('profile')->findOrFail($id);
         return response()->json($teacher);
+    }
+
+    /**
+     * Assign advisory section and teaching load to teacher (from Teacher Management).
+     */
+    public function assignTeacherLoad(Request $request, $id)
+    {
+        $teacher = User::where('role_id', 3)->findOrFail($id);
+        $currentSY = SchoolYear::where('status', 'active')->first();
+
+        $request->validate([
+            'advisory_section_id'   => 'nullable|exists:sections,id',
+            'teaching_subject_ids'  => 'nullable|array',
+            'teaching_subject_ids.*'=> 'exists:subjects,id',
+        ]);
+
+        // Assign advisory section (update existing section record in the active SY)
+        if ($currentSY && $request->filled('advisory_section_id')) {
+            $selectedSection = Section::where('id', $request->advisory_section_id)
+                ->where('school_year_id', $currentSY->id)
+                ->firstOrFail();
+
+            if ($selectedSection->adviser_id && $selectedSection->adviser_id != $teacher->id) {
+                return back()->withErrors([
+                    'advisory_section_id' => 'This section already has an assigned adviser.',
+                ])->withInput();
+            }
+
+            // Clear previous advisory of this teacher in active SY (other sections)
+            Section::where('school_year_id', $currentSY->id)
+                ->where('adviser_id', $teacher->id)
+                ->where('id', '!=', $selectedSection->id)
+                ->update(['adviser_id' => null]);
+
+            // Set adviser for the selected section
+            $selectedSection->update(['adviser_id' => $teacher->id]);
+        }
+
+        // Assign teaching subjects to the advisory section (if set)
+        if ($currentSY && $request->filled('advisory_section_id') && $request->filled('teaching_subject_ids')) {
+            $sectionId = (int) $request->advisory_section_id;
+
+            foreach ($request->teaching_subject_ids as $subjectId) {
+                $subjectId = (int) $subjectId;
+
+                // Always INSERT a new teaching load row for this teacher + section + subject (for class list / load views)
+                \DB::table('subject_teacher')->insert([
+                    'section_id' => $sectionId,
+                    'subject_id' => $subjectId,
+                    'teacher_id' => $teacher->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // 🔁 Keep SubjectAssignment in sync so the Grades page dropdown sees the same load
+                SubjectAssignment::updateOrCreate(
+                    [
+                        'teacher_id'     => $teacher->id,
+                        'section_id'     => $sectionId,
+                        'subject_id'     => $subjectId,
+                        'school_year_id' => $currentSY->id,
+                    ],
+                    [
+                        'grade_status'   => 'draft',
+                    ]
+                );
+            }
+        }
+
+        $this->logActivity('Assign Teacher Load', "Updated advisory/teaching load for teacher {$teacher->name}");
+
+        return back()->with('success', 'Teacher advisory and teaching load updated.');
     }
 
     public function assignSubject(Request $request, Section $section)
@@ -1878,5 +2452,303 @@ public function printForm138($studentId)
         $this->logActivity('Restore Subject', "Restored subject {$subject->name}");
 
         return back()->with('success', 'Subject restored successfully.');
+    }
+
+    public function curriculum(Request $request)
+    {
+        $schoolYears = SchoolYear::orderBy('start_date', 'desc')->get();
+        $selectedSchoolYearId = $request->get('school_year_id');
+        $currentSY = SchoolYear::where('status', 'active')->first();
+
+        $curricula = collect();
+        $subjectsByGrade = collect();
+        
+        if ($selectedSchoolYearId) {
+            $curricula = Curriculum::with(['schoolYear', 'subjects.gradeLevel'])
+                ->where('school_year_id', $selectedSchoolYearId)
+                ->where('is_template', false)
+                ->orderBy('name')
+                ->get();
+            
+            // Get all subjects for the selected school year, grouped by grade level
+            $subjectsByGrade = Subject::where('school_year_id', $selectedSchoolYearId)
+                ->where('is_archived', false)
+                ->with('gradeLevel')
+                ->get()
+                ->groupBy('grade_level_id');
+        }
+
+        // All defined curricula (global list for Set Curriculum dropdown)
+        // Collapse duplicates by name so each curriculum name appears only once.
+        $allCurricula = Curriculum::with('subjects.gradeLevel')
+            ->where('is_template', false)
+            ->orderBy('name')
+            ->get()
+            ->groupBy('name')
+            ->map(function ($group) {
+                // Prefer a curriculum whose school_year_id is null (template),
+                // otherwise just take the first one in the group.
+                return $group->firstWhere('school_year_id', null) ?? $group->first();
+            })
+            ->values();
+
+        // Get reusable school years (for reuse functionality)
+        $reusableSchoolYears = SchoolYear::query()
+            ->when($currentSY, fn($q) => $q->where('id', '!=', $currentSY->id))
+            ->orderBy('start_date', 'desc')
+            ->get();
+
+        $canReuseCurricula = $currentSY && $reusableSchoolYears->isNotEmpty();
+
+        return view('registrars.curriculum', compact(
+            'schoolYears',
+            'selectedSchoolYearId',
+            'curricula',
+            'subjectsByGrade',
+            'reusableSchoolYears',
+            'canReuseCurricula',
+            'currentSY',
+            'allCurricula'
+        ));
+    }
+
+    public function storeCurriculum(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'school_year_id' => 'required|exists:school_years,id',
+            'subjects' => 'required|array|min:1',
+            'subjects.*' => 'exists:subjects,id',
+        ]);
+
+        $schoolYearId = (int) $request->school_year_id;
+
+        // Ensure the selected school year already has subjects and sections defined.
+        $hasSubjects = Subject::where('school_year_id', $schoolYearId)
+            ->where('is_archived', false)
+            ->exists();
+
+        $hasSections = Section::where('school_year_id', $schoolYearId)->exists();
+
+        if (!$hasSubjects || !$hasSections) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'school_year_id' => 'Cannot add a curriculum for this school year because it has no subjects and/or sections defined yet. Please create subjects and sections first.',
+                ]);
+        }
+
+        $curriculum = Curriculum::create([
+            'name' => $request->name,
+            'school_year_id' => $schoolYearId,
+            'is_template' => false,
+        ]);
+
+        $curriculum->subjects()->attach($request->subjects);
+
+        $this->logActivity('Add Curriculum', "Added curriculum {$request->name}");
+
+        return redirect()->route('registrars.curriculum', ['school_year_id' => $request->school_year_id])
+            ->with('success', 'Curriculum added successfully.');
+    }
+
+    /**
+     * Apply an existing curriculum to the selected school year (inherit subjects).
+     */
+    public function applyCurriculum(Request $request)
+    {
+        $request->validate([
+            'school_year_id' => 'required|exists:school_years,id',
+            'curriculum_id' => 'required|exists:curricula,id',
+        ]);
+
+        $schoolYearId = (int) $request->school_year_id;
+
+        $source = Curriculum::with('subjects')->findOrFail($request->curriculum_id);
+
+        // Create a new curriculum for this school year with the same name
+        $curriculum = Curriculum::create([
+            'name' => $source->name,
+            'school_year_id' => $schoolYearId,
+            'is_template' => false,
+        ]);
+
+        // Inherit all subjects from the selected curriculum
+        $subjectIds = $source->subjects->pluck('id')->all();
+        if (!empty($subjectIds)) {
+            $curriculum->subjects()->sync($subjectIds);
+        }
+
+        $this->logActivity('Set Curriculum', "Applied curriculum {$source->name} to school year ID {$schoolYearId}");
+
+        return redirect()->route('registrars.curriculum', ['school_year_id' => $schoolYearId])
+            ->with('success', 'Curriculum applied and subjects inherited successfully.');
+    }
+
+    public function showCurriculum($id)
+    {
+        $curriculum = Curriculum::with(['schoolYear', 'subjects.gradeLevel'])
+            ->findOrFail($id);
+
+        // Group subjects by grade level
+        $subjectsByGradeLevel = $curriculum->subjects()
+            ->with('gradeLevel')
+            ->get()
+            ->groupBy(function ($subject) {
+                return $subject->gradeLevel->name ?? 'Unassigned';
+            })
+            ->map(function ($subjects) {
+                return $subjects->map(function ($subject) {
+                    return [
+                        'id' => $subject->id,
+                        'name' => $subject->name,
+                    ];
+                });
+            });
+
+        return view('registrars.curriculum-show', compact('curriculum', 'subjectsByGradeLevel'));
+    }
+
+    public function updateCurriculum(Request $request, $id)
+    {
+        $curriculum = Curriculum::findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'subjects' => 'required|array|min:1',
+            'subjects.*' => 'exists:subjects,id',
+        ]);
+
+        $curriculum->update([
+            'name' => $request->name,
+        ]);
+
+        $curriculum->subjects()->sync($request->subjects);
+
+        $this->logActivity('Update Curriculum', "Updated curriculum {$curriculum->name}");
+
+        return redirect()->route('registrars.curriculum', ['school_year_id' => $curriculum->school_year_id])
+            ->with('success', 'Curriculum updated successfully.');
+    }
+
+    public function destroyCurriculum($id)
+    {
+        $curriculum = Curriculum::findOrFail($id);
+        $curriculumName = $curriculum->name;
+        $schoolYearId = $curriculum->school_year_id;
+
+        $curriculum->delete();
+
+        $this->logActivity('Delete Curriculum', "Deleted curriculum {$curriculumName}");
+
+        return redirect()->route('registrars.curriculum', ['school_year_id' => $schoolYearId])
+            ->with('success', 'Curriculum deleted successfully.');
+    }
+
+    public function getSubjectsForCurriculum(Request $request)
+    {
+        $request->validate([
+            'school_year_id' => 'required|exists:school_years,id',
+        ]);
+
+        $subjects = Subject::where('school_year_id', $request->school_year_id)
+            ->where('is_archived', false)
+            ->with('gradeLevel')
+            ->get()
+            ->map(function ($subject) {
+                return [
+                    'id' => $subject->id,
+                    'name' => $subject->name,
+                    'grade_level_id' => $subject->grade_level_id,
+                    'grade_level_name' => $subject->gradeLevel->name ?? 'Unassigned',
+                ];
+            });
+
+        return response()->json(['subjects' => $subjects]);
+    }
+
+    public function getCurriculaForSchoolYear(Request $request)
+    {
+        $request->validate([
+            'school_year_id' => 'required|exists:school_years,id',
+        ]);
+
+        $curricula = Curriculum::where('school_year_id', $request->school_year_id)
+            ->where('is_template', false)
+            ->withCount('subjects')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($curriculum) {
+                return [
+                    'id' => $curriculum->id,
+                    'name' => $curriculum->name,
+                    'subjects_count' => $curriculum->subjects_count,
+                ];
+            });
+
+        return response()->json(['curricula' => $curricula]);
+    }
+
+    public function reuseCurricula(Request $request)
+    {
+        $currentSY = $this->getCurrentSY();
+        if (!$currentSY) {
+            return back()->withErrors(['msg' => 'Cannot reuse curricula without an active school year.']);
+        }
+
+        $request->validate([
+            'source_school_year_id' => ['required', 'exists:school_years,id', 'different:' . $currentSY->id],
+        ]);
+
+        $sourceSY = SchoolYear::findOrFail($request->source_school_year_id);
+
+        $sourceCurricula = Curriculum::where('school_year_id', $sourceSY->id)
+            ->with('subjects')
+            ->get();
+
+        if ($sourceCurricula->isEmpty()) {
+            return back()->with('info', "No curricula found for {$sourceSY->name}.");
+        }
+
+        $created = 0;
+        $updated = 0;
+
+        DB::transaction(function () use ($sourceCurricula, $currentSY, &$created, &$updated) {
+            foreach ($sourceCurricula as $curriculum) {
+                // Create or update curriculum in current school year
+                $newCurriculum = Curriculum::updateOrCreate(
+                    [
+                        'name' => $curriculum->name,
+                        'school_year_id' => $currentSY->id,
+                    ]
+                );
+
+                $newCurriculum->wasRecentlyCreated ? $created++ : $updated++;
+
+                // Map subjects from source school year to current school year
+                // Match subjects by name and grade level
+                $subjectIds = [];
+                foreach ($curriculum->subjects as $sourceSubject) {
+                    $matchingSubject = Subject::where('school_year_id', $currentSY->id)
+                        ->where('name', $sourceSubject->name)
+                        ->where('grade_level_id', $sourceSubject->grade_level_id)
+                        ->where('is_archived', false)
+                        ->first();
+
+                    if ($matchingSubject) {
+                        $subjectIds[] = $matchingSubject->id;
+                    }
+                }
+
+                // Sync subjects to the new curriculum
+                if (!empty($subjectIds)) {
+                    $newCurriculum->subjects()->sync($subjectIds);
+                }
+            }
+        });
+
+        $this->logActivity('Reuse Curricula', "Imported curricula from {$sourceSY->name} to {$currentSY->name}");
+
+        return back()->with('success', "Curricula reused successfully. Created {$created}, updated {$updated}.");
     }
 }

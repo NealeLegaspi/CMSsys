@@ -23,6 +23,11 @@ class SchoolYear extends Model
         return $this->hasMany(Enrollment::class, 'school_year_id');
     }
 
+    public function curricula()
+    {
+        return $this->hasMany(Curriculum::class, 'school_year_id');
+    }
+
     protected static function booted()
     {
         static::creating(function ($sy) {

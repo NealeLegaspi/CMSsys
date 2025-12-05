@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             SectionSeeder::class,
             SubjectSeeder::class,
             SettingsTableSeeder::class,
+            CurriculumSeeder::class,
         ]);
     }
 }

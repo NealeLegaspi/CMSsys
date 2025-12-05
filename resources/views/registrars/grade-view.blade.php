@@ -115,14 +115,21 @@
     </div>
 
     <!-- Action Buttons -->
+    @php
+      $isApproved = ($assignment->grade_status ?? $assignment->status ?? '') === 'approved';
+    @endphp
     <div class="d-flex justify-content-end gap-2">
       <button type="button" class="btn btn-outline-warning px-4" data-bs-toggle="modal" data-bs-target="#returnModal"
-        @if($syClosed) disabled title="Cannot return grades. No active school year." @endif>
+        @if($syClosed || $isApproved) disabled 
+           title="{{ $syClosed ? 'Cannot return grades. No active school year.' : 'Grades already approved.' }}"
+        @endif>
         <i class="bi bi-arrow-counterclockwise me-1"></i> Return to Teacher
       </button>
 
       <button type="button" class="btn btn-outline-success px-4" data-bs-toggle="modal" data-bs-target="#approveModal"
-        @if($syClosed) disabled title="Cannot approve grades. No active school year." @endif>
+        @if($syClosed || $isApproved) disabled 
+           title="{{ $syClosed ? 'Cannot approve grades. No active school year.' : 'Grades already approved.' }}"
+        @endif>
         <i class="bi bi-check-circle me-1"></i> Approve Grades
       </button>
     </div>
@@ -148,7 +155,7 @@
           @csrf
           @method('PUT')
           <input type="hidden" name="status" value="returned">
-          <button type="submit" class="btn btn-warning" @if($syClosed) disabled @endif>Confirm</button>
+          <button type="submit" class="btn btn-warning" @if($syClosed || $isApproved) disabled @endif>Confirm</button>
         </form>
       </div>
     </div>
@@ -174,7 +181,7 @@
           @csrf
           @method('PUT')
           <input type="hidden" name="status" value="approved">
-          <button type="submit" class="btn btn-success" @if($syClosed) disabled @endif>Confirm</button>
+          <button type="submit" class="btn btn-success" @if($syClosed || $isApproved) disabled @endif>Confirm</button>
         </form>
       </div>
     </div>

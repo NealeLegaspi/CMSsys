@@ -17,18 +17,70 @@
 @else
 <div class="container my-4">
   <div class="card border-0 shadow-sm p-4">
-    
-    @if($grades->count())
-      @foreach($grades as $subject => $records)
+    <div class="d-flex justify-content-between align-items-center mb-3 small text-muted">
+      <div>
+        @isset($section)
+          Section:
+          <strong>
+            {{ $section->gradeLevel->name ?? 'N/A' }}
+            @if($section->name)
+              - {{ $section->name }}
+            @endif
+          </strong>
+        @else
+          Section: <strong>N/A</strong>
+        @endisset
+      </div>
+      <div class="d-flex align-items-center">
+        @isset($schoolYears)
+          <form method="GET" action="{{ route('students.grades') }}" class="d-flex align-items-center">
+            <label for="school_year_id" class="me-2">School Year:</label>
+            <select name="school_year_id" id="school_year_id" class="form-select form-select-sm" onchange="this.form.submit()">
+              @foreach($schoolYears as $sy)
+                <option value="{{ $sy->id }}"
+                  {{ (isset($selectedSchoolYearId) && $selectedSchoolYearId == $sy->id) ? 'selected' : '' }}>
+                  {{ $sy->name ?? ($sy->start_date . ' - ' . $sy->end_date) }}
+                </option>
+              @endforeach
+            </select>
+            <noscript>
+              <button type="submit" class="btn btn-sm btn-primary ms-2">Go</button>
+            </noscript>
+          </form>
+        @else
+          School Year:
+          <strong>{{ $activeSY->name ?? ($activeSY->start_date . ' - ' . $activeSY->end_date) }}</strong>
+        @endisset
+      </div>
+    </div>
+
+    @if($subjects->count())
+      @foreach($subjects as $item)
         @php
+          $subject = $item['subject'];
+          $teacher = $item['teacher'];
+          $records = $item['grades'];
+
+          // Compute final only when all 4 quarters have grades
           $quartersCompleted = $records->pluck('quarter')->unique()->count();
           $final = $quartersCompleted === 4 ? $records->avg('grade') : null;
           $remarks = $final !== null ? ($final >= 75 ? 'PASSED' : 'FAILED') : null;
         @endphp
 
         <div class="card mb-4 border-0 shadow-sm">
-          <div class="card-header bg-light fw-bold">
-            <i class="bi bi-book"></i> {{ e($subject) }}
+          <div class="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
+            <div>
+              <i class="bi bi-book"></i>
+              {{ e($subject->name ?? 'Subject') }}
+            </div>
+            <div class="text-muted small">
+              <i class="bi bi-person-badge me-1"></i>
+              @if($teacher)
+                {{ $teacher->profile->full_name ?? $teacher->full_name ?? $teacher->email }}
+              @else
+                No Subject Teacher Assigned
+              @endif
+            </div>
           </div>
           <div class="card-body table-responsive">
             <table class="table table-bordered align-middle mb-0">
@@ -41,28 +93,35 @@
               </thead>
               <tbody class="text-center">
                 
-                @foreach($records->sortBy('quarter') as $g)
-                <tr>
-                  <td>{{ e($g->quarter ?? '-') }}</td>
+                @php
+                  $quartersOrder = ['1st', '2nd', '3rd', '4th'];
+                @endphp
 
-                  <td>
-                    @if($g->grade !== null)
-                      <span class="fw-semibold {{ $g->grade < 75 ? 'text-danger' : 'text-success' }}">
-                        {{ number_format($g->grade, 2) }}
-                      </span>
-                    @else
-                      -
-                    @endif
-                  </td>
+                @foreach($quartersOrder as $q)
+                  @php
+                    $g = $records->firstWhere('quarter', $q);
+                  @endphp
+                  <tr>
+                    <td>{{ $q }}</td>
 
-                  <td>
-                    @if($g->grade !== null)
-                      {{ $g->grade >= 75 ? 'PASSED' : 'FAILED' }}
-                    @else
-                      -
-                    @endif
-                  </td>
-                </tr>
+                    <td>
+                      @if($g && $g->grade !== null)
+                        <span class="fw-semibold {{ $g->grade < 75 ? 'text-danger' : 'text-success' }}">
+                          {{ number_format($g->grade, 2) }}
+                        </span>
+                      @else
+                        -
+                      @endif
+                    </td>
+
+                    <td>
+                      @if($g && $g->grade !== null)
+                        {{ $g->grade >= 75 ? 'PASSED' : 'FAILED' }}
+                      @else
+                        -
+                      @endif
+                    </td>
+                  </tr>
                 @endforeach
 
                 @if($final !== null)

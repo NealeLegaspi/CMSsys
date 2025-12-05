@@ -10,9 +10,35 @@
     body { background-color: #e6f3f9; margin: 0; }
     .sidebar { width: 220px; background: #fff; border-right: 1px solid #ddd;
                position: fixed; top: 0; bottom: 0; padding: 20px 15px; overflow-y:auto; }
-    .sidebar a { display: block; padding: 8px 10px; color: #0077b6; font-weight: 500;
-                 text-decoration: none; border-radius: 5px; margin-bottom: 8px; cursor: pointer; }
-    .sidebar a:hover, .sidebar a.active { background: #f0f8ff; }
+
+    /* Sidebar items (links and dropdown button) */
+    .sidebar a,
+    .sidebar button.nav-link {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 8px 10px;
+      color: #0077b6;
+      font-weight: 500;
+      text-decoration: none;
+      border-radius: 5px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+    }
+    .sidebar a:hover,
+    .sidebar a.active,
+    .sidebar button.nav-link:hover {
+      background: #f0f8ff;
+    }
+
+    /* Nested items inside Academic Management */
+    .sidebar .collapse .nav-link {
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+
     .top-header { height: 60px; background: #fff; border-bottom: 1px solid #ddd;
                   padding: 0 20px; display: flex; align-items: center; justify-content: space-between; }
     .sub-header { background: #66c2e0; color: #fff; padding: 12px 20px; font-weight: 600; }
@@ -39,7 +65,8 @@
     </div>
 
     <a href="{{ route('registrars.dashboard') }}" 
-       class="nav-link {{ request()->routeIs('registrars.dashboard') ? 'active' : '' }}">
+       class="nav-link {{ request()->routeIs('registrars.dashboard') ? 'active' : '' }}"
+       data-ajax="true">
        <i class='bx bx-home me-2'></i> Dashboard
     </a>
     <a href="{{ route('registrars.docs.certs') }}" 
@@ -57,31 +84,63 @@
        <i class='bx bx-user me-2'></i> Student Records
     </a>---->
     <a href="{{ route('registrars.enrollment') }}" 
-       class="nav-link {{ request()->routeIs('registrars.enrollment') ? 'active' : '' }}">
+       class="nav-link {{ request()->routeIs('registrars.enrollment') ? 'active' : '' }}"
+       data-ajax="true">
        <i class='bx bx-edit me-2'></i> Student Registration
     </a>
     <a href="{{ route('registrars.quarterSettings') }}" 
-      class="nav-link {{ request()->routeIs('registrars.quarterSettings') ? 'active' : '' }}">
+      class="nav-link {{ request()->routeIs('registrars.quarterSettings') ? 'active' : '' }}"
+      data-ajax="true">
       <i class="bi bi-calendar-check me-2"></i> Quarter Control
     </a>
     <a href="{{ route('registrars.grades') }}" 
-       class="nav-link {{ request()->routeIs('registrars.grades*') ? 'active' : '' }}">
+       class="nav-link {{ request()->routeIs('registrars.grades*') ? 'active' : '' }}"
+       data-ajax="true">
        <i class='bx bx-book me-2'></i> Grades
     </a>
-    <a href="{{ route('registrars.subjects') }}" 
-       class="nav-link {{ request()->routeIs('registrars.subjects') ? 'active' : '' }}">
-       <i class='bx bx-book me-2'></i> Subjects
+
+    {{-- Academic Management dropdown --}}
+    @php
+      $isAcademicActive = request()->routeIs('registrars.sections') || request()->routeIs('registrars.subjects*');
+    @endphp
+    <button class="nav-link d-flex align-items-center justify-content-between"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#academicMenu"
+            aria-expanded="{{ $isAcademicActive ? 'true' : 'false' }}">
+      <span><i class='bx bx-library me-2'></i> Academic Management</span>
+      <i class="bi bi-chevron-down small"></i>
+    </button>
+    <div class="collapse {{ $isAcademicActive ? 'show' : '' }}" id="academicMenu">
+      <a href="{{ route('registrars.sections') }}" 
+         class="nav-link ms-3 {{ request()->routeIs('registrars.sections') ? 'active' : '' }}"
+         data-ajax="true">
+         <i class='bx bx-grid-alt me-2'></i> Sections
+      </a>
+      <a href="{{ route('registrars.subjects') }}" 
+         class="nav-link ms-3 {{ request()->routeIs('registrars.subjects*') ? 'active' : '' }}"
+         data-ajax="true">
+         <i class='bx bx-book-open me-2'></i> Subjects
+      </a>
+    </div>
+
+    <a href="{{ route('registrars.teachers') }}" 
+       class="nav-link {{ request()->routeIs('registrars.teachers*') ? 'active' : '' }}">
+       <i class='bx bx-chalkboard me-2'></i> Teacher Management
     </a>
-    <a href="{{ route('registrars.sections') }}" 
-       class="nav-link {{ request()->routeIs('registrars.sections') ? 'active' : '' }}">
-       <i class='bx bx-grid-alt me-2'></i> Sections
+    <a href="{{ route('registrars.curriculum') }}" 
+       class="nav-link {{ request()->routeIs('registrars.curriculum*') ? 'active' : '' }}"
+       data-ajax="true">
+       <i class='bx bx-book-bookmark me-2'></i> Curriculum
     </a>
     <a href="{{ route('registrars.reports') }}" 
-       class="nav-link {{ request()->routeIs('registrars.reports') ? 'active' : '' }}">
+       class="nav-link {{ request()->routeIs('registrars.reports') ? 'active' : '' }}"
+       data-ajax="true">
        <i class='bx bx-file me-2'></i> Reports
     </a>
     <a href="{{ route('registrars.settings') }}" 
-       class="nav-link {{ request()->routeIs('registrars.settings') ? 'active' : '' }}">
+       class="nav-link {{ request()->routeIs('registrars.settings') ? 'active' : '' }}"
+       data-ajax="true">
        <i class='bx bx-cog me-2'></i> Settings
     </a>
   </div>
@@ -125,7 +184,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+    document.querySelectorAll('.sidebar .nav-link[data-ajax="true"]').forEach(link => {
       link.addEventListener('click', function(e) {
         e.preventDefault();
         const url = this.href;
@@ -143,6 +202,8 @@
             this.classList.add('active');
 
             window.history.pushState({}, '', url); 
+            // Notify pages that content has changed so they can re-bind JS
+            document.dispatchEvent(new Event('page:loaded'));
             document.querySelector('#loader').style.display = 'none';
           })
           .catch(err => {
@@ -152,5 +213,6 @@
       });
     });
   </script>
+  @stack('scripts')
 </body>
 </html>
