@@ -567,6 +567,37 @@ public function printForm138($studentId)
         ));
     }
 
+    /**
+     * Find an available section for a given grade level that has capacity.
+     * Returns the section ID or null if all sections are full.
+     */
+    private function findAvailableSection($gradeLevelId, $schoolYearId, $excludeSectionId = null)
+    {
+        $sections = Section::where('gradelevel_id', $gradeLevelId)
+            ->where('school_year_id', $schoolYearId)
+            ->when($excludeSectionId, function ($q) use ($excludeSectionId) {
+                $q->where('id', '!=', $excludeSectionId);
+            })
+            ->get();
+
+        foreach ($sections as $section) {
+            if (!$section->capacity) {
+                // No capacity limit, so it's available
+                return $section;
+            }
+
+            $enrolledCount = Enrollment::where('section_id', $section->id)
+                ->where('school_year_id', $schoolYearId)
+                ->count();
+
+            if ($enrolledCount < $section->capacity) {
+                return $section;
+            }
+        }
+
+        return null; // All sections are full
+    }
+
     public function storeEnrollment(Request $request)
     {
         $activeSY = SchoolYear::where('status', 'active')->first();
@@ -598,13 +629,34 @@ public function printForm138($studentId)
         }
 
         $section = Section::findOrFail($request->section_id);
+        $gradeLevelId = $section->gradelevel_id;
+        $gradeLevelName = $section->gradeLevel->name ?? 'this grade level';
+
+        // Check if selected section has capacity
+        $selectedSectionFull = false;
         if ($section->capacity) {
             $count = Enrollment::where('section_id', $section->id)
                 ->where('school_year_id', $activeSY->id)
                 ->count();
             if ($count >= $section->capacity) {
-                return back()->withErrors(['section_id' => 'This section has reached maximum capacity.']);
+                $selectedSectionFull = true;
             }
+        }
+
+        // If selected section is full, try to find another section with the same grade level
+        if ($selectedSectionFull) {
+            $availableSection = $this->findAvailableSection($gradeLevelId, $activeSY->id, $section->id);
+            
+            if (!$availableSection) {
+                // All sections of this grade level are full
+                return back()->withErrors([
+                    'section_id' => "All sections for {$gradeLevelName} are full. Cannot enroll more students in {$gradeLevelName}."
+                ]);
+            }
+
+            // Use the available section instead
+            $section = $availableSection;
+            $request->merge(['section_id' => $section->id]);
         }
 
         $student = Student::with('user.profile')->findOrFail($request->student_id);
@@ -785,6 +837,37 @@ public function printForm138($studentId)
             'adviser_id' => 'nullable|exists:users,id',
         ]);
 
+        $section = Section::findOrFail($request->section_id);
+        $gradeLevelId = $section->gradelevel_id;
+        $gradeLevelName = $section->gradeLevel->name ?? 'this grade level';
+
+        // Check if selected section has capacity
+        $selectedSectionFull = false;
+        if ($section->capacity) {
+            $count = Enrollment::where('section_id', $section->id)
+                ->where('school_year_id', $currentSchoolYear->id)
+                ->count();
+            if ($count >= $section->capacity) {
+                $selectedSectionFull = true;
+            }
+        }
+
+        // If selected section is full, try to find another section with the same grade level
+        if ($selectedSectionFull) {
+            $availableSection = $this->findAvailableSection($gradeLevelId, $currentSchoolYear->id, $section->id);
+            
+            if (!$availableSection) {
+                // All sections of this grade level are full
+                return back()->withErrors([
+                    'section_id' => "All sections for {$gradeLevelName} are full. Cannot enroll more students in {$gradeLevelName}."
+                ]);
+            }
+
+            // Use the available section instead
+            $section = $availableSection;
+            $request->merge(['section_id' => $section->id]);
+        }
+
         $baseCode = '400655';
         $lastStudent = Student::orderBy('id', 'desc')->first();
         $lastNumber = $lastStudent && preg_match('/^400655(\d{4,})$/', $lastStudent->student_number, $m)
@@ -796,7 +879,7 @@ public function printForm138($studentId)
             return back()->withErrors(['email' => 'A student with this name already exists.']);
         }
 
-        DB::transaction(function () use ($request, $currentSchoolYear, $studentNumber, $email) {
+        DB::transaction(function () use ($request, $currentSchoolYear, $studentNumber, $email, $section) {
             $lastFour = substr($studentNumber, -4);
             $tempPassword = ucfirst($request->last_name) . ucfirst($request->first_name) . $lastFour;
 
@@ -827,19 +910,18 @@ public function printForm138($studentId)
             $student = Student::create([
                 'user_id' => $user->id,
                 'student_number' => $studentNumber,
-                'section_id' => $request->section_id,
+                'section_id' => $section->id,
             ]);
 
             Enrollment::create([
                 'student_id' => $student->id,
-                'section_id' => $request->section_id,
+                'section_id' => $section->id,
                 'school_year_id' => $currentSchoolYear->id,
                 'status' => 'Enrolled',
             ]);
 
             // Update section adviser if provided
             if ($request->filled('adviser_id')) {
-                $section = Section::findOrFail($request->section_id);
                 $section->update(['adviser_id' => $request->adviser_id]);
             }
         });
@@ -1303,6 +1385,9 @@ public function printForm138($studentId)
         }
 
         $query = Section::with(['gradeLevel', 'schoolYear', 'adviser.profile'])
+                        ->withCount(['enrollments' => function ($q) {
+                            $q->where('archived', false);
+                        }])
                         ->where('school_year_id', $currentSY->id);
 
         if ($request->filled('search')) {
@@ -2456,22 +2541,20 @@ public function printForm138($studentId)
 
     public function curriculum(Request $request)
     {
-        $schoolYears = SchoolYear::orderBy('start_date', 'desc')->get();
-        $selectedSchoolYearId = $request->get('school_year_id');
         $currentSY = SchoolYear::where('status', 'active')->first();
 
         $curricula = collect();
         $subjectsByGrade = collect();
         
-        if ($selectedSchoolYearId) {
+        if ($currentSY) {
             $curricula = Curriculum::with(['schoolYear', 'subjects.gradeLevel'])
-                ->where('school_year_id', $selectedSchoolYearId)
+                ->where('school_year_id', $currentSY->id)
                 ->where('is_template', false)
                 ->orderBy('name')
                 ->get();
             
-            // Get all subjects for the selected school year, grouped by grade level
-            $subjectsByGrade = Subject::where('school_year_id', $selectedSchoolYearId)
+            // Get all subjects for the active school year, grouped by grade level
+            $subjectsByGrade = Subject::where('school_year_id', $currentSY->id)
                 ->where('is_archived', false)
                 ->with('gradeLevel')
                 ->get()
@@ -2501,8 +2584,6 @@ public function printForm138($studentId)
         $canReuseCurricula = $currentSY && $reusableSchoolYears->isNotEmpty();
 
         return view('registrars.curriculum', compact(
-            'schoolYears',
-            'selectedSchoolYearId',
             'curricula',
             'subjectsByGrade',
             'reusableSchoolYears',

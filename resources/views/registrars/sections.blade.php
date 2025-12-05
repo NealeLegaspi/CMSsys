@@ -160,7 +160,7 @@
                 {{ $sec->adviser?->profile?->last_name ?? '' }}
               </td>
               <td>{{ $sec->capacity ?? '∞' }}</td>
-              <td>{{ $sec->enrollments->count() }}</td>
+              <td>{{ $sec->enrollments_count ?? 0 }}</td>
               <td>
                 <div class="d-flex justify-content-center gap-1">
                   {{-- Manage Subjects --}}
