@@ -75,6 +75,7 @@
                       <th>LRN</th>
                       <th>Student</th>
                       <th>Section</th>
+                      <th>Adviser</th>
                       <th>Status</th>
                       <th class="text-center">Actions</th>
                     </tr>
@@ -87,6 +88,7 @@
                         <td class="fw-bold text-primary">{{ $en->student->student_number ?? 'N/A' }}</td>
                         <td>{{ $en->student->user->profile->full_name ?? 'N/A' }}</td>
                         <td>{{ $en->section->name ?? 'N/A' }}</td>
+                        <td>{{ $en->section->adviser->profile->full_name ?? 'N/A' }}</td>
                         <td>
                           <span class="badge {{ $en->status == 'Enrolled' ? 'bg-success' : ($en->status == 'For Verification' ? 'bg-warning text-dark' : 'bg-secondary') }}">
                             {{ $en->status }}
@@ -116,7 +118,7 @@
                         </td>
                       </tr>
                     @empty
-                      <tr><td colspan="6" class="text-center text-muted">No enrolled students for the active school year.</td></tr>
+                      <tr><td colspan="7" class="text-center text-muted">No enrolled students for the active school year.</td></tr>
                     @endforelse
                   </tbody>
                 </table>
@@ -133,11 +135,17 @@
             <div class="card">
               <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Student Tools</h5>
-                <div>
-                  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+                <div class="d-flex align-items-center" style="gap:8px;">
+                  <input type="text"
+                         id="studentToolsSearch"
+                         class="form-control form-control-sm"
+                         placeholder="Search student...">
+                  <button class="btn btn-primary btn-sm px-2 py-1" style="font-size: 0.75rem; white-space: nowrap;"
+                          data-bs-toggle="modal" data-bs-target="#addStudentModal">
                     <i class="bi bi-person-plus me-1"></i> Add / Register Student
                   </button>
-                  <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#importModal">
+                  <button class="btn btn-success btn-sm px-2 py-1" style="font-size: 0.75rem; white-space: nowrap;"
+                          data-bs-toggle="modal" data-bs-target="#importModal">
                     <i class="bi bi-upload me-1"></i> Import Excel
                   </button>
                 </div>
@@ -147,31 +155,188 @@
                 @if(isset($studentsNotEnrolled) && $studentsNotEnrolled->isEmpty())
                   <div class="text-muted small p-3">All students already enrolled in the active school year.</div>
                 @elseif(isset($studentsNotEnrolled))
-                  <ul class="list-group list-group-flush">
+                  <ul class="list-group list-group-flush" id="studentToolsList">
                     @foreach($studentsNotEnrolled as $s)
-                      <li class="list-group-item d-flex justify-content-between align-items-center">
+                      @php
+                        $info = $studentUpgradeInfo[$s->id] ?? null;
+                        $allowedSectionIds = $info['allowed_section_ids'] ?? $sections->pluck('id')->all();
+                        $fullName = $s->user->profile->full_name ?? 'N/A';
+                        $studentNo = $s->student_number ?? '—';
+                      @endphp
+                      <li class="list-group-item d-flex justify-content-between align-items-center student-tools-item"
+                          data-name="{{ Str::lower($fullName) }}"
+                          data-lrn="{{ Str::lower($studentNo) }}">
                         <div>
-                          <div class="fw-semibold">{{ $s->user->profile->full_name ?? 'N/A' }}</div>
-                          <small class="text-muted">{{ $s->student_number ?? '—' }}</small>
+                          <div class="fw-semibold">{{ $fullName }}</div>
+                          <small class="text-muted d-block">{{ $studentNo }}</small>
+                          @if($info && $info['last_sy_name'])
+                            <small class="text-muted d-block">
+                              Last enrolled: {{ $info['last_sy_name'] }} ({{ $info['last_grade_name'] ?? 'N/A' }})
+                            </small>
+                          @endif
+                          @if($info && !empty($info['allowed_grade_names']))
+                            <small class="text-muted d-block">
+                              Allowed grades this SY: {{ implode(', ', $info['allowed_grade_names']) }}
+                            </small>
+                          @endif
                         </div>
                         <div>
                           @if($isActive)
-                            <form method="POST" action="{{ route('registrars.enrollment.store') }}" class="d-inline">
-                              @csrf
-                              <input type="hidden" name="student_id" value="{{ $s->id }}">
-                              <select name="section_id" class="form-select form-select-sm d-inline-block me-2" style="width:220px;" required>
-                                <option value="" disabled selected>-- Select Section --</option>
-                                @foreach($sections as $section)
-                                  <option value="{{ $section->id }}">{{ $section->gradeLevel->name ?? 'No Grade' }} - {{ $section->name }}</option>
-                                @endforeach
-                              </select>
-                              <button class="btn btn-sm btn-primary">Enroll</button>
-                            </form>
+                            <button class="btn btn-sm btn-primary" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#enrollStudentModal-{{ $s->id }}">
+                              Enroll
+                            </button>
                           @else
                             <span class="small text-muted">Enrollment Closed</span>
                           @endif
                         </div>
                       </li>
+
+                      {{-- Enrollment Modal for this student --}}
+                      @php
+                        $profile = $s->user->profile ?? null;
+                        // Parse guardian_name into parts (assuming format: "First Middle Last" or "First Last")
+                        $guardianParts = $profile && $profile->guardian_name 
+                          ? explode(' ', trim($profile->guardian_name), 3) 
+                          : ['', '', ''];
+                        $guardianFirst = $guardianParts[0] ?? '';
+                        $guardianMiddle = isset($guardianParts[1]) && count($guardianParts) > 2 ? $guardianParts[1] : '';
+                        $guardianLast = count($guardianParts) > 2 ? ($guardianParts[2] ?? '') : ($guardianParts[1] ?? '');
+                      @endphp
+                      <div class="modal fade" id="enrollStudentModal-{{ $s->id }}" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                          <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                              <h5 class="modal-title"><i class="bi bi-person-plus me-1"></i> Enroll Student</h5>
+                              <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+
+                            <form method="POST" action="{{ route('registrars.enrollment.store') }}">
+                              @csrf
+                              <input type="hidden" name="student_id" value="{{ $s->id }}">
+                              <div class="modal-body">
+                                <div class="row g-2">
+                                  <div class="col-md-4">
+                                    <label class="form-label small">First Name</label>
+                                    <input name="first_name" class="form-control" value="{{ $profile->first_name ?? '' }}" required>
+                                  </div>
+                                  <div class="col-md-4">
+                                    <label class="form-label small">Middle Name</label>
+                                    <input name="middle_name" class="form-control" value="{{ $profile->middle_name ?? '' }}">
+                                  </div>
+                                  <div class="col-md-4">
+                                    <label class="form-label small">Last Name</label>
+                                    <input name="last_name" class="form-control" value="{{ $profile->last_name ?? '' }}" required>
+                                  </div>
+
+                                  <div class="col-md-6">
+                                    <label class="form-label small">Birthdate</label>
+                                    <input type="date" name="birthdate_display" class="form-control" value="{{ $profile->birthdate ?? '' }}" disabled>
+                                    <input type="hidden" name="birthdate" value="{{ $profile->birthdate ?? '' }}">
+                                  </div>
+
+                                  <div class="col-md-6">
+                                    <label class="form-label small">Gender</label>
+                                    <select name="sex_display" class="form-select" disabled>
+                                      <option value="Male" {{ ($profile->sex ?? '') == 'Male' ? 'selected' : '' }}>Male</option>
+                                      <option value="Female" {{ ($profile->sex ?? '') == 'Female' ? 'selected' : '' }}>Female</option>
+                                    </select>
+                                    <input type="hidden" name="sex" value="{{ $profile->sex ?? '' }}">
+                                  </div>
+
+                                  <div class="col-md-4">
+                                    <label class="form-label small">Guardian First Name</label>
+                                    <input name="guardian_first_name" class="form-control" value="{{ $guardianFirst }}" required>
+                                  </div>
+                                  <div class="col-md-4">
+                                    <label class="form-label small">Guardian Middle Name</label>
+                                    <input name="guardian_middle_name" class="form-control" value="{{ $guardianMiddle }}">
+                                  </div>
+                                  <div class="col-md-4">
+                                    <label class="form-label small">Guardian Last Name</label>
+                                    <input name="guardian_last_name" class="form-control" value="{{ $guardianLast }}" required>
+                                  </div>
+
+                                  <div class="col-12">
+                                    <label class="form-label small">Contact Number</label>
+                                    <input name="contact_number" class="form-control" value="{{ $profile->contact_number ?? '' }}" required>
+                                  </div>
+
+                                  <div class="col-12">
+                                    <label class="form-label small">Address</label>
+                                    <input name="address" class="form-control" value="{{ $profile->address ?? '' }}" required>
+                                  </div>
+
+                                  <div class="col-12">
+                                    <label class="form-label small">LRN</label>
+                                    <input class="form-control" value="{{ $s->student_number ?? '—' }}" disabled>
+                                  </div>
+
+                                  <div class="col-md-6">
+                                    <label class="form-label small">Adviser</label>
+                                    <select id="enrollAdviser-{{ $s->id }}" class="form-select" disabled style="background-color: #e9ecef; cursor: not-allowed;">
+                                      <option value="">-- Select Section First --</option>
+                                      @foreach($teachers as $teacher)
+                                        @php
+                                          // Find section assigned to this teacher (within allowed sections)
+                                          $teacherSection = $sections->whereIn('id', $allowedSectionIds)->firstWhere('adviser_id', $teacher->id);
+                                        @endphp
+                                        <option value="{{ $teacher->id }}" data-section-id="{{ $teacherSection->id ?? '' }}">
+                                          {{ $teacher->profile->full_name ?? $teacher->email }}
+                                        </option>
+                                      @endforeach
+                                    </select>
+                                    {{-- Hidden input to submit adviser_id even though select is disabled --}}
+                                    <input type="hidden" name="adviser_id" id="enrollAdviserHidden-{{ $s->id }}">
+                                  </div>
+
+                                  <div class="col-md-6">
+                                    <label class="form-label small">Section <span class="text-danger">*</span></label>
+                                    <select name="section_id" id="enrollSection-{{ $s->id }}" class="form-select" required>
+                                      <option value="" disabled selected>-- Select Section --</option>
+                                      @php
+                                        $sectionsByGrade = $sections->whereIn('id', $allowedSectionIds)->groupBy(fn($sec) => $sec->gradeLevel->name ?? 'No Grade');
+                                      @endphp
+                                      @foreach($sectionsByGrade as $gradeName => $gradeSections)
+                                        <optgroup label="{{ $gradeName }}">
+                                          @foreach($gradeSections as $section)
+                                            <option value="{{ $section->id }}" data-adviser-id="{{ $section->adviser_id ?? '' }}">{{ $section->name }}</option>
+                                          @endforeach
+                                        </optgroup>
+                                      @endforeach
+                                    </select>
+                                  </div>
+                                  
+                                  {{-- Subject Assignments Display (read-only, per student enrollment) --}}
+                                  <div class="col-12 mt-3 enroll-subject-assignments" id="enrollSubjectAssignments-{{ $s->id }}" style="display: none;">
+                                    <label class="form-label small fw-bold">Subject Assignments</label>
+                                    <div class="table-responsive">
+                                      <table class="table table-sm table-bordered">
+                                        <thead class="table-light">
+                                          <tr>
+                                            <th>Subject</th>
+                                            <th>Subject Teacher</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody id="enrollSubjectAssignmentsBody-{{ $s->id }}">
+                                          {{-- Populated via JavaScript --}}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div class="modal-footer">
+                                <button class="btn btn-success"><i class="bi bi-check-circle me-1"></i> Enroll</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                              </div>
+                            </form>
+
+                          </div>
+                        </div>
+                      </div>
                     @endforeach
                   </ul>
                 @else
@@ -393,14 +558,22 @@
               </select>
             </div>
 
-            <div class="col-md-6">
-              <label class="form-label small">Contact Number</label>
-              <input name="contact_number" class="form-control" required>
+            <div class="col-md-4">
+              <label class="form-label small">Guardian First Name</label>
+              <input name="guardian_first_name" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">Guardian Middle Name</label>
+              <input name="guardian_middle_name" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">Guardian Last Name</label>
+              <input name="guardian_last_name" class="form-control" required>
             </div>
 
-            <div class="col-md-6">
-              <label class="form-label small">Guardian Name</label>
-              <input name="guardian_name" class="form-control" required>
+            <div class="col-12">
+              <label class="form-label small">Contact Number</label>
+              <input name="contact_number" class="form-control" required>
             </div>
 
             <div class="col-12">
@@ -408,9 +581,9 @@
               <input name="address" class="form-control" required>
             </div>
 
-            <div class="col-12">
+            <div class="col-md-6">
               <label class="form-label small">Section</label>
-              <select name="section_id" class="form-select" required>
+              <select name="section_id" id="addStudentSection" class="form-select" required>
                 <option value="" disabled selected>-- Select Section --</option>
                 @php
                   $sectionsByGrade = $sections->groupBy(fn($s) => $s->gradeLevel->name ?? 'No Grade');
@@ -418,11 +591,38 @@
                 @foreach($sectionsByGrade as $gradeName => $gradeSections)
                   <optgroup label="{{ $gradeName }}">
                     @foreach($gradeSections as $section)
-                      <option value="{{ $section->id }}">{{ $section->name }}</option>
+                      <option value="{{ $section->id }}" data-adviser-id="{{ $section->adviser_id ?? '' }}">{{ $section->name }}</option>
                     @endforeach
                   </optgroup>
                 @endforeach
               </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label small">Adviser</label>
+              <select id="addStudentAdviser" class="form-select" disabled style="background-color: #e9ecef; cursor: not-allowed;">
+                <option value="">-- Select Section First --</option>
+              </select>
+              {{-- Hidden input to ensure adviser_id is submitted even when select is disabled --}}
+              <input type="hidden" name="adviser_id" id="addStudentAdviserHidden">
+            </div>
+
+            {{-- Subject Assignments Display (read-only) --}}
+            <div class="col-12 mt-3" id="addStudentSubjectAssignments" style="display: none;">
+              <label class="form-label small fw-bold">Subject Assignments</label>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Subject</th>
+                      <th>Subject Teacher</th>
+                    </tr>
+                  </thead>
+                  <tbody id="addStudentSubjectAssignmentsBody">
+                    {{-- Will be populated via JavaScript --}}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -542,9 +742,50 @@
   @endforeach
 @endisset
 
-{{-- Keep tab open on page reload if hash present or query param page exists --}}
+{{-- Scripts --}}
 @push('scripts')
 <script>
+// Live search for Student Tools (works on initial load and AJAX page loads)
+function initStudentToolsSearch() {
+  console.log('initStudentToolsSearch called');
+  const searchInput = document.getElementById('studentToolsSearch');
+  const items = document.querySelectorAll('.student-tools-item');
+
+  console.log('Student Tools items found:', items.length);
+
+  if (!searchInput || !items.length) return;
+
+  // Ensure we don't add multiple listeners
+  if (searchInput.dataset.bound === 'true') return;
+  searchInput.dataset.bound = 'true';
+
+  searchInput.addEventListener('input', function () {
+    console.log('Student Tools search input:', this.value);
+    const term = this.value.toLowerCase().trim();
+
+    items.forEach(item => {
+      const name = item.dataset.name || '';
+      const lrn  = item.dataset.lrn || '';
+      const match = !term || name.includes(term) || lrn.includes(term);
+      if (match) {
+        item.classList.remove('d-none');
+      } else {
+        item.classList.add('d-none');
+      }
+    });
+  });
+}
+
+// Run once on initial load (even if DOMContentLoaded already fired),
+// and again every time the layout AJAX-loads a new page.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initStudentToolsSearch);
+} else {
+  initStudentToolsSearch();
+}
+document.addEventListener('page:loaded', initStudentToolsSearch);
+
+// Keep tab open on page reload if hash present or query param page exists
 document.addEventListener('DOMContentLoaded', function () {
   // Show tab according to URL hash
   const hash = window.location.hash;
@@ -561,6 +802,183 @@ document.addEventListener('DOMContentLoaded', function () {
     btn.addEventListener('shown.bs.tab', function (e) {
       const target = e.target.getAttribute('data-bs-target');
       history.replaceState(null, null, target);
+    });
+  });
+
+  // Section subject assignments data from server
+  const sectionSubjectAssignments = @json($sectionSubjectAssignments ?? []);
+
+  // Auto-fill adviser and show subject assignments when section is selected
+  function initAddStudentAutoFill() {
+    const addStudentSection = document.getElementById('addStudentSection');
+    const addStudentAdviser = document.getElementById('addStudentAdviser');
+    const subjectAssignmentsDiv = document.getElementById('addStudentSubjectAssignments');
+    const subjectAssignmentsBody = document.getElementById('addStudentSubjectAssignmentsBody');
+
+    if (addStudentSection && addStudentAdviser) {
+      // Populate adviser dropdown with all teachers (for display purposes)
+      const teachers = @json($teachers->map(function($t) {
+        return ['id' => $t->id, 'name' => $t->profile->full_name ?? $t->email];
+      })->values());
+      addStudentAdviser.innerHTML = '<option value="">-- Select Section First --</option>';
+      teachers.forEach(teacher => {
+        const option = document.createElement('option');
+        option.value = teacher.id;
+        option.textContent = teacher.name;
+        addStudentAdviser.appendChild(option);
+      });
+
+      // When section is selected, update adviser and show subject assignments
+      addStudentSection.onchange = function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const sectionId = this.value;
+        const adviserId = selectedOption.getAttribute('data-adviser-id');
+        
+        // Update adviser dropdown (readonly, but show the value)
+        const adviserHiddenInput = document.getElementById('addStudentAdviserHidden');
+        if (adviserId && adviserId !== '' && adviserId !== '0') {
+          addStudentAdviser.value = adviserId;
+          if (adviserHiddenInput) {
+            adviserHiddenInput.value = adviserId;
+          }
+        } else {
+          addStudentAdviser.value = '';
+          if (adviserHiddenInput) {
+            adviserHiddenInput.value = '';
+          }
+        }
+
+        // Show/hide and populate subject assignments
+        if (sectionId && sectionSubjectAssignments[sectionId]) {
+          const assignments = sectionSubjectAssignments[sectionId];
+          subjectAssignmentsBody.innerHTML = '';
+          
+          if (assignments.length > 0) {
+            assignments.forEach(assignment => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${assignment.subject_name || 'N/A'}</td>
+                <td>${assignment.teacher_name || 'Not Assigned'}</td>
+              `;
+              subjectAssignmentsBody.appendChild(row);
+            });
+            subjectAssignmentsDiv.style.display = 'block';
+          } else {
+            subjectAssignmentsBody.innerHTML = '<tr><td colspan="2" class="text-muted text-center">No subjects available for this grade level</td></tr>';
+            subjectAssignmentsDiv.style.display = 'block';
+          }
+        } else {
+          subjectAssignmentsDiv.style.display = 'none';
+          subjectAssignmentsBody.innerHTML = '';
+        }
+      };
+    }
+  }
+
+  // Initialize on page load
+  initAddStudentAutoFill();
+
+  // Re-initialize when page is loaded via AJAX
+  document.addEventListener('page:loaded', initAddStudentAutoFill);
+
+  // Initialize when "Add / Register Student" modal is shown
+  const addStudentModal = document.getElementById('addStudentModal');
+  if (addStudentModal) {
+    addStudentModal.addEventListener('shown.bs.modal', function() {
+      initAddStudentAutoFill();
+    });
+    
+    // Reset form and hide subject assignments when modal is closed
+    addStudentModal.addEventListener('hidden.bs.modal', function() {
+      const form = addStudentModal.querySelector('form');
+      if (form) {
+        form.reset();
+      }
+      const subjectAssignmentsDiv = document.getElementById('addStudentSubjectAssignments');
+      const subjectAssignmentsBody = document.getElementById('addStudentSubjectAssignmentsBody');
+      if (subjectAssignmentsDiv) {
+        subjectAssignmentsDiv.style.display = 'none';
+      }
+      if (subjectAssignmentsBody) {
+        subjectAssignmentsBody.innerHTML = '';
+      }
+      const addStudentAdviser = document.getElementById('addStudentAdviser');
+      if (addStudentAdviser) {
+        addStudentAdviser.innerHTML = '<option value="">-- Select Section First --</option>';
+      }
+    });
+  }
+
+  // Auto-fill between Section and Adviser for enrollment modals
+  function initEnrollmentAutoFill() {
+    document.querySelectorAll('[id^="enrollSection-"]').forEach(function(sectionSelect) {
+      const studentId = sectionSelect.id.replace('enrollSection-', '');
+      const adviserSelect = document.getElementById('enrollAdviser-' + studentId);
+      const adviserHiddenInput = document.getElementById('enrollAdviserHidden-' + studentId);
+      const subjectAssignmentsDiv = document.getElementById('enrollSubjectAssignments-' + studentId);
+      const subjectAssignmentsBody = document.getElementById('enrollSubjectAssignmentsBody-' + studentId);
+      
+      if (adviserSelect) {
+        // When section is selected, auto-fill adviser and show subject assignments
+        sectionSelect.onchange = function() {
+          const selectedOption = this.options[this.selectedIndex];
+          const adviserId = selectedOption.getAttribute('data-adviser-id');
+          const sectionId = this.value;
+          
+          if (adviserId && adviserId !== '' && adviserId !== '0') {
+            const adviserOption = Array.from(adviserSelect.options).find(opt => opt.value === adviserId);
+            if (adviserOption) {
+              adviserSelect.value = adviserId;
+              if (adviserHiddenInput) {
+                adviserHiddenInput.value = adviserId;
+              }
+            }
+          } else {
+            adviserSelect.value = '';
+            if (adviserHiddenInput) {
+              adviserHiddenInput.value = '';
+            }
+          }
+
+          // Show/hide and populate subject assignments for this enrollment
+          if (sectionId && sectionSubjectAssignments[sectionId]) {
+            const assignments = sectionSubjectAssignments[sectionId];
+            if (subjectAssignmentsBody && subjectAssignmentsDiv) {
+              subjectAssignmentsBody.innerHTML = '';
+              if (assignments.length > 0) {
+                assignments.forEach(assignment => {
+                  const row = document.createElement('tr');
+                  row.innerHTML = `
+                    <td>${assignment.subject_name || 'N/A'}</td>
+                    <td>${assignment.teacher_name || 'Not Assigned'}</td>
+                  `;
+                  subjectAssignmentsBody.appendChild(row);
+                });
+                subjectAssignmentsDiv.style.display = 'block';
+              } else {
+                subjectAssignmentsBody.innerHTML = '<tr><td colspan="2" class="text-muted text-center">No subjects available for this grade level</td></tr>';
+                subjectAssignmentsDiv.style.display = 'block';
+              }
+            }
+          } else if (subjectAssignmentsDiv && subjectAssignmentsBody) {
+            subjectAssignmentsDiv.style.display = 'none';
+            subjectAssignmentsBody.innerHTML = '';
+          }
+        };
+      }
+    });
+  }
+
+  // Initialize on page load
+  initEnrollmentAutoFill();
+
+  // Re-initialize when page is loaded via AJAX
+  document.addEventListener('page:loaded', initEnrollmentAutoFill);
+
+  // Initialize when enrollment modals are shown
+  document.querySelectorAll('[id^="enrollStudentModal-"]').forEach(function(modal) {
+    modal.addEventListener('shown.bs.modal', function() {
+      initEnrollmentAutoFill();
     });
   });
 });

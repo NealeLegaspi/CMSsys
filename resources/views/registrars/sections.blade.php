@@ -5,6 +5,85 @@
     <i class="bi bi-building me-2"></i> Section Management
 @endsection
 
+@push('scripts')
+<script>
+(function () {
+  const gradeSubjectsMap = @json(
+    $subjects->groupBy('grade_level_id')->map(function ($group) {
+        return $group->map(function ($subject) {
+            return [
+                'id' => $subject->id,
+                'name' => $subject->name,
+            ];
+        })->values();
+    })
+  );
+
+
+  const renderSubjectsList = (container, subjects, countEl) => {
+    if (!container) return;
+    if (!subjects || !subjects.length) {
+      container.innerHTML = '<span class="text-muted">No subjects found for this grade level.</span>';
+      if (countEl) countEl.textContent = '';
+      return;
+    }
+
+    const listHtml = subjects
+      .map(sub => `<span class="badge text-bg-secondary me-1 mb-1">${sub.name}</span>`)
+      .join('');
+
+    container.innerHTML = listHtml;
+    if (countEl) {
+      countEl.textContent = `${subjects.length} subject${subjects.length === 1 ? '' : 's'}`;
+    }
+  };
+
+  const initAddSectionSubjects = () => {
+    const modal = document.getElementById('addSectionModal');
+    if (!modal || modal.dataset.subjectsBound === 'true') {
+      return;
+    }
+
+    const gradeSelect = modal.querySelector('.add-section-grade-select');
+    const subjectList = modal.querySelector('#add-section-subject-list');
+    const subjectCount = modal.querySelector('#add-section-subject-count');
+
+    if (!gradeSelect || !subjectList) {
+      return;
+    }
+
+    const handleUpdate = () => {
+      const gradeId = gradeSelect.value;
+      if (!gradeId) {
+        subjectList.innerHTML = 'Select a grade level to view its subjects.';
+        if (subjectCount) subjectCount.textContent = '';
+        return;
+      }
+      const subjects = gradeSubjectsMap[gradeId] || [];
+      if (!subjects.length) {
+        subjectList.innerHTML = '<span class="text-muted">No subjects found for this grade level.</span>';
+        if (subjectCount) subjectCount.textContent = '';
+        return;
+      }
+      renderSubjectsList(subjectList, subjects, subjectCount);
+    };
+
+    gradeSelect.addEventListener('change', handleUpdate);
+    modal.addEventListener('shown.bs.modal', handleUpdate);
+    modal.dataset.subjectsBound = 'true';
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initAddSectionSubjects();
+  });
+
+  document.addEventListener('page:loaded', () => {
+    initAddSectionSubjects();
+  });
+})();
+</script>
+@endpush
+
 @section('content')
 <div class="card shadow-sm border-0">
   <div class="card-body">
@@ -98,9 +177,13 @@
                     <i class="bi bi-people"></i>
                   </a>
 
-                  {{-- Edit Section --}}
+                  {{-- Edit Section (Toggle Expand) --}}
                   <button class="btn btn-sm btn-warning"
-                          data-bs-toggle="modal" data-bs-target="#editSectionModal{{ $sec->id }}"
+                          type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#sectionDetails{{ $sec->id }}"
+                          aria-expanded="false"
+                          aria-controls="sectionDetails{{ $sec->id }}"
                           {{ (!$currentSY || $currentSY->status !== 'active') ? 'disabled' : '' }}>
                     <i class="bi bi-pencil"></i>
                   </button>
@@ -115,37 +198,25 @@
               </td>
             </tr>
 
-            {{-- Edit Section Modal --}}
-            <div class="modal fade" id="editSectionModal{{ $sec->id }}" tabindex="-1" aria-hidden="true">
-              <div class="modal-dialog">
-                <form method="POST" action="{{ route('registrars.sections.update', $sec->id) }}">
-                  @csrf @method('PUT')
-                  <div class="modal-content">
-                    <div class="modal-header bg-warning text-white">
-                      <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Edit Section</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                      <div class="mb-3">
-                        <label class="form-label">Section Name</label>
-                        <input type="text" name="name" value="{{ $sec->name }}" class="form-control" required>
+            {{-- Expanded Row for Subject Assignments --}}
+            <tr class="collapse" id="sectionDetails{{ $sec->id }}">
+              <td colspan="7" class="p-0">
+                <div class="p-3 bg-light">
+                  <form method="POST" action="{{ route('registrars.sections.update', $sec->id) }}" id="sectionForm{{ $sec->id }}">
+                    @csrf @method('PUT')
+                    <input type="hidden" name="selected_section_id" value="{{ $sec->id }}">
+                    
+                    <div class="row mb-3">
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold">Section Name</label>
+                        <input type="text" class="form-control" value="{{ $sec->name }}" readonly>
                       </div>
-                      <div class="mb-3">
-                        <label class="form-label">Grade Level</label>
-                        <select name="gradelevel_id" class="form-select" required>
-                          @foreach($gradeLevels as $gl)
-                            <option value="{{ $gl->id }}" {{ $sec->gradelevel_id == $gl->id ? 'selected' : '' }}>
-                              {{ $gl->name }}
-                            </option>
-                          @endforeach
-                        </select>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold">Grade Level</label>
+                        <input type="text" class="form-control" value="{{ $sec->gradeLevel->name ?? 'N/A' }}" readonly>
                       </div>
-                      <div class="mb-3">
-                        <label class="form-label">School Year</label>
-                        <input type="text" class="form-control" value="{{ $sec->schoolYear->name ?? 'N/A' }}" readonly>
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">Adviser</label>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold">Adviser</label>
                         <select name="adviser_id" class="form-select">
                           <option value="">-- None --</option>
                           @foreach($teachers as $t)
@@ -155,20 +226,89 @@
                           @endforeach
                         </select>
                       </div>
-                      <div class="mb-3">
-                        <label class="form-label">Capacity (Max: 30)</label>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold">Capacity (Max: 30)</label>
                         <input type="number" name="capacity" class="form-control" min="1" max="30"
                                value="{{ $sec->capacity ?? 30 }}" required>
                       </div>
                     </div>
-                    <div class="modal-footer">
-                      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                      <button class="btn btn-warning text-white">Update</button>
+
+                    {{-- Subject Assignments Table --}}
+                    @php
+                      $sectionGradeLevelId = $sec->gradelevel_id;
+                      $subjectsForGrade = $subjects->where('grade_level_id', $sectionGradeLevelId);
+                      $currentAssignments = $sectionSubjectAssignments[$sec->id] ?? [];
+                    @endphp
+                    
+                    @if($subjectsForGrade->count() > 0)
+                      <div class="mb-3">
+                        <label class="form-label fw-bold">Subject Assignments</label>
+                        <div class="table-responsive">
+                          <table class="table table-sm table-bordered bg-white">
+                            <thead class="table-light">
+                              <tr>
+                                <th style="width: 50%;">Subject</th>
+                                <th style="width: 50%;">Subject Teacher</th>
+                              </tr>
+                            </thead>
+                              <tbody>
+                              @foreach($subjectsForGrade as $subject)
+                                @php
+                                  // Only show teachers who are already assigned to this subject
+                                  // across any section in the active school year.
+                                  $teachersForSubject = isset($subjectTeachers[$subject->id]) 
+                                    ? $teachers->whereIn('id', $subjectTeachers[$subject->id])
+                                    : collect();
+
+                                  // Also include the currently assigned teacher (for this section)
+                                  // even if they are not in the global subject teacher list.
+                                  $currentTeacherId = $currentAssignments[$subject->id] ?? null;
+                                  if ($currentTeacherId && !$teachersForSubject->contains('id', $currentTeacherId)) {
+                                    $currentTeacher = $teachers->firstWhere('id', $currentTeacherId);
+                                    if ($currentTeacher) {
+                                      $teachersForSubject = $teachersForSubject->push($currentTeacher);
+                                    }
+                                  }
+                                @endphp
+                                <tr>
+                                  <td class="align-middle">{{ $subject->name }}</td>
+                                  <td>
+                                    <select name="subject_teachers[{{ $subject->id }}]" class="form-select form-select-sm">
+                                      <option value="">-- None --</option>
+                                      @if($teachersForSubject->count() > 0)
+                                        @foreach($teachersForSubject as $t)
+                                          <option value="{{ $t->id }}" 
+                                            {{ isset($currentAssignments[$subject->id]) && $currentAssignments[$subject->id] == $t->id ? 'selected' : '' }}>
+                                            {{ $t->profile->first_name }} {{ $t->profile->last_name }}
+                                          </option>
+                                        @endforeach
+                                      @else
+                                        <option value="" disabled>No teachers assigned to this subject</option>
+                                      @endif
+                                    </select>
+                                  </td>
+                                </tr>
+                              @endforeach
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    @else
+                      <div class="alert alert-info mb-3">
+                        <i class="bi bi-info-circle me-2"></i>No subjects found for {{ $sec->gradeLevel->name ?? 'this grade level' }}.
+                      </div>
+                    @endif
+
+                    <div class="d-flex justify-content-end gap-2">
+                      <button type="button" class="btn btn-secondary" 
+                              data-bs-toggle="collapse" 
+                              data-bs-target="#sectionDetails{{ $sec->id }}">Cancel</button>
+                      <button type="submit" class="btn btn-warning text-white">Update</button>
                     </div>
-                  </div>
-                </form>
-              </div>
-            </div>
+                  </form>
+                </div>
+              </td>
+            </tr>
 
             {{-- Archive Confirmation Modal --}}
             <div class="modal fade" id="archiveSectionModal{{ $sec->id }}" tabindex="-1" aria-hidden="true">
@@ -224,12 +364,21 @@
           </div>
           <div class="mb-3">
             <label class="form-label">Grade Level</label>
-            <select name="gradelevel_id" class="form-select" required>
+            <select name="gradelevel_id" class="form-select add-section-grade-select" required>
               <option value="">-- Select --</option>
               @foreach($gradeLevels as $gl)
                 <option value="{{ $gl->id }}">{{ $gl->name }}</option>
               @endforeach
             </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label d-flex justify-content-between align-items-center">
+              <span>Subjects for Selected Grade</span>
+              <span class="text-muted small" id="add-section-subject-count"></span>
+            </label>
+            <div id="add-section-subject-list" class="border rounded p-3 bg-light-subtle small text-muted">
+              Select a grade level to view its subjects.
+            </div>
           </div>
           <div class="mb-3">
             <label class="form-label">School Year</label>
@@ -240,7 +389,7 @@
             <label class="form-label">Adviser</label>
             <select name="adviser_id" class="form-select">
               <option value="">-- None --</option>
-              @foreach($teachers as $t)
+              @foreach(($availableAdvisers ?? $teachers) as $t)
                 <option value="{{ $t->id }}">
                   {{ $t->profile?->first_name ?? 'N/A' }} {{ $t->profile?->last_name ?? '' }}
                 </option>

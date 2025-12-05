@@ -206,7 +206,11 @@ class TeacherController extends Controller
         $currentSY = SchoolYear::where('status', 'active')->first();
         $syClosed = !$currentSY; 
 
-        $advisorySection = Section::where('adviser_id', $teacher->id)->first();
+        // Advisory section should be taken from the ACTIVE school year
+        $advisorySection = Section::where('adviser_id', $teacher->id)
+            ->when($currentSY, fn($q) => $q->where('school_year_id', $currentSY->id))
+            ->orderByDesc('school_year_id')
+            ->first();
 
         if (!$advisorySection) {
             return view('teachers.classlist', [
@@ -221,16 +225,48 @@ class TeacherController extends Controller
 
         $section = $advisorySection;
 
-        $baseQuery = Student::whereHas('activeEnrollment', fn($q) => $q->where('section_id', $section->id))
-                        ->with('user.profile'); 
+        // Fetch active, non-archived enrollments for this section in the active SY
+        $enrollmentQuery = Enrollment::with(['student.user.profile'])
+            ->where('section_id', $section->id)
+            ->where('archived', false);
 
-        $studentsMale = (clone $baseQuery)
-            ->whereHas('user.profile', fn($q) => $q->where('sex', 'Male')->orderBy('last_name'))
-            ->get();
+        if ($currentSY) {
+            $enrollmentQuery->where('school_year_id', $currentSY->id);
+        }
 
-        $studentsFemale = (clone $baseQuery)
-            ->whereHas('user.profile', fn($q) => $q->where('sex', 'Female')->orderBy('last_name'))
-            ->get();
+        $enrollments = $enrollmentQuery->get();
+
+        // Split students by gender based on profile
+        $studentsMale = $enrollments
+            ->filter(function ($enrollment) {
+                return optional(optional($enrollment->student)->user->profile)->sex === 'Male';
+            })
+            ->sortBy(fn($enr) => optional($enr->student->user->profile)->last_name)
+            ->map(function ($enr) {
+                $student = $enr->student;
+                if ($student) {
+                    // Expose enrollment status on the student so the view can read it
+                    $student->status = $enr->status;
+                }
+                return $student;
+            })
+            ->filter()
+            ->values();
+
+        $studentsFemale = $enrollments
+            ->filter(function ($enrollment) {
+                return optional(optional($enrollment->student)->user->profile)->sex === 'Female';
+            })
+            ->sortBy(fn($enr) => optional($enr->student->user->profile)->last_name)
+            ->map(function ($enr) {
+                $student = $enr->student;
+                if ($student) {
+                    $student->status = $enr->status;
+                }
+                return $student;
+            })
+            ->filter()
+            ->values();
 
         $mySubjects = DB::table('subject_teacher')
             ->join('subjects', 'subject_teacher.subject_id', '=', 'subjects.id')
@@ -258,7 +294,9 @@ class TeacherController extends Controller
         }
 
         $teacher = Auth::user();
-        $section = Section::where('adviser_id', $teacher->id)->first();
+        $section = Section::where('adviser_id', $teacher->id)
+            ->where('school_year_id', $currentSY->id)
+            ->first();
 
         if (!$section) {
             return back()->withErrors('You have no advisory section.');
@@ -293,8 +331,10 @@ class TeacherController extends Controller
         $currentSY = SchoolYear::where('status', 'active')->first();
         $syClosed = !$currentSY || $currentSY->status === 'closed';
 
+        // Only show assignments for this teacher in the ACTIVE school year
         $assignments = SubjectAssignment::with(['subject', 'section.gradeLevel'])
             ->where('teacher_id', $teacherId)
+            ->when($currentSY, fn($q) => $q->where('school_year_id', $currentSY->id))
             ->get()
             ->map(function ($a) {
                 return (object)[
@@ -320,6 +360,7 @@ class TeacherController extends Controller
 
             $selectedAssignment = SubjectAssignment::with(['subject', 'section.gradeLevel'])
                 ->where('teacher_id', $teacherId)
+                ->when($currentSY, fn($q) => $q->where('school_year_id', $currentSY->id))
                 ->find($assignmentId);
 
             if (!$selectedAssignment) {
@@ -438,17 +479,28 @@ class TeacherController extends Controller
         foreach ($request->grades as $studentId => $quarters) {
             foreach ($quarters as $quarter => $gradeValue) {
 
-                if ((int)$quarter > $currentQuarter) continue;
+                // Do not allow saving grades for future quarters
+                if ((int)$quarter > $currentQuarter) {
+                    continue;
+                }
 
-                if (is_numeric($gradeValue) && $gradeValue >= 60 && $gradeValue <= 100) {
+                // Normalize numeric value
+                if (is_numeric($gradeValue)) {
+                    $gradeValue = (float)$gradeValue;
+                }
+
+                // Enforce numeric range 75–100 and round to 2 decimals
+                if (is_numeric($gradeValue) && $gradeValue >= 75 && $gradeValue <= 100) {
+                    $gradeValue = round((float)$gradeValue, 2);
                     Grade::updateOrCreate(
                         [
-                            'student_id' => (int)$studentId,
-                            'subject_id' => (int)$request->subject_id,
-                            'quarter'    => $quarter,
+                            'student_id'     => (int)$studentId,
+                            'subject_id'     => (int)$request->subject_id,
+                            'school_year_id' => $activeSY->id,
+                            'quarter'        => $quarter,
                         ],
                         [
-                            'grade' => number_format((float)$gradeValue, 2, '.', ''), // ✔ FIX HERE
+                            'grade' => number_format($gradeValue, 2, '.', ''),
                         ]
                     );
                     $savedCount++;
@@ -456,6 +508,7 @@ class TeacherController extends Controller
                 elseif (empty($gradeValue)) {
                     Grade::where('student_id', (int)$studentId)
                         ->where('subject_id', (int)$request->subject_id)
+                        ->where('school_year_id', $activeSY->id)
                         ->where('quarter', $quarter)
                         ->delete();
                 }

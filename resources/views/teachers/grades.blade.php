@@ -127,15 +127,22 @@
                     </td>
 
                     @foreach(['1st','2nd','3rd','4th'] as $q)
+                      @php
+                        $quarterNumberMap = ['1st' => 1, '2nd' => 2, '3rd' => 3, '4th' => 4];
+                        $qNum = $quarterNumberMap[$q] ?? 0;
+                        $isFutureQuarter = $qNum > ($activeQuarter ?? 0);
+                        $isLocked = in_array($q, $lockedQuarters ?? []);
+                        $disabled = $syClosed || $isFutureQuarter || $isLocked;
+                      @endphp
                       <td>
                         <input 
                           type="number"
                           name="grades[{{ $student->id }}][{{ $q }}]"
                           value="{{ old('grades.'.$student->id.'.'.$q, $grades[$q]) }}"
                           class="form-control text-center grade-input"
-                          min="0" max="100" step="0.01"
-                          {{ $syClosed ? 'readonly disabled' : '' }}
-                          {{ in_array($q, $lockedQuarters ?? []) ? 'readonly disabled' : '' }}>
+                          min="0" max="100" step="1"
+                          {{ $disabled ? 'readonly disabled' : '' }}
+                          oninput="validateAndCompute(this)">
                       </td>
                     @endforeach
 
@@ -276,8 +283,11 @@ function validateAndCompute(input) {
 
     let val = parseFloat(input.value);
     if (!isNaN(val)) {
-        if (val > 100) input.value = 100;
-        if (val < 0) input.value = 0;
+        // Force whole-number quarter grades, clamp only to 0–100 while typing
+        val = Math.round(val);
+        if (val > 100) val = 100;
+        if (val < 0)   val = 0;
+        input.value = val;
     } else {
         input.value = '';
     }
@@ -291,8 +301,13 @@ function validateAndCompute(input) {
     });
 
     if (grades.length === 4) {
-        const avg = (grades.reduce((a, b) => a + b, 0) / 4).toFixed(2);
-        finalInput.value = avg;
+        const sum = grades.reduce((a, b) => a + b, 0);
+        const avg = sum / 4;
+
+        // Final grade: AVERAGE of 1st–4th, 2 decimal places
+        finalInput.value = avg.toFixed(2);
+
+        // Remarks based on average
         remarksSpan.textContent = avg >= 75 ? 'PASSED' : 'FAILED';
         remarksSpan.className = `badge rounded-pill px-3 py-2 ${
             avg >= 75 

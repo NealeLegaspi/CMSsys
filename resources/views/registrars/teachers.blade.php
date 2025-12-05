@@ -5,13 +5,24 @@
 
 @section('content')
 <div class="card shadow-sm border-0">
-  <div class="card-header d-flex justify-content-between align-items-center bg-light">
-    <h6 class="fw-bold mb-0">
-      <i class="bi bi-person-workspace me-2"></i> Teachers
-    </h6>
-    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addTeacherModal">
-      <i class="bi bi-plus-circle me-1"></i> Add Teacher
-    </button>
+  <div class="card-header bg-light">
+    <div class="d-flex justify-content-between align-items-center">
+      <h6 class="fw-bold mb-0">
+        <i class="bi bi-person-workspace me-2"></i> Teachers
+      </h6>
+    </div>
+    <ul class="nav nav-tabs mt-3">
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('registrars.teachers') ? 'active' : '' }}" href="{{ route('registrars.teachers') }}">
+          Active
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('registrars.teachers.archived') ? 'active' : '' }}" href="{{ route('registrars.teachers.archived') }}">
+          Archived
+        </a>
+      </li>
+    </ul>
   </div>
 
   <div class="card-body">
@@ -46,9 +57,25 @@
         </thead>
         <tbody>
           @forelse($teachers as $i => $teacher)
+          @php
+            $advisories = $advisoriesByTeacher[$teacher->id] ?? collect();
+            $loads      = $teachingLoads[$teacher->id] ?? collect();
+          @endphp
           <tr>
             <td>{{ $teachers->firstItem() + $i }}</td>
-            <td>{{ $teacher->profile->last_name }}, {{ $teacher->profile->first_name }} {{ $teacher->profile->middle_name }}</td>
+            <td>
+              {{ $teacher->profile->last_name }}, {{ $teacher->profile->first_name }} {{ $teacher->profile->middle_name }}
+              @if($advisories->isNotEmpty())
+                <div class="small text-muted mt-1">
+                  <div>
+                    <strong>Advisory:</strong>
+                    @foreach($advisories as $sec)
+                      {{ $sec->gradeLevel->name ?? 'Grade' }} - {{ $sec->name }}@if(!$loop->last),@endif
+                    @endforeach
+                  </div>
+                </div>
+              @endif
+            </td>
             <td>{{ $teacher->email }}</td>
             <td>{{ $teacher->profile->contact_number ?? '—' }}</td>
             <td class="text-center">
@@ -56,11 +83,14 @@
                 <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#viewTeacher{{ $teacher->id }}" title="View">
                   <i class="bi bi-eye"></i>
                 </button>
+                <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#assignTeacher{{ $teacher->id }}" title="Assign Advisory & Subjects">
+                  <i class="bi bi-diagram-3"></i>
+                </button>
                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editTeacher{{ $teacher->id }}" title="Edit">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteTeacher{{ $teacher->id }}" title="Delete">
-                  <i class="bi bi-trash"></i>
+                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#deleteTeacher{{ $teacher->id }}" title="Archive">
+                  <i class="bi bi-archive"></i>
                 </button>
               </div>
             </td>
@@ -83,6 +113,94 @@
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- 📚 Assign Advisory & Subjects Modal -->
+          <div class="modal fade" id="assignTeacher{{ $teacher->id }}" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+              <form method="POST" action="{{ route('registrars.teachers.assignLoad', $teacher->id) }}">
+                @csrf
+                <div class="modal-content">
+                  <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title">
+                      <i class="bi bi-diagram-3 me-2"></i>
+                      Assign Advisory & Teaching Load
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    @if(isset($currentSY))
+                      <p class="small text-muted mb-3">
+                        Active School Year: <strong>{{ $currentSY->name ?? ($currentSY->start_date.' - '.$currentSY->end_date) }}</strong>
+                      </p>
+                    @endif
+
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Advisory Section</label>
+                      <select name="advisory_section_id"
+                              class="form-select advisory-section-select"
+                              data-teacher-id="{{ $teacher->id }}">
+                        <option value="">-- None / No Change --</option>
+                        @foreach($sections as $section)
+                          <option value="{{ $section->id }}"
+                            data-gradelevel-id="{{ $section->gradelevel_id }}"
+                            @if($advisories->contains('id', $section->id)) selected @endif>
+                            {{ $section->gradeLevel->name ?? 'Grade' }} - {{ $section->name }}
+                          </option>
+                        @endforeach
+                      </select>
+                      <small class="text-muted">This sets which section (grade & section) the teacher will advise for the active school year.</small>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-2">
+                      <label class="form-label fw-semibold">Subjects (for this teacher in their advisory)</label>
+                      <div class="border rounded p-2" style="max-height:220px; overflow:auto;">
+                        @forelse($subjects as $subject)
+                          <div class="form-check">
+                            <input class="form-check-input subject-checkbox" type="checkbox"
+                                   name="teaching_subject_ids[]"
+                                   value="{{ $subject->id }}"
+                                   id="teachSub{{ $teacher->id }}_{{ $subject->id }}"
+                                   data-gradelevel-id="{{ $subject->grade_level_id }}"
+                                   data-subject-name="{{ strtolower(trim($subject->name)) }}"
+                                   @if($loads->contains('subject_id', $subject->id)) checked @endif>
+                            <label class="form-check-label" for="teachSub{{ $teacher->id }}_{{ $subject->id }}">
+                              {{ $subject->gradeLevel->name ?? 'Grade' }} - {{ $subject->name }}
+                            </label>
+                          </div>
+                        @empty
+                          <div class="text-muted small">No subjects available for the active school year.</div>
+                        @endforelse
+                      </div>
+                      <small class="text-muted d-block mt-1">
+                        Checked subjects will be assigned to this teacher in their advisory section.
+                      </small>
+                    </div>
+
+                    @if($loads->isNotEmpty())
+                      <hr>
+                      <div class="small">
+                        <strong>Current Load:</strong>
+                        <ul class="mb-0">
+                          @foreach($loads as $load)
+                            <li>
+                              {{ $gradeLevels[$load->gradelevel_id] ?? 'Grade' }} - {{ $load->section_name }}:
+                              {{ $load->subject_name }}
+                            </li>
+                          @endforeach
+                        </ul>
+                      </div>
+                    @endif
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-secondary">Save Assignments</button>
+                  </div>
+                </div>
+              </form>
             </div>
           </div>
 
@@ -136,22 +254,22 @@
             </div>
           </div>
 
-          <!-- 🗑️ Delete Modal -->
+          <!-- 🗃️ Archive Modal -->
           <div class="modal fade" id="deleteTeacher{{ $teacher->id }}" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
               <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                  <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Delete</h5>
-                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <div class="modal-header bg-warning text-dark">
+                  <h5 class="modal-title"><i class="bi bi-archive"></i> Archive Teacher</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                  Are you sure you want to delete <strong>{{ $teacher->profile->first_name }} {{ $teacher->profile->last_name }}</strong>?
+                  Are you sure you want to archive <strong>{{ $teacher->profile->first_name }} {{ $teacher->profile->last_name }}</strong>?
                 </div>
                 <div class="modal-footer">
                   <form method="POST" action="{{ route('registrars.teachers.destroy', $teacher->id) }}">
                     @csrf @method('DELETE')
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i> Delete</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-archive"></i> Archive</button>
                   </form>
                 </div>
               </div>
@@ -223,3 +341,83 @@
   </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+  const initAutoCheckSubjects = () => {
+    document.querySelectorAll('.advisory-section-select').forEach(select => {
+      if (select.dataset.bound === 'true') return;
+      select.dataset.bound = 'true';
+
+      const teacherId = select.dataset.teacherId;
+      const modal = select.closest('.modal');
+      if (!modal) return;
+
+      const subjectCheckboxes = modal.querySelectorAll('.form-check-input[data-gradelevel-id]');
+
+      const syncSubjects = () => {
+        const selectedOption = select.options[select.selectedIndex];
+        const gradeLevelId = selectedOption ? selectedOption.getAttribute('data-gradelevel-id') : null;
+
+        if (!gradeLevelId) {
+          // If no advisory selected, do not change existing checks
+          return;
+        }
+
+        subjectCheckboxes.forEach(cb => {
+          const cbGradeId = cb.getAttribute('data-gradelevel-id');
+          if (cbGradeId === gradeLevelId) {
+            cb.checked = true;
+          }
+        });
+      };
+
+      // Auto-check when advisory section changes
+      select.addEventListener('change', syncSubjects);
+
+      // Also run once when modal is first opened (in case advisory already selected)
+      modal.addEventListener('shown.bs.modal', syncSubjects, { once: true });
+    });
+  };
+
+  // Auto-check all subjects with the same name when one is checked
+  const initSubjectNameGrouping = () => {
+    document.querySelectorAll('.subject-checkbox').forEach(checkbox => {
+      if (checkbox.dataset.groupingBound === 'true') return;
+      checkbox.dataset.groupingBound = 'true';
+
+      checkbox.addEventListener('change', function() {
+        const subjectName = this.getAttribute('data-subject-name');
+        const isChecked = this.checked;
+        const modal = this.closest('.modal');
+        
+        if (!modal || !subjectName) return;
+
+        // Find all checkboxes with the same subject name in this modal
+        const sameNameCheckboxes = modal.querySelectorAll(
+          `.subject-checkbox[data-subject-name="${subjectName}"]`
+        );
+
+        // Check/uncheck all subjects with the same name
+        sameNameCheckboxes.forEach(cb => {
+          if (cb !== this) {
+            cb.checked = isChecked;
+          }
+        });
+      });
+    });
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initAutoCheckSubjects();
+    initSubjectNameGrouping();
+  });
+  
+  document.addEventListener('page:loaded', () => {
+    initAutoCheckSubjects();
+    initSubjectNameGrouping();
+  });
+})();
+</script>
+@endpush

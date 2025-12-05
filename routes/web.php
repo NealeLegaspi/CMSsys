@@ -115,10 +115,13 @@ Route::prefix('registrar')->middleware(['auth', 'role:Registrar'])->group(functi
     Route::get('/forms/form138/{student}', [RegistrarController::class, 'printForm138'])->name('registrars.printForm138');
 
     Route::get('/teachers', [RegistrarController::class, 'teachers'])->name('registrars.teachers');
+    Route::get('/teachers/archived', [RegistrarController::class, 'archivedTeachers'])->name('registrars.teachers.archived');
     Route::post('/teachers', [RegistrarController::class, 'storeTeacher'])->name('registrars.teachers.store');
     Route::get('/teachers/{id}', [RegistrarController::class, 'showTeacher'])->name('registrars.teachers.show');
     Route::put('/teachers/{id}', [RegistrarController::class, 'updateTeacher'])->name('registrars.teachers.update');
     Route::delete('/teachers/{id}', [RegistrarController::class, 'destroyTeacher'])->name('registrars.teachers.destroy');
+    Route::put('/teachers/{id}/restore', [RegistrarController::class, 'restoreTeacher'])->name('registrars.teachers.restore');
+    Route::post('/teachers/{id}/assign-load', [RegistrarController::class, 'assignTeacherLoad'])->name('registrars.teachers.assignLoad');
 
     Route::get('/sections', [RegistrarController::class, 'sections'])->name('registrars.sections');
     Route::post('/sections', [RegistrarController::class, 'storeSection'])->name('registrars.sections.store');
@@ -225,6 +228,16 @@ Route::get('/grades/export/pdf', [RegistrarController::class, 'exportGradesPDF']
     Route::put('/subjects/{id}/archive', [RegistrarController::class, 'archiveSubject'])->name('registrars.subjects.archive');
     Route::get('/subjects/archived', [RegistrarController::class, 'archivedSubjects'])->name('registrars.subjects.archived');
     Route::put('/subjects/{id}/restore', [RegistrarController::class, 'restoreSubject'])->name('registrars.subjects.restore');
+
+    Route::get('/curriculum', [RegistrarController::class, 'curriculum'])->name('registrars.curriculum');
+    Route::post('/curriculum', [RegistrarController::class, 'storeCurriculum'])->name('registrars.curriculum.store');
+    Route::post('/curriculum/set', [RegistrarController::class, 'applyCurriculum'])->name('registrars.curriculum.templates.store');
+    Route::post('/curriculum/reuse', [RegistrarController::class, 'reuseCurricula'])->name('registrars.curriculum.reuse');
+    Route::get('/curriculum/get-subjects', [RegistrarController::class, 'getSubjectsForCurriculum'])->name('registrars.curriculum.get-subjects');
+    Route::get('/curriculum/get-curricula', [RegistrarController::class, 'getCurriculaForSchoolYear'])->name('registrars.curriculum.get-curricula');
+    Route::get('/curriculum/{id}', [RegistrarController::class, 'showCurriculum'])->name('registrars.curriculum.show');
+    Route::put('/curriculum/{id}', [RegistrarController::class, 'updateCurriculum'])->name('registrars.curriculum.update');
+    Route::delete('/curriculum/{id}', [RegistrarController::class, 'destroyCurriculum'])->name('registrars.curriculum.destroy');
 });
 
 // -------------------- TEACHER ROUTES --------------------

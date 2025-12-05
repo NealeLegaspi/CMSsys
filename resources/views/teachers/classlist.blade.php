@@ -44,9 +44,15 @@
                                 {{ $section->gradeLevel->name ?? 'N/A' }} - {{ $section->name ?? 'No Advisory Section Assigned' }}
                             </h5>
                             <p class="mb-0 text-muted">
-                                Total Students: 
-                                <span class="fw-semibold">{{ $studentsMale->count() + $studentsFemale->count() }}</span>
-                                (Male: {{ $studentsMale->count() }}, Female: {{ $studentsFemale->count() }})
+                                <span class="me-3">
+                                    <strong>School Year:</strong>
+                                    {{ $currentSY->name ?? 'N/A' }}
+                                </span>
+                                <span>
+                                    <strong>Total Students:</strong>
+                                    <span class="fw-semibold">{{ $studentsMale->count() + $studentsFemale->count() }}</span>
+                                    (Male: {{ $studentsMale->count() }}, Female: {{ $studentsFemale->count() }})
+                                </span>
                             </p>
                         </div>
                     </div>
@@ -67,12 +73,17 @@
                       </div>
                 </div>
 
-                {{-- Nested Tabs for Male/Female Students --}}
+                {{-- Nested Tabs for All / Male / Female Students --}}
                 <div class="card border-0 shadow-sm rounded-3">
                     <div class="card-header p-0 bg-white border-bottom-0">
-                        <ul class="nav nav-tabs card-header-tabs" id="genderTab" role="tablist">
+                        <ul class="nav nav-tabs card-header-tabs gap-2 ps-3" id="genderTab" role="tablist">
                             <li class="nav-item">
-                                <button class="nav-link active fw-semibold" id="male-tab" data-bs-toggle="tab" data-bs-target="#maleStudents" type="button" role="tab" aria-controls="maleStudents" aria-selected="true">
+                                <button class="nav-link active fw-semibold" id="all-tab" data-bs-toggle="tab" data-bs-target="#allStudents" type="button" role="tab" aria-controls="allStudents" aria-selected="true">
+                                    <i class="bi bi-people-fill me-1 text-secondary"></i> All ({{ $studentsMale->count() + $studentsFemale->count() }})
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link fw-semibold" id="male-tab" data-bs-toggle="tab" data-bs-target="#maleStudents" type="button" role="tab" aria-controls="maleStudents" aria-selected="false">
                                     <i class="bi bi-gender-male me-1 text-primary"></i> Male ({{ $studentsMale->count() }})
                                 </button>
                             </li>
@@ -85,10 +96,57 @@
                     </div>
 
                     <div class="card-body pt-3">
-                        <div class="tab-content" id="genderTabContent">
+                        <div class="tab-content mt-2" id="genderTabContent">
+
+                            @php
+                                $studentsAll = $studentsMale->merge($studentsFemale)
+                                    ->unique('id')
+                                    ->sortBy(fn($st) => $st->user->profile->last_name ?? '');
+                            @endphp
+
+                            {{-- All Students Tab Content --}}
+                            <div class="tab-pane fade show active" id="allStudents" role="tabpanel" aria-labelledby="all-tab">
+                                @if($studentsAll->count() > 0)
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-hover align-middle student-table">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th class="text-center">LRN</th>
+                                                    <th>Last Name</th>
+                                                    <th>First Name</th>
+                                                    <th class="text-center">Middle Name</th>
+                                                    <th class="text-center">Gender</th>
+                                                    <th class="text-center">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($studentsAll as $st)
+                                                <tr>
+                                                    <td class="text-center">{{ $st->student_number ?? 'N/A' }}</td>
+                                                    <td>{{ $st->user->profile->last_name ?? '' }}</td>
+                                                    <td>{{ $st->user->profile->first_name ?? '' }}</td>
+                                                    <td class="text-center">{{ $st->user->profile->middle_name ?? '' }}</td>
+                                                    <td class="text-center">{{ $st->user->profile->sex ?? 'N/A' }}</td>
+                                                    <td class="text-center">
+                                                        @php $status = strtolower($st->status ?? ''); @endphp
+                                                        @if($status === 'active' || $status === 'enrolled')
+                                                            <span class="badge bg-success">Active</span>
+                                                        @else
+                                                            <span class="badge bg-danger">Inactive</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @else
+                                    <div class="alert alert-light text-center mb-0">No students enrolled in this section.</div>
+                                @endif
+                            </div>
 
                             {{-- Male Students Tab Content --}}
-                            <div class="tab-pane fade show active" id="maleStudents" role="tabpanel" aria-labelledby="male-tab">
+                            <div class="tab-pane fade" id="maleStudents" role="tabpanel" aria-labelledby="male-tab">
                                 @if($studentsMale->count() > 0)
                                     <div class="table-responsive">
                                         <table class="table table-striped table-hover align-middle student-table">
