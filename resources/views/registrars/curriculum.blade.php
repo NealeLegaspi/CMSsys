@@ -15,45 +15,45 @@ use App\Models\Subject;
     <div class="card-body">
       @include('partials.alerts')
 
-      {{-- School Year Filter --}}
-      <form method="GET" action="{{ route('registrars.curriculum') }}" class="row g-3 align-items-end mb-4">
-        <div class="col-md-4">
-          <label class="form-label fw-semibold">Select School Year</label>
-          <select name="school_year_id" class="form-select" onchange="this.form.submit()">
-            <option value="">-- Select School Year --</option>
-            @foreach($schoolYears as $sy)
-              <option value="{{ $sy->id }}" {{ $selectedSchoolYearId == $sy->id ? 'selected' : '' }}>
-                {{ $sy->name }}
-              </option>
-            @endforeach
-          </select>
+      {{-- Active School Year Display --}}
+      @if($currentSY)
+        <div class="alert alert-info mb-4">
+          <i class="bi bi-info-circle me-2"></i>
+          <strong>Active School Year:</strong> {{ $currentSY->name }}
         </div>
-        <div class="col-md-8 d-flex justify-content-end gap-2">
-          <button type="button"
-                  class="btn btn-outline-secondary"
-                  data-bs-toggle="modal"
-                  data-bs-target="#setCurriculumModal"
-                  @if(!$selectedSchoolYearId) disabled title="Please select a school year first to set curriculum." @endif>
-            <i class="bi bi-sliders me-1"></i> Set Curriculum
-          </button>
-          <button type="button"
-                  class="btn btn-outline-primary"
-                  data-bs-toggle="modal"
-                  data-bs-target="#reuseCurriculaModal"
-                  @if(!$canReuseCurricula) disabled title="Cannot reuse curricula. No active school year or no previous school years available." @endif>
-            <i class="bi bi-arrow-counterclockwise me-1"></i> Reuse Previous
-          </button>
-          <button type="button"
-                  class="btn btn-primary"
-                  data-bs-toggle="modal"
-                  data-bs-target="#addCurriculumModal"
-                  @if(!$selectedSchoolYearId) disabled title="Please select a school year first to add a curriculum definition." @endif>
-            <i class="bi bi-plus-circle me-1"></i> Add Curriculum
-          </button>
+      @else
+        <div class="alert alert-warning mb-4">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          <strong>No Active School Year:</strong> Please activate a school year first to manage curricula.
         </div>
-      </form>
+      @endif
 
-      @if($selectedSchoolYearId)
+      {{-- Action Buttons --}}
+      <div class="d-flex justify-content-end gap-2 mb-4">
+        <button type="button"
+                class="btn btn-outline-secondary"
+                data-bs-toggle="modal"
+                data-bs-target="#setCurriculumModal"
+                @if(!$currentSY) disabled title="Please activate a school year first to set curriculum." @endif>
+          <i class="bi bi-sliders me-1"></i> Set Curriculum
+        </button>
+        <button type="button"
+                class="btn btn-outline-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#reuseCurriculaModal"
+                @if(!$canReuseCurricula) disabled title="Cannot reuse curricula. No active school year or no previous school years available." @endif>
+          <i class="bi bi-arrow-counterclockwise me-1"></i> Reuse Previous
+        </button>
+        <button type="button"
+                class="btn btn-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#addCurriculumModal"
+                @if(!$currentSY) disabled title="Please activate a school year first to add a curriculum definition." @endif>
+          <i class="bi bi-plus-circle me-1"></i> Add Curriculum
+        </button>
+      </div>
+
+      @if($currentSY)
         {{-- Curriculum Table --}}
         <div class="table-responsive">
           <table class="table table-hover align-middle">
@@ -267,8 +267,8 @@ use App\Models\Subject;
             <input type="text" name="name" value="{{ old('name') }}" class="form-control" required placeholder="e.g., K-12 Basic Education Curriculum">
           </div>
           
-          {{-- Hidden school year, bound to selected filter but not chosen here (curriculum is conceptually global) --}}
-          <input type="hidden" name="school_year_id" id="addCurriculumSchoolYear" value="{{ $selectedSchoolYearId }}">
+          {{-- Hidden school year, always uses active school year --}}
+          <input type="hidden" name="school_year_id" id="addCurriculumSchoolYear" value="{{ $currentSY->id ?? '' }}">
 
           <div class="mb-3" id="existingCurriculaContainer" style="display: none;">
             <label class="form-label">Existing Curricula <small class="text-muted">(Optional - Select to edit or leave empty to create new)</small></label>
@@ -305,7 +305,7 @@ use App\Models\Subject;
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <input type="hidden" name="school_year_id" value="{{ $selectedSchoolYearId }}">
+          <input type="hidden" name="school_year_id" value="{{ $currentSY->id ?? '' }}">
 
           <div class="mb-3">
             <label class="form-label">Select Curriculum</label>
@@ -359,7 +359,7 @@ use App\Models\Subject;
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-secondary" @if(!$selectedSchoolYearId || $allCurricula->isEmpty()) disabled @endif>Apply Curriculum</button>
+          <button type="submit" class="btn btn-secondary" @if(!$currentSY || $allCurricula->isEmpty()) disabled @endif>Apply Curriculum</button>
         </div>
       </div>
     </form>
@@ -373,141 +373,144 @@ document.addEventListener('DOMContentLoaded', function() {
   const existingCurriculaContainer = document.getElementById('existingCurriculaContainer');
   const existingCurriculaSelect = document.getElementById('existingCurriculaSelect');
   
-  if (schoolYearSelect) {
-    schoolYearSelect.addEventListener('change', function() {
-      const schoolYearId = this.value;
-      
-      // Load existing curricula for the selected school year
-      if (schoolYearId) {
-        fetch(`{{ url('/registrar/curriculum/get-curricula') }}?school_year_id=${schoolYearId}`)
-          .then(response => response.json())
-          .then(data => {
-            if (data.curricula && data.curricula.length > 0) {
-              existingCurriculaSelect.innerHTML = '<option value="">-- Create New Curriculum --</option>';
-              data.curricula.forEach(curriculum => {
-                const option = document.createElement('option');
-                option.value = curriculum.id;
-                option.textContent = curriculum.name + ' (' + curriculum.subjects_count + ' subjects)';
-                existingCurriculaSelect.appendChild(option);
-              });
-              existingCurriculaContainer.style.display = 'block';
-            } else {
-              existingCurriculaContainer.style.display = 'none';
-              existingCurriculaSelect.innerHTML = '<option value="">-- Create New Curriculum --</option>';
-            }
-          })
-          .catch(error => {
-            console.error('Error fetching curricula:', error);
-            existingCurriculaContainer.style.display = 'none';
+  function loadSubjectsAndCurricula() {
+    const schoolYearId = schoolYearSelect ? schoolYearSelect.value : null;
+    
+    if (!schoolYearId) {
+      subjectsContainer.innerHTML = '<p class="text-muted small">No active school year. Please activate a school year first.</p>';
+      return;
+    }
+    
+    // Load existing curricula for the active school year
+    fetch(`{{ url('/registrar/curriculum/get-curricula') }}?school_year_id=${schoolYearId}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.curricula && data.curricula.length > 0) {
+          existingCurriculaSelect.innerHTML = '<option value="">-- Create New Curriculum --</option>';
+          data.curricula.forEach(curriculum => {
+            const option = document.createElement('option');
+            option.value = curriculum.id;
+            option.textContent = curriculum.name + ' (' + curriculum.subjects_count + ' subjects)';
+            existingCurriculaSelect.appendChild(option);
           });
-      } else {
+          existingCurriculaContainer.style.display = 'block';
+        } else {
+          existingCurriculaContainer.style.display = 'none';
+          existingCurriculaSelect.innerHTML = '<option value="">-- Create New Curriculum --</option>';
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching curricula:', error);
         existingCurriculaContainer.style.display = 'none';
-        existingCurriculaSelect.innerHTML = '<option value="">-- Create New Curriculum --</option>';
-      }
-      
-      // Load subjects
-      if (schoolYearId) {
-        // Fetch subjects for the selected school year
-        fetch(`{{ url('/registrar/curriculum/get-subjects') }}?school_year_id=${schoolYearId}`)
-          .then(response => response.json())
-          .then(data => {
-            if (data.subjects && data.subjects.length > 0) {
-              let html = '';
-              const subjectsByGrade = {};
-              
-              // Group subjects by grade level
-              data.subjects.forEach(subject => {
-                const gradeLevelId = subject.grade_level_id || 'unassigned';
-                const gradeLevelName = subject.grade_level_name || 'Unassigned';
-                
-                if (!subjectsByGrade[gradeLevelId]) {
-                  subjectsByGrade[gradeLevelId] = {
-                    name: gradeLevelName,
-                    subjects: []
-                  };
-                }
-                subjectsByGrade[gradeLevelId].subjects.push(subject);
-              });
-              
-              // Render grouped subjects
-              Object.keys(subjectsByGrade).forEach(gradeLevelId => {
-                const group = subjectsByGrade[gradeLevelId];
-                html += `<div class="mb-3 grade-group" data-grade-id="${gradeLevelId}">`;
-                html += `<div class="d-flex justify-content-between align-items-center mb-2">`;
-                html += `<h6 class="text-primary mb-0"><i class="bi bi-bookmark"></i> ${group.name}</h6>`;
-                html += `<div class="form-check">`;
-                html += `<input class="form-check-input select-all-grade" type="checkbox" id="select_all_${gradeLevelId}">`;
-                html += `<label class="form-check-label small" for="select_all_${gradeLevelId}">Select All</label>`;
-                html += `</div>`;
-                html += `</div>`;
-                html += `<div class="row g-2">`;
-                group.subjects.forEach(subject => {
-                  html += `<div class="col-md-6">`;
-                  html += `<div class="form-check">`;
-                  html += `<input class="form-check-input grade-${gradeLevelId}-subject" type="checkbox" name="subjects[]" value="${subject.id}" id="subject_${subject.id}">`;
-                  html += `<label class="form-check-label" for="subject_${subject.id}">${subject.name}</label>`;
-                  html += `</div></div>`;
-                });
-                html += `</div></div>`;
-              });
-              
-              subjectsContainer.innerHTML = html;
-              
-              // If existing curriculum is selected, load its subjects
-              existingCurriculaSelect.addEventListener('change', function() {
-                const curriculumId = this.value;
-                if (curriculumId) {
-                  // Redirect to edit page or load curriculum data
-                  window.location.href = `{{ url('/registrar/curriculum') }}/${curriculumId}`;
-                }
-              });
-              
-              // Add select all functionality
-              document.querySelectorAll('.select-all-grade').forEach(selectAllCheckbox => {
-                selectAllCheckbox.addEventListener('change', function() {
-                  const gradeId = this.id.replace('select_all_', '');
-                  const gradeSubjects = document.querySelectorAll(`.grade-${gradeId}-subject`);
-                  gradeSubjects.forEach(subjectCheckbox => {
-                    subjectCheckbox.checked = this.checked;
-                  });
-                });
-              });
-              
-              // Update select all when individual checkboxes change
-              document.querySelectorAll('[class*="grade-"][class*="-subject"]').forEach(subjectCheckbox => {
-                subjectCheckbox.addEventListener('change', function() {
-                  const classList = Array.from(this.classList);
-                  const gradeClass = classList.find(cls => cls.startsWith('grade-') && cls.includes('-subject'));
-                  if (gradeClass) {
-                    const gradeId = gradeClass.match(/grade-(.+)-subject/)[1];
-                    const gradeSubjects = document.querySelectorAll(`.grade-${gradeId}-subject`);
-                    const selectAllCheckbox = document.getElementById(`select_all_${gradeId}`);
-                    if (selectAllCheckbox) {
-                      const allChecked = Array.from(gradeSubjects).every(cb => cb.checked);
-                      const someChecked = Array.from(gradeSubjects).some(cb => cb.checked);
-                      selectAllCheckbox.checked = allChecked;
-                      selectAllCheckbox.indeterminate = someChecked && !allChecked;
-                    }
-                  }
-                });
-              });
-            } else {
-              subjectsContainer.innerHTML = '<p class="text-muted small">No subjects found for this school year.</p>';
+      });
+    
+    // Load subjects for the active school year
+    fetch(`{{ url('/registrar/curriculum/get-subjects') }}?school_year_id=${schoolYearId}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.subjects && data.subjects.length > 0) {
+          let html = '';
+          const subjectsByGrade = {};
+          
+          // Group subjects by grade level
+          data.subjects.forEach(subject => {
+            const gradeLevelId = subject.grade_level_id || 'unassigned';
+            const gradeLevelName = subject.grade_level_name || 'Unassigned';
+            
+            if (!subjectsByGrade[gradeLevelId]) {
+              subjectsByGrade[gradeLevelId] = {
+                name: gradeLevelName,
+                subjects: []
+              };
             }
-          })
-          .catch(error => {
-            console.error('Error fetching subjects:', error);
-            subjectsContainer.innerHTML = '<p class="text-danger small">Error loading subjects. Please try again.</p>';
+            subjectsByGrade[gradeLevelId].subjects.push(subject);
           });
-      } else {
-        subjectsContainer.innerHTML = '<p class="text-muted small">Please select a school year first to load subjects.</p>';
+          
+          // Render grouped subjects
+          Object.keys(subjectsByGrade).forEach(gradeLevelId => {
+            const group = subjectsByGrade[gradeLevelId];
+            html += `<div class="mb-3 grade-group" data-grade-id="${gradeLevelId}">`;
+            html += `<div class="d-flex justify-content-between align-items-center mb-2">`;
+            html += `<h6 class="text-primary mb-0"><i class="bi bi-bookmark"></i> ${group.name}</h6>`;
+            html += `<div class="form-check">`;
+            html += `<input class="form-check-input select-all-grade" type="checkbox" id="select_all_${gradeLevelId}">`;
+            html += `<label class="form-check-label small" for="select_all_${gradeLevelId}">Select All</label>`;
+            html += `</div>`;
+            html += `</div>`;
+            html += `<div class="row g-2">`;
+            group.subjects.forEach(subject => {
+              html += `<div class="col-md-6">`;
+              html += `<div class="form-check">`;
+              html += `<input class="form-check-input grade-${gradeLevelId}-subject" type="checkbox" name="subjects[]" value="${subject.id}" id="subject_${subject.id}">`;
+              html += `<label class="form-check-label" for="subject_${subject.id}">${subject.name}</label>`;
+              html += `</div></div>`;
+            });
+            html += `</div></div>`;
+          });
+          
+          subjectsContainer.innerHTML = html;
+          
+          // Add select all functionality
+          document.querySelectorAll('.select-all-grade').forEach(selectAllCheckbox => {
+            selectAllCheckbox.addEventListener('change', function() {
+              const gradeId = this.id.replace('select_all_', '');
+              const gradeSubjects = document.querySelectorAll(`.grade-${gradeId}-subject`);
+              gradeSubjects.forEach(subjectCheckbox => {
+                subjectCheckbox.checked = this.checked;
+              });
+            });
+          });
+          
+          // Update select all when individual checkboxes change
+          document.querySelectorAll('[class*="grade-"][class*="-subject"]').forEach(subjectCheckbox => {
+            subjectCheckbox.addEventListener('change', function() {
+              const classList = Array.from(this.classList);
+              const gradeClass = classList.find(cls => cls.startsWith('grade-') && cls.includes('-subject'));
+              if (gradeClass) {
+                const gradeId = gradeClass.match(/grade-(.+)-subject/)[1];
+                const gradeSubjects = document.querySelectorAll(`.grade-${gradeId}-subject`);
+                const selectAllCheckbox = document.getElementById(`select_all_${gradeId}`);
+                if (selectAllCheckbox) {
+                  const allChecked = Array.from(gradeSubjects).every(cb => cb.checked);
+                  const someChecked = Array.from(gradeSubjects).some(cb => cb.checked);
+                  selectAllCheckbox.checked = allChecked;
+                  selectAllCheckbox.indeterminate = someChecked && !allChecked;
+                }
+              }
+            });
+          });
+        } else {
+          subjectsContainer.innerHTML = '<p class="text-muted small">No subjects found for this school year.</p>';
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching subjects:', error);
+        subjectsContainer.innerHTML = '<p class="text-danger small">Error loading subjects. Please try again.</p>';
+      });
+  }
+  
+  // Load subjects when modal opens
+  const addCurriculumModal = document.getElementById('addCurriculumModal');
+  if (addCurriculumModal) {
+    addCurriculumModal.addEventListener('shown.bs.modal', function() {
+      loadSubjectsAndCurricula();
+    });
+  }
+  
+  // Also load on page load if school year is available
+  if (schoolYearSelect && schoolYearSelect.value) {
+    loadSubjectsAndCurricula();
+  }
+  
+  // Handle existing curriculum selection
+  if (existingCurriculaSelect) {
+    existingCurriculaSelect.addEventListener('change', function() {
+      const curriculumId = this.value;
+      if (curriculumId) {
+        // Redirect to edit page or load curriculum data
+        window.location.href = `{{ url('/registrar/curriculum') }}/${curriculumId}`;
       }
     });
-    
-    // Trigger change if school year is already selected
-    if (schoolYearSelect.value) {
-      schoolYearSelect.dispatchEvent(new Event('change'));
-    }
   }
 });
 
