@@ -143,58 +143,50 @@ class StudentController extends Controller
         $sectionId = $activeEnrollment->section_id;
         $section   = $activeEnrollment->section;
 
-        // Get all subject assignments (subjects + teachers) for this section in the active SY,
-        // but only for subjects that belong to the section's grade level (enrolled curriculum).
+        // Get all subjects for the section's grade level in the active school year
+        // This shows all enrolled subjects, even if no teacher is assigned yet
+        $allSubjects = \App\Models\Subject::where('grade_level_id', $section->gradelevel_id)
+            ->where('school_year_id', $selectedSchoolYearId)
+            ->where('is_archived', false)
+            ->with('gradeLevel')
+            ->orderBy('name')
+            ->get();
+
+        // Get subject assignments (to match teachers) for this section
         $assignments = SubjectAssignment::with(['subject', 'teacher.profile'])
             ->where('section_id', $sectionId)
             ->where('school_year_id', $selectedSchoolYearId)
             ->whereHas('subject', function ($q) use ($section) {
                 $q->where('grade_level_id', $section->gradelevel_id);
             })
-            ->get();
+            ->get()
+            ->keyBy('subject_id');
 
-        if ($assignments->isEmpty()) {
-            return view('students.grades', [
-                'subjects' => collect(),
-                'activeSY' => $activeSY,
-                'section'  => $section,
-                'schoolYears' => $schoolYears,
-                'selectedSchoolYearId' => $selectedSchoolYearId,
-            ]);
-        }
+        // Get all subject IDs (for fetching grades)
+        $subjectIds = $allSubjects->pluck('id')->unique()->filter();
 
-        $subjectIds = $assignments->pluck('subject_id')->unique()->filter();
-
-        // Only consider grades for approved subject assignments
-        $approvedSubjectIds = $assignments
-            ->where('grade_status', 'approved')
-            ->pluck('subject_id')
-            ->unique()
-            ->filter();
-
+        // Get all grades for this student in the selected school year
         $grades = Grade::with('subject')
             ->where('student_id', $student->id ?? null)
             ->where('school_year_id', $selectedSchoolYearId)
-            ->whereIn('subject_id', $approvedSubjectIds)
+            ->when($subjectIds->isNotEmpty(), function ($q) use ($subjectIds) {
+                $q->whereIn('subject_id', $subjectIds);
+            })
             ->get()
             ->groupBy('subject_id');
 
-        // Build subject list including subjects with no grades yet
-        $subjects = $assignments
-            ->groupBy('subject_id')
-            ->map(function ($group) use ($grades) {
-                $assignment = $group->first();
-                $subject = $assignment->subject;
-                $teacher = $assignment->teacher;
-                $subjectGrades = $grades->get($subject->id, collect());
+        // Build subject list including all enrolled subjects, even if no teacher assigned
+        $subjects = $allSubjects->map(function ($subject) use ($assignments, $grades) {
+            $assignment = $assignments->get($subject->id);
+            $teacher = $assignment ? $assignment->teacher : null;
+            $subjectGrades = $grades->get($subject->id, collect());
 
-                return [
-                    'subject' => $subject,
-                    'teacher' => $teacher,
-                    'grades'  => $subjectGrades,
-                ];
-            })
-            ->sortBy(fn($item) => $item['subject']->name ?? '')->values();
+            return [
+                'subject' => $subject,
+                'teacher' => $teacher,
+                'grades'  => $subjectGrades,
+            ];
+        })->sortBy(fn($item) => $item['subject']->name ?? '')->values();
 
         return view('students.grades', [
             'subjects' => $subjects,

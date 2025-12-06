@@ -46,7 +46,7 @@
                 <option value="{{ $assignment->assignment_id }}"
                   {{ $selectedAssignment && $selectedAssignment->assignment_id == $assignment->assignment_id ? 'selected' : '' }}>
                   {{ $assignment->subject_name }} — 
-                  {{ $assignment->gradelevel_name ?? 'N/A' }} 
+                  {{ $assignment->gradelevel_name ?? 'N/A' }}
                   ({{ $assignment->section_name ?? 'No Section' }})
                 </option>
               @endforeach

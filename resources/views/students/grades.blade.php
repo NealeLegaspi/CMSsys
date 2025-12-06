@@ -142,7 +142,7 @@
     @else
       <div class="alert alert-info text-center py-4">
         <i class="bi bi-info-circle fs-4"></i>
-        <p class="mt-2 mb-0">No grades available yet.</p>
+        <p class="mt-2 mb-0">No subjects assigned to this section yet.</p>
       </div>
     @endif
   </div>

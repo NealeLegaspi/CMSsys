@@ -332,10 +332,24 @@ class TeacherController extends Controller
         $syClosed = !$currentSY || $currentSY->status === 'closed';
 
         // Only show assignments for this teacher in the ACTIVE school year
-        $assignments = SubjectAssignment::with(['subject', 'section.gradeLevel'])
+        // Filter to only show subjects assigned through Sections management (where subject grade level matches section grade level)
+        $assignments = SubjectAssignment::with(['subject.gradeLevel', 'section.gradeLevel'])
             ->where('teacher_id', $teacherId)
             ->when($currentSY, fn($q) => $q->where('school_year_id', $currentSY->id))
+            ->whereHas('subject', function($q) {
+                $q->whereNotNull('grade_level_id');
+            })
+            ->whereHas('section', function($q) {
+                $q->whereNotNull('gradelevel_id');
+            })
             ->get()
+            ->filter(function ($a) {
+                // Only show if subject's grade level matches section's grade level
+                // This ensures only assignments from Sections management are shown
+                $subjectGradeLevelId = $a->subject->grade_level_id ?? null;
+                $sectionGradeLevelId = $a->section->gradelevel_id ?? null;
+                return $subjectGradeLevelId && $sectionGradeLevelId && $subjectGradeLevelId == $sectionGradeLevelId;
+            })
             ->map(function ($a) {
                 return (object)[
                     'assignment_id'  => $a->id,
@@ -343,7 +357,7 @@ class TeacherController extends Controller
                     'subject_name'   => $a->subject->name ?? 'N/A',
                     'section_id'     => $a->section->id ?? null,
                     'section_name'   => $a->section->name ?? 'N/A',
-                    'gradelevel_name'=> $a->section->gradeLevel->name ?? 'N/A',
+                    'gradelevel_name'=> $a->subject->gradeLevel->name ?? $a->section->gradeLevel->name ?? 'N/A',
                     'grade_status'   => $a->grade_status ?? 'draft',
                 ];
             });
