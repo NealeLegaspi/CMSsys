@@ -281,7 +281,11 @@ use App\Models\Subject;
           <div class="mb-3">
             <label class="form-label">Select Subjects (per Grade Level)</label>
             <div class="border rounded p-3" style="max-height: 400px; overflow-y: auto;" id="subjectsContainer">
-              <p class="text-muted small">Please select a school year first to load subjects.</p>
+              @if($currentSY)
+                <p class="text-muted small">Loading subjects for {{ $currentSY->name }}...</p>
+              @else
+                <p class="text-muted small">Please activate a school year first to load subjects.</p>
+              @endif
             </div>
           </div>
         </div>
@@ -489,17 +493,21 @@ document.addEventListener('DOMContentLoaded', function() {
       });
   }
   
-  // Load subjects when modal opens
+  // Load subjects immediately if school year is available
+  if (schoolYearSelect && schoolYearSelect.value) {
+    loadSubjectsAndCurricula();
+  }
+  
+  // Load subjects when modal opens (in case it wasn't loaded on page load)
   const addCurriculumModal = document.getElementById('addCurriculumModal');
   if (addCurriculumModal) {
     addCurriculumModal.addEventListener('shown.bs.modal', function() {
-      loadSubjectsAndCurricula();
+      // Only load if container still shows loading/empty message
+      const containerText = subjectsContainer.textContent.trim();
+      if (!containerText || containerText.includes('Loading') || containerText.includes('Please')) {
+        loadSubjectsAndCurricula();
+      }
     });
-  }
-  
-  // Also load on page load if school year is available
-  if (schoolYearSelect && schoolYearSelect.value) {
-    loadSubjectsAndCurricula();
   }
   
   // Handle existing curriculum selection

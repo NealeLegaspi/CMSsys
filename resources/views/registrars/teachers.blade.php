@@ -165,8 +165,7 @@
                                    value="{{ $subject->id }}"
                                    id="teachSub{{ $teacher->id }}_{{ $subject->id }}"
                                    data-gradelevel-id="{{ $subject->grade_level_id }}"
-                                   data-subject-name="{{ strtolower(trim($subject->name)) }}"
-                                   @if($loads->contains('subject_id', $subject->id)) checked @endif>
+                                   data-subject-name="{{ strtolower(trim($subject->name)) }}">
                             <label class="form-check-label" for="teachSub{{ $teacher->id }}_{{ $subject->id }}">
                               {{ $subject->gradeLevel->name ?? 'Grade' }} - {{ $subject->name }}
                             </label>
@@ -185,10 +184,13 @@
                       <div class="small">
                         <strong>Current Load:</strong>
                         <ul class="mb-0">
-                          @foreach($loads as $load)
+                          @php
+                            // Filter out duplicates by subject_id only (since we're not showing sections)
+                            $uniqueLoads = $loads->unique('subject_id');
+                          @endphp
+                          @foreach($uniqueLoads as $load)
                             <li>
-                              {{ $gradeLevels[$load->gradelevel_id] ?? 'Grade' }} - {{ $load->section_name }}:
-                              {{ $load->subject_name }}
+                              {{ $gradeLevels[$load->subject_grade_level_id ?? $load->gradelevel_id] ?? 'Grade' }} - {{ $load->subject_name }}
                             </li>
                           @endforeach
                         </ul>
@@ -373,11 +375,9 @@
         });
       };
 
-      // Auto-check when advisory section changes
-      select.addEventListener('change', syncSubjects);
-
-      // Also run once when modal is first opened (in case advisory already selected)
-      modal.addEventListener('shown.bs.modal', syncSubjects, { once: true });
+      // Removed auto-check functionality - subjects should be manually selected
+      // select.addEventListener('change', syncSubjects);
+      // modal.addEventListener('shown.bs.modal', syncSubjects, { once: true });
     });
   };
 
@@ -410,12 +410,14 @@
   };
 
   document.addEventListener('DOMContentLoaded', () => {
-    initAutoCheckSubjects();
+    // Removed initAutoCheckSubjects() - subjects should not auto-select based on advisory
+    // initAutoCheckSubjects();
     initSubjectNameGrouping();
   });
   
   document.addEventListener('page:loaded', () => {
-    initAutoCheckSubjects();
+    // Removed initAutoCheckSubjects() - subjects should not auto-select based on advisory
+    // initAutoCheckSubjects();
     initSubjectNameGrouping();
   });
 })();
