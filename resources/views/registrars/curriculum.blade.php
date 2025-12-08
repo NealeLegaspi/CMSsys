@@ -40,9 +40,9 @@ use App\Models\Subject;
         <button type="button"
                 class="btn btn-outline-primary"
                 data-bs-toggle="modal"
-                data-bs-target="#reuseCurriculaModal"
-                @if(!$canReuseCurricula) disabled title="Cannot reuse curricula. No active school year or no previous school years available." @endif>
-          <i class="bi bi-arrow-counterclockwise me-1"></i> Reuse Previous
+                data-bs-target="#addCurriculumNameModal"
+                @if(!$currentSY) disabled title="Please activate a school year first to add a curriculum name." @endif>
+          <i class="bi bi-tag me-1"></i> Add Curriculum Name
         </button>
         <button type="button"
                 class="btn btn-primary"
@@ -211,40 +211,42 @@ use App\Models\Subject;
   </div>
 </div>
 
-{{-- Reuse Curricula Modal --}}
-<div class="modal fade" id="reuseCurriculaModal" tabindex="-1">
+{{-- Add Curriculum Name Modal --}}
+<div class="modal fade" id="addCurriculumNameModal" tabindex="-1">
   <div class="modal-dialog">
-    <form method="POST" action="{{ route('registrars.curriculum.reuse') }}">
+    <form method="POST" action="{{ route('registrars.curriculum.storeName') }}">
       @csrf
       <div class="modal-content">
-        <div class="modal-header bg-info text-white">
-          <h5 class="modal-title"><i class="bi bi-arrow-counterclockwise me-2"></i> Reuse Curricula</h5>
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="bi bi-tag me-2"></i> Add Curriculum Name</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          @if(!$canReuseCurricula)
+          @if(!$currentSY)
             <div class="alert alert-warning mb-0">
-              No previous school years available for reuse.
+              Please activate a school year first to add a curriculum name.
             </div>
           @else
             <div class="mb-3">
-              <label class="form-label fw-semibold">Source School Year</label>
-              <select name="source_school_year_id" class="form-select" required>
-                <option value="">-- Select School Year --</option>
-                @foreach($reusableSchoolYears as $sy)
-                  <option value="{{ $sy->id }}">{{ $sy->name }} ({{ ucfirst($sy->status) }})</option>
-                @endforeach
-              </select>
+              <label class="form-label fw-semibold">Curriculum Name</label>
+              <input type="text" 
+                     name="name" 
+                     class="form-control" 
+                     required 
+                     placeholder="e.g., Matatag Curriculum"
+                     value="{{ old('name') }}">
+              <small class="text-muted d-block mt-2">
+                The curriculum name will be stored as a fixed template in the database and can be reused across different school years. 
+                A curriculum instance will be created for the active school year ({{ $currentSY->name }}). 
+                You can add subjects to it later by editing the curriculum.
+              </small>
             </div>
-            <small class="text-muted d-block">
-              Curricula from the selected school year will be copied to the active school year ({{ $currentSY->name ?? 'N/A' }}). 
-              Subjects will be matched by name and grade level. Existing curricula with the same name will be updated.
-            </small>
+            <input type="hidden" name="school_year_id" value="{{ $currentSY->id }}">
           @endif
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-info text-white" @if(!$canReuseCurricula) disabled @endif>Reuse Curricula</button>
+          <button type="submit" class="btn btn-primary" @if(!$currentSY) disabled @endif>Add Curriculum</button>
         </div>
       </div>
     </form>
@@ -254,7 +256,7 @@ use App\Models\Subject;
 {{-- Add Curriculum Modal --}}
 <div class="modal fade" id="addCurriculumModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
-    <form method="POST" action="{{ route('registrars.curriculum.store') }}">
+    <form method="POST" action="{{ route('registrars.curriculum.store') }}" id="addCurriculumForm">
       @csrf
       <div class="modal-content">
         <div class="modal-header bg-primary text-white">
@@ -263,29 +265,58 @@ use App\Models\Subject;
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label">Curriculum Name</label>
-            <input type="text" name="name" value="{{ old('name') }}" class="form-control" required placeholder="e.g., K-12 Basic Education Curriculum">
+            <label class="form-label">Select Curriculum Template</label>
+            <select name="curriculum_template_id" id="curriculumTemplateSelect" class="form-select" required>
+              <option value="">-- Select Curriculum Template --</option>
+              @foreach($curriculumTemplates as $template)
+                <option value="{{ $template->id }}" data-name="{{ $template->name }}" 
+                  @if(isset($currentCurriculumTemplateId) && $currentCurriculumTemplateId == $template->id) selected @endif>
+                  {{ $template->name }}
+                </option>
+              @endforeach
+            </select>
+            <small class="text-muted d-block mt-1">Select a curriculum template to use for this school year.</small>
           </div>
           
-          {{-- Hidden school year, always uses active school year --}}
-          <input type="hidden" name="school_year_id" id="addCurriculumSchoolYear" value="{{ $currentSY->id ?? '' }}">
-
-          <div class="mb-3" id="existingCurriculaContainer" style="display: none;">
-            <label class="form-label">Existing Curricula <small class="text-muted">(Optional - Select to edit or leave empty to create new)</small></label>
-            <select name="existing_curriculum_id" class="form-select" id="existingCurriculaSelect">
-              <option value="">-- Create New Curriculum --</option>
-            </select>
-            <small class="text-muted">Select an existing curriculum to edit, or leave as "Create New" to add a new one.</small>
+          <div class="mb-3">
+            <label class="form-label">Select Grade Levels</label>
+            <div class="border rounded p-3">
+              @php
+                $allGradeLevels = \App\Models\GradeLevel::orderBy('id')->get();
+              @endphp
+              @if($allGradeLevels->count() > 0)
+                <div class="row g-2">
+                  @foreach($allGradeLevels as $gradeLevel)
+                    <div class="col-md-4 col-sm-6">
+                      <div class="form-check">
+                        <input class="form-check-input grade-level-checkbox" 
+                               type="checkbox" 
+                               name="grade_levels[]" 
+                               value="{{ $gradeLevel->id }}" 
+                               id="grade_level_{{ $gradeLevel->id }}"
+                               data-grade-name="{{ $gradeLevel->name }}">
+                        <label class="form-check-label" for="grade_level_{{ $gradeLevel->id }}">
+                          {{ $gradeLevel->name }}
+                        </label>
+                      </div>
+                    </div>
+                  @endforeach
+                </div>
+              @else
+                <p class="text-muted small text-center py-2">No grade levels available. Please add grade levels first.</p>
+              @endif
+            </div>
+            <small class="text-muted d-block mt-1">Select grade levels to show their subjects below.</small>
           </div>
+          
+          {{-- Hidden fields --}}
+          <input type="hidden" name="name" id="curriculumNameInput" value="">
+          <input type="hidden" name="school_year_id" id="addCurriculumSchoolYear" value="{{ $currentSY->id ?? '' }}">
 
           <div class="mb-3">
             <label class="form-label">Select Subjects (per Grade Level)</label>
             <div class="border rounded p-3" style="max-height: 400px; overflow-y: auto;" id="subjectsContainer">
-              @if($currentSY)
-                <p class="text-muted small">Loading subjects for {{ $currentSY->name }}...</p>
-              @else
-                <p class="text-muted small">Please activate a school year first to load subjects.</p>
-              @endif
+              <p class="text-muted small text-center py-3">Select grade levels above to load subjects.</p>
             </div>
           </div>
         </div>
@@ -370,153 +401,396 @@ use App\Models\Subject;
   </div>
 </div>
 
+{{-- Add Subject Modal --}}
+<div class="modal fade" id="addSubjectModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form id="addSubjectForm">
+      @csrf
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i> Add Subject</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="grade_level_id" id="addSubjectGradeLevelId">
+          <input type="hidden" name="school_year_id" id="addSubjectSchoolYearId" value="{{ $currentSY->id ?? '' }}">
+          <div class="mb-3">
+            <label class="form-label">Grade Level</label>
+            <input type="text" class="form-control" id="addSubjectGradeLevelName" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Subject Name</label>
+            <input type="text" name="name" id="addSubjectName" class="form-control" required placeholder="Enter subject name">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Subject</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const schoolYearSelect = document.querySelector('#addCurriculumSchoolYear');
   const subjectsContainer = document.getElementById('subjectsContainer');
-  const existingCurriculaContainer = document.getElementById('existingCurriculaContainer');
-  const existingCurriculaSelect = document.getElementById('existingCurriculaSelect');
-  
-  function loadSubjectsAndCurricula() {
-    const schoolYearId = schoolYearSelect ? schoolYearSelect.value : null;
-    
-    if (!schoolYearId) {
-      subjectsContainer.innerHTML = '<p class="text-muted small">No active school year. Please activate a school year first.</p>';
-      return;
-    }
-    
-    // Load existing curricula for the active school year
-    fetch(`{{ url('/registrar/curriculum/get-curricula') }}?school_year_id=${schoolYearId}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.curricula && data.curricula.length > 0) {
-          existingCurriculaSelect.innerHTML = '<option value="">-- Create New Curriculum --</option>';
-          data.curricula.forEach(curriculum => {
-            const option = document.createElement('option');
-            option.value = curriculum.id;
-            option.textContent = curriculum.name + ' (' + curriculum.subjects_count + ' subjects)';
-            existingCurriculaSelect.appendChild(option);
-          });
-          existingCurriculaContainer.style.display = 'block';
-        } else {
-          existingCurriculaContainer.style.display = 'none';
-          existingCurriculaSelect.innerHTML = '<option value="">-- Create New Curriculum --</option>';
-        }
-      })
-      .catch(error => {
-        console.error('Error fetching curricula:', error);
-        existingCurriculaContainer.style.display = 'none';
-      });
-    
-    // Load subjects for the active school year
-    fetch(`{{ url('/registrar/curriculum/get-subjects') }}?school_year_id=${schoolYearId}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.subjects && data.subjects.length > 0) {
-          let html = '';
-          const subjectsByGrade = {};
-          
-          // Group subjects by grade level
-          data.subjects.forEach(subject => {
-            const gradeLevelId = subject.grade_level_id || 'unassigned';
-            const gradeLevelName = subject.grade_level_name || 'Unassigned';
-            
-            if (!subjectsByGrade[gradeLevelId]) {
-              subjectsByGrade[gradeLevelId] = {
-                name: gradeLevelName,
-                subjects: []
-              };
-            }
-            subjectsByGrade[gradeLevelId].subjects.push(subject);
-          });
-          
-          // Render grouped subjects
-          Object.keys(subjectsByGrade).forEach(gradeLevelId => {
-            const group = subjectsByGrade[gradeLevelId];
-            html += `<div class="mb-3 grade-group" data-grade-id="${gradeLevelId}">`;
-            html += `<div class="d-flex justify-content-between align-items-center mb-2">`;
-            html += `<h6 class="text-primary mb-0"><i class="bi bi-bookmark"></i> ${group.name}</h6>`;
-            html += `<div class="form-check">`;
-            html += `<input class="form-check-input select-all-grade" type="checkbox" id="select_all_${gradeLevelId}">`;
-            html += `<label class="form-check-label small" for="select_all_${gradeLevelId}">Select All</label>`;
-            html += `</div>`;
-            html += `</div>`;
-            html += `<div class="row g-2">`;
-            group.subjects.forEach(subject => {
-              html += `<div class="col-md-6">`;
-              html += `<div class="form-check">`;
-              html += `<input class="form-check-input grade-${gradeLevelId}-subject" type="checkbox" name="subjects[]" value="${subject.id}" id="subject_${subject.id}">`;
-              html += `<label class="form-check-label" for="subject_${subject.id}">${subject.name}</label>`;
-              html += `</div></div>`;
-            });
-            html += `</div></div>`;
-          });
-          
-          subjectsContainer.innerHTML = html;
-          
-          // Add select all functionality
-          document.querySelectorAll('.select-all-grade').forEach(selectAllCheckbox => {
-            selectAllCheckbox.addEventListener('change', function() {
-              const gradeId = this.id.replace('select_all_', '');
-              const gradeSubjects = document.querySelectorAll(`.grade-${gradeId}-subject`);
-              gradeSubjects.forEach(subjectCheckbox => {
-                subjectCheckbox.checked = this.checked;
-              });
-            });
-          });
-          
-          // Update select all when individual checkboxes change
-          document.querySelectorAll('[class*="grade-"][class*="-subject"]').forEach(subjectCheckbox => {
-            subjectCheckbox.addEventListener('change', function() {
-              const classList = Array.from(this.classList);
-              const gradeClass = classList.find(cls => cls.startsWith('grade-') && cls.includes('-subject'));
-              if (gradeClass) {
-                const gradeId = gradeClass.match(/grade-(.+)-subject/)[1];
-                const gradeSubjects = document.querySelectorAll(`.grade-${gradeId}-subject`);
-                const selectAllCheckbox = document.getElementById(`select_all_${gradeId}`);
-                if (selectAllCheckbox) {
-                  const allChecked = Array.from(gradeSubjects).every(cb => cb.checked);
-                  const someChecked = Array.from(gradeSubjects).some(cb => cb.checked);
-                  selectAllCheckbox.checked = allChecked;
-                  selectAllCheckbox.indeterminate = someChecked && !allChecked;
-                }
-              }
-            });
-          });
-        } else {
-          subjectsContainer.innerHTML = '<p class="text-muted small">No subjects found for this school year.</p>';
-        }
-      })
-      .catch(error => {
-        console.error('Error fetching subjects:', error);
-        subjectsContainer.innerHTML = '<p class="text-danger small">Error loading subjects. Please try again.</p>';
-      });
-  }
-  
-  // Load subjects immediately if school year is available
-  if (schoolYearSelect && schoolYearSelect.value) {
-    loadSubjectsAndCurricula();
-  }
-  
-  // Load subjects when modal opens (in case it wasn't loaded on page load)
+  const curriculumTemplateSelect = document.getElementById('curriculumTemplateSelect');
+  const curriculumNameInput = document.getElementById('curriculumNameInput');
   const addCurriculumModal = document.getElementById('addCurriculumModal');
-  if (addCurriculumModal) {
-    addCurriculumModal.addEventListener('shown.bs.modal', function() {
-      // Only load if container still shows loading/empty message
-      const containerText = subjectsContainer.textContent.trim();
-      if (!containerText || containerText.includes('Loading') || containerText.includes('Please')) {
-        loadSubjectsAndCurricula();
+  const gradeLevelCheckboxes = document.querySelectorAll('.grade-level-checkbox');
+  
+  // Store loaded subjects data
+  let allSubjectsData = {};
+  // Store temporarily added subjects (not yet saved to database)
+  let temporarySubjects = {};
+  
+  // Handle curriculum template selection
+  if (curriculumTemplateSelect && curriculumNameInput) {
+    curriculumTemplateSelect.addEventListener('change', function() {
+      const selectedOption = this.options[this.selectedIndex];
+      if (selectedOption.value) {
+        const curriculumName = selectedOption.getAttribute('data-name');
+        curriculumNameInput.value = curriculumName || '';
+      } else {
+        curriculumNameInput.value = '';
       }
     });
   }
   
-  // Handle existing curriculum selection
-  if (existingCurriculaSelect) {
-    existingCurriculaSelect.addEventListener('change', function() {
-      const curriculumId = this.value;
-      if (curriculumId) {
-        // Redirect to edit page or load curriculum data
-        window.location.href = `{{ url('/registrar/curriculum') }}/${curriculumId}`;
+  // Load all subjects for the active school year
+  function loadAllSubjects() {
+    const schoolYearId = schoolYearSelect ? schoolYearSelect.value : null;
+    
+    if (!schoolYearId) {
+      return;
+    }
+    
+    fetch(`{{ url('/registrar/curriculum/get-subjects') }}?school_year_id=${schoolYearId}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.subjects && data.subjects.length > 0) {
+          // Group subjects by grade level
+          data.subjects.forEach(subject => {
+            const gradeLevelId = subject.grade_level_id || 'unassigned';
+            if (!allSubjectsData[gradeLevelId]) {
+              allSubjectsData[gradeLevelId] = {
+                name: subject.grade_level_name || 'Unassigned',
+                subjects: []
+              };
+            }
+            allSubjectsData[gradeLevelId].subjects.push(subject);
+          });
+          
+          // Update display based on selected grade levels
+          updateSubjectsDisplay();
+        } else {
+          // Even if no subjects, update display to show selected grade levels
+          updateSubjectsDisplay();
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching subjects:', error);
+        // Even on error, update display to show selected grade levels
+        updateSubjectsDisplay();
+      });
+  }
+  
+  // Update subjects display based on selected grade levels
+  function updateSubjectsDisplay() {
+    // Get current checkboxes - try modal first, then document
+    const modal = document.getElementById('addCurriculumModal');
+    let currentCheckboxes = modal ? modal.querySelectorAll('.grade-level-checkbox') : [];
+    
+    if (currentCheckboxes.length === 0) {
+      currentCheckboxes = document.querySelectorAll('.grade-level-checkbox');
+    }
+    
+    const selectedGradeLevels = Array.from(currentCheckboxes)
+      .filter(cb => cb.checked)
+      .map(cb => ({
+        id: cb.value,
+        name: cb.getAttribute('data-grade-name') || 'Unassigned'
+      }));
+    
+    if (selectedGradeLevels.length === 0) {
+      subjectsContainer.innerHTML = '<p class="text-muted small text-center py-3">Select grade levels above to load subjects.</p>';
+      return;
+    }
+    
+    let html = '';
+    
+    selectedGradeLevels.forEach(gradeLevel => {
+      const gradeLevelId = gradeLevel.id;
+      const gradeLevelName = gradeLevel.name;
+      
+      html += `<div class="mb-3 grade-group" data-grade-id="${gradeLevelId}">`;
+      html += `<div class="d-flex justify-content-between align-items-center mb-2">`;
+      html += `<h6 class="text-primary mb-0"><i class="bi bi-bookmark"></i> ${gradeLevelName}</h6>`;
+      html += `<div class="d-flex gap-2 align-items-center">`;
+      
+      // Check if this grade level has subjects
+      if (allSubjectsData[gradeLevelId] && allSubjectsData[gradeLevelId].subjects.length > 0) {
+        const group = allSubjectsData[gradeLevelId];
+        html += `<div class="form-check me-2">`;
+        html += `<input class="form-check-input select-all-grade" type="checkbox" id="select_all_${gradeLevelId}">`;
+        html += `<label class="form-check-label small" for="select_all_${gradeLevelId}">Select All</label>`;
+        html += `</div>`;
+      }
+      html += `<button type="button" class="btn btn-sm btn-outline-primary add-subject-btn" data-grade-id="${gradeLevelId}" data-grade-name="${gradeLevelName}">`;
+      html += `<i class="bi bi-plus-circle me-1"></i> Add Subject`;
+      html += `</button>`;
+      html += `</div>`;
+      html += `</div>`;
+      
+      // Subjects list
+      const existingSubjects = allSubjectsData[gradeLevelId] && allSubjectsData[gradeLevelId].subjects.length > 0 
+        ? allSubjectsData[gradeLevelId].subjects 
+        : [];
+      const tempSubjects = temporarySubjects[gradeLevelId] || [];
+      
+      if (existingSubjects.length > 0 || tempSubjects.length > 0) {
+        html += `<div class="row g-2">`;
+        
+        // Display existing subjects
+        existingSubjects.forEach(subject => {
+          html += `<div class="col-md-6">`;
+          html += `<div class="form-check">`;
+          html += `<input class="form-check-input grade-${gradeLevelId}-subject" type="checkbox" name="subjects[]" value="${subject.id}" id="subject_${subject.id}">`;
+          html += `<label class="form-check-label" for="subject_${subject.id}">${subject.name}</label>`;
+          html += `</div></div>`;
+        });
+        
+        // Display temporary subjects (not yet saved)
+        tempSubjects.forEach((subject, index) => {
+          html += `<div class="col-md-6">`;
+          html += `<div class="form-check">`;
+          html += `<input class="form-check-input grade-${gradeLevelId}-subject" type="checkbox" name="temp_subjects[${gradeLevelId}][]" value="${subject.name}" id="temp_subject_${gradeLevelId}_${index}" checked>`;
+          html += `<label class="form-check-label" for="temp_subject_${gradeLevelId}_${index}">${subject.name} <span class="badge bg-warning text-dark ms-1">New</span></label>`;
+          html += `</div></div>`;
+        });
+        
+        html += `</div>`;
+      } else {
+        // No subjects for this grade level
+        html += `<p class="text-muted small text-center py-2">No subjects available for this grade level in the current school year.</p>`;
+      }
+      
+      html += `</div>`;
+    });
+    
+    subjectsContainer.innerHTML = html;
+    
+    // Add select all functionality
+    document.querySelectorAll('.select-all-grade').forEach(selectAllCheckbox => {
+      selectAllCheckbox.addEventListener('change', function() {
+        const gradeId = this.id.replace('select_all_', '');
+        const gradeSubjects = document.querySelectorAll(`.grade-${gradeId}-subject`);
+        gradeSubjects.forEach(subjectCheckbox => {
+          subjectCheckbox.checked = this.checked;
+        });
+      });
+    });
+    
+    // Update select all when individual checkboxes change
+    document.querySelectorAll('[class*="grade-"][class*="-subject"]').forEach(subjectCheckbox => {
+      subjectCheckbox.addEventListener('change', function() {
+        const classList = Array.from(this.classList);
+        const gradeClass = classList.find(cls => cls.startsWith('grade-') && cls.includes('-subject'));
+        if (gradeClass) {
+          const gradeId = gradeClass.match(/grade-(.+)-subject/)[1];
+          const gradeSubjects = document.querySelectorAll(`.grade-${gradeId}-subject`);
+          const selectAllCheckbox = document.getElementById(`select_all_${gradeId}`);
+          if (selectAllCheckbox) {
+            const allChecked = Array.from(gradeSubjects).every(cb => cb.checked);
+            const someChecked = Array.from(gradeSubjects).some(cb => cb.checked);
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = someChecked && !allChecked;
+          }
+        }
+      });
+    });
+    
+    // Add event listeners for "Add Subject" buttons (using event delegation)
+    // This ensures buttons work even after dynamic HTML updates
+    subjectsContainer.querySelectorAll('.add-subject-btn').forEach(btn => {
+      // Remove any existing listeners
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+      
+      newBtn.addEventListener('click', function() {
+        const gradeLevelId = this.getAttribute('data-grade-id');
+        const gradeLevelName = this.getAttribute('data-grade-name');
+        
+        // Set modal values
+        document.getElementById('addSubjectGradeLevelId').value = gradeLevelId;
+        document.getElementById('addSubjectGradeLevelName').value = gradeLevelName;
+        document.getElementById('addSubjectName').value = '';
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('addSubjectModal'));
+        modal.show();
+      });
+    });
+  }
+  
+  // Use event delegation for "Add Subject" buttons at the modal level
+  if (addCurriculumModal) {
+    addCurriculumModal.addEventListener('click', function(e) {
+      if (e.target && e.target.closest('.add-subject-btn')) {
+        const btn = e.target.closest('.add-subject-btn');
+        const gradeLevelId = btn.getAttribute('data-grade-id');
+        const gradeLevelName = btn.getAttribute('data-grade-name');
+        
+        // Set modal values
+        document.getElementById('addSubjectGradeLevelId').value = gradeLevelId;
+        document.getElementById('addSubjectGradeLevelName').value = gradeLevelName;
+        document.getElementById('addSubjectName').value = '';
+        
+        // Show modal
+        const addSubjectModal = new bootstrap.Modal(document.getElementById('addSubjectModal'));
+        addSubjectModal.show();
+      }
+    });
+  }
+  
+  // Handle Add Subject form submission (temporary, not saved to database yet)
+  const addSubjectForm = document.getElementById('addSubjectForm');
+  if (addSubjectForm) {
+    addSubjectForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const gradeLevelId = document.getElementById('addSubjectGradeLevelId').value;
+      const gradeLevelName = document.getElementById('addSubjectGradeLevelName').value;
+      const subjectName = document.getElementById('addSubjectName').value.trim();
+      
+      if (!subjectName) {
+        alert('Please enter a subject name');
+        return;
+      }
+      
+      // Check if subject already exists in temporary subjects for this grade level
+      if (temporarySubjects[gradeLevelId]) {
+        const exists = temporarySubjects[gradeLevelId].some(s => s.name.toLowerCase() === subjectName.toLowerCase());
+        if (exists) {
+          alert('This subject has already been added for this grade level.');
+          return;
+        }
+      }
+      
+      // Check if subject already exists in loaded subjects
+      if (allSubjectsData[gradeLevelId]) {
+        const exists = allSubjectsData[gradeLevelId].subjects.some(s => s.name.toLowerCase() === subjectName.toLowerCase());
+        if (exists) {
+          alert('This subject already exists for this grade level.');
+          return;
+        }
+      }
+      
+      // Add to temporary subjects
+      if (!temporarySubjects[gradeLevelId]) {
+        temporarySubjects[gradeLevelId] = [];
+      }
+      
+      temporarySubjects[gradeLevelId].push({
+        name: subjectName,
+        grade_level_id: gradeLevelId,
+        grade_level_name: gradeLevelName
+      });
+      
+      // Update display
+      updateSubjectsDisplay();
+      
+      // Close modal
+      const modal = bootstrap.Modal.getInstance(document.getElementById('addSubjectModal'));
+      modal.hide();
+      
+      // Clear form
+      document.getElementById('addSubjectName').value = '';
+    });
+  }
+  
+  // Use event delegation for grade level checkboxes (works even if modal is opened dynamically)
+  if (addCurriculumModal) {
+    // Listen for changes on grade level checkboxes using event delegation
+    addCurriculumModal.addEventListener('change', function(e) {
+      if (e.target && e.target.classList.contains('grade-level-checkbox')) {
+        // Always update display immediately when checkbox changes
+        // Use setTimeout to ensure the checkbox state is updated
+        setTimeout(function() {
+          if (Object.keys(allSubjectsData).length === 0) {
+            // Load subjects if not loaded yet, but also update display immediately
+            updateSubjectsDisplay(); // Show selected grade levels even without subjects
+            loadAllSubjects();
+          } else {
+            // Update display immediately
+            updateSubjectsDisplay();
+          }
+        }, 10);
+      }
+    });
+    
+    // Load subjects when modal opens if school year is available
+    addCurriculumModal.addEventListener('shown.bs.modal', function() {
+      // Auto-select current curriculum template if available
+      @if(isset($currentCurriculumTemplateId) && $currentCurriculumTemplateId)
+        if (curriculumTemplateSelect) {
+          curriculumTemplateSelect.value = '{{ $currentCurriculumTemplateId }}';
+          // Trigger change event to populate curriculum name
+          curriculumTemplateSelect.dispatchEvent(new Event('change'));
+        }
+      @endif
+      
+      // First, update display to show any already checked grade levels
+      updateSubjectsDisplay();
+      
+      // Then load subjects if school year is available and data not loaded
+      if (schoolYearSelect && schoolYearSelect.value && Object.keys(allSubjectsData).length === 0) {
+        loadAllSubjects();
+      } else if (Object.keys(allSubjectsData).length > 0) {
+        // If subjects are already loaded, just update the display
+        updateSubjectsDisplay();
+      }
+    });
+  }
+  
+  // Reset form when modal is hidden
+  if (addCurriculumModal) {
+    addCurriculumModal.addEventListener('hidden.bs.modal', function() {
+      if (curriculumTemplateSelect) {
+        curriculumTemplateSelect.value = '';
+      }
+      if (curriculumNameInput) {
+        curriculumNameInput.value = '';
+      }
+      // Uncheck all grade level checkboxes
+      const currentCheckboxes = document.querySelectorAll('.grade-level-checkbox');
+      currentCheckboxes.forEach(checkbox => {
+        checkbox.checked = false;
+      });
+      // Reset subjects container to empty state
+      if (subjectsContainer) {
+        subjectsContainer.innerHTML = '<p class="text-muted small text-center py-3">Select grade levels above to load subjects.</p>';
+      }
+      // Clear subjects data
+      allSubjectsData = {};
+      temporarySubjects = {};
+    });
+  }
+  
+  // Handle curriculum form submission - validate that at least one subject is selected
+  const addCurriculumForm = document.getElementById('addCurriculumForm');
+  if (addCurriculumForm) {
+    addCurriculumForm.addEventListener('submit', function(e) {
+      // Check if at least one subject is selected (existing or temporary)
+      const existingSubjectCheckboxes = this.querySelectorAll('input[name="subjects[]"]:checked');
+      const tempSubjectCheckboxes = this.querySelectorAll('input[name^="temp_subjects"]:checked');
+      
+      if (existingSubjectCheckboxes.length === 0 && tempSubjectCheckboxes.length === 0) {
+        e.preventDefault();
+        alert('Please select at least one subject or add a new subject.');
+        return false;
       }
     });
   }

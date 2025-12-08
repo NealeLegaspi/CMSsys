@@ -239,9 +239,21 @@
             <label class="form-label">End Date</label>
             <input type="date" name="end_date" class="form-control" required>
           </div>
-          <div class="form-check">
-            <input type="checkbox" name="set_active" id="set_active" class="form-check-input">
-            <label for="set_active" class="form-check-label">Set as Active</label>
+          <div class="mb-3">
+            <div class="form-check">
+              <input type="checkbox" name="set_active" id="set_active" class="form-check-input">
+              <label for="set_active" class="form-check-label">Set as Active</label>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Curriculum</label>
+            <select name="curriculum_id" class="form-select">
+              <option value="">-- Select Curriculum (Optional) --</option>
+              @foreach($curriculumTemplates as $curriculum)
+                <option value="{{ $curriculum->id }}">{{ $curriculum->name }}</option>
+              @endforeach
+            </select>
+            <small class="text-muted d-block mt-1">Select a curriculum template to apply to this school year</small>
           </div>
         </div>
         <div class="modal-footer">

@@ -57,6 +57,7 @@
             <th>Grade Level</th>
             <th>Section</th>
             <th>Status</th>
+            <th>Enrolled By</th>
           </tr>
         </thead>
         <tbody>
@@ -73,9 +74,15 @@
                   {{ ucfirst($enroll->status) }}
                 </span>
               </td>
+              <td>
+                @php
+                  $registrarProfile = $enroll->createdBy->profile ?? null;
+                @endphp
+                {{ $registrarProfile ? ($registrarProfile->first_name . ' ' . ($registrarProfile->middle_name ? $registrarProfile->middle_name . ' ' : '') . $registrarProfile->last_name) : 'N/A' }}
+              </td>
             </tr>
           @empty
-            <tr><td colspan="4" class="text-center text-muted">No enrollment records found.</td></tr>
+            <tr><td colspan="5" class="text-center text-muted">No enrollment records found.</td></tr>
           @endforelse
         </tbody>
       </table>
@@ -178,30 +185,136 @@
 
     <!-- Grades -->
     <h6 class="fw-bold text-primary mb-3"><i class="bi bi-journal-text"></i> Academic Records</h6>
-    <div class="table-responsive">
-      <table class="table table-bordered align-middle">
-        <thead class="table-light">
-          <tr>
-            <th>Subject</th>
-            <th>Grade Level</th>
-            <th>Section</th>
-            <th>Grade</th>
-          </tr>
-        </thead>
-        <tbody>
-          @forelse($grades as $grade)
-            <tr>
-              <td>{{ $grade->subject->name ?? 'N/A' }}</td>
-              <td>{{ $grade->enrollment->section->gradeLevel->name ?? 'N/A' }}</td>
-              <td>{{ $grade->enrollment->section->name ?? 'N/A' }}</td>
-              <td>{{ $grade->grade ?? 'N/A' }}</td>
-            </tr>
-          @empty
-            <tr><td colspan="4" class="text-center text-muted">No grades recorded yet.</td></tr>
-          @endforelse
-        </tbody>
-      </table>
-    </div>
+    
+    @forelse($gradesBySchoolYear as $schoolYearIndex => $schoolYearData)
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">
+            <i class="bi bi-calendar3 me-2"></i>
+            School Year: {{ $schoolYearData['school_year']->name ?? 'N/A' }}
+          </h6>
+          <button type="button" 
+                  class="btn btn-sm btn-light" 
+                  data-bs-toggle="modal" 
+                  data-bs-target="#schoolYearGradesModal{{ $schoolYearIndex }}">
+            <i class="bi bi-eye"></i> View All Quarters
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Subject</th>
+                  <th>Grade Level</th>
+                  <th>Section</th>
+                  <th>Average</th>
+                </tr>
+              </thead>
+              <tbody>
+                @forelse($schoolYearData['subjects'] as $subjectIndex => $gradeData)
+                  <tr>
+                    <td>{{ $gradeData['subject']->name ?? 'N/A' }}</td>
+                    <td>{{ $gradeData['enrollment']->section->gradeLevel->name ?? 'N/A' }}</td>
+                    <td>{{ $gradeData['enrollment']->section->name ?? 'N/A' }}</td>
+                    <td>
+                      @if($gradeData['average'])
+                        <strong>{{ number_format($gradeData['average'], 2) }}</strong>
+                      @else
+                        <span class="text-muted">N/A</span>
+                      @endif
+                    </td>
+                  </tr>
+                @empty
+                  <tr><td colspan="4" class="text-center text-muted">No subjects recorded for this school year.</td></tr>
+                @endforelse
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    @empty
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>No grades recorded yet.
+      </div>
+    @endforelse
+
+    <!-- School Year Grade Details Modals -->
+    @foreach($gradesBySchoolYear as $schoolYearIndex => $schoolYearData)
+      <div class="modal fade" id="schoolYearGradesModal{{ $schoolYearIndex }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+          <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+              <h5 class="modal-title">
+                <i class="bi bi-journal-text me-2"></i>
+                All Subjects - {{ $schoolYearData['school_year']->name ?? 'N/A' }}
+              </h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <strong>School Year:</strong> {{ $schoolYearData['school_year']->name ?? 'N/A' }}
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Subject</th>
+                      <th>Grade Level</th>
+                      <th>Section</th>
+                      <th>1st Quarter</th>
+                      <th>2nd Quarter</th>
+                      <th>3rd Quarter</th>
+                      <th>4th Quarter</th>
+                      <th>Average</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @php
+                      $quarters = ['1st', '2nd', '3rd', '4th'];
+                    @endphp
+                    @forelse($schoolYearData['subjects'] as $gradeData)
+                      <tr>
+                        <td><strong>{{ $gradeData['subject']->name ?? 'N/A' }}</strong></td>
+                        <td>{{ $gradeData['enrollment']->section->gradeLevel->name ?? 'N/A' }}</td>
+                        <td>{{ $gradeData['enrollment']->section->name ?? 'N/A' }}</td>
+                        @foreach($quarters as $quarter)
+                          @php
+                            $quarterGrade = $gradeData['quarters']->get($quarter);
+                          @endphp
+                          <td class="text-center">
+                            @if($quarterGrade && $quarterGrade->grade)
+                              <span class="badge bg-primary">{{ number_format($quarterGrade->grade, 2) }}</span>
+                            @else
+                              <span class="text-muted">-</span>
+                            @endif
+                          </td>
+                        @endforeach
+                        <td class="text-center">
+                          @if($gradeData['average'])
+                            <strong class="text-primary">{{ number_format($gradeData['average'], 2) }}</strong>
+                          @else
+                            <span class="text-muted">N/A</span>
+                          @endif
+                        </td>
+                      </tr>
+                    @empty
+                      <tr>
+                        <td colspan="8" class="text-center text-muted">No subjects recorded for this school year.</td>
+                      </tr>
+                    @endforelse
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    @endforeach
+
   </div>
 </div>
 @endsection

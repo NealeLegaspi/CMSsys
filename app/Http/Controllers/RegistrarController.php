@@ -246,6 +246,7 @@ class RegistrarController extends Controller
             'user.profile',
             'enrollments.section.gradeLevel',
             'enrollments.schoolYear',
+            'enrollments.createdBy.profile',
         ])->findOrFail($id);
 
         $currentSY = $this->getCurrentSY();
@@ -260,11 +261,41 @@ class RegistrarController extends Controller
             ->latest()
             ->get();
 
-        $grades = Grade::with(['subject', 'enrollment.section.gradeLevel'])
+        // Get all grades grouped by school year, then by subject
+        $allGrades = Grade::with(['subject', 'schoolYear'])
             ->where('student_id', $id)
-            ->get();
+            ->get()
+            ->map(function($grade) {
+                $grade->load(['enrollment' => function($query) use ($grade) {
+                    $query->where('school_year_id', $grade->school_year_id);
+                }, 'enrollment.section.gradeLevel']);
+                return $grade;
+            });
 
-        return view('registrars.student-record', compact('student', 'documents', 'certificates', 'grades', 'currentSY'));
+        // Group by school year first, then by subject within each school year
+        $gradesBySchoolYear = $allGrades->groupBy('school_year_id')->map(function($schoolYearGrades, $schoolYearId) {
+            $firstGrade = $schoolYearGrades->first();
+            $schoolYear = $firstGrade->schoolYear;
+            
+            // Group subjects within this school year
+            $subjects = $schoolYearGrades->groupBy('subject_id')->map(function($gradeGroup) {
+                $firstGrade = $gradeGroup->first();
+                return [
+                    'subject' => $firstGrade->subject,
+                    'enrollment' => $firstGrade->enrollment,
+                    'quarters' => $gradeGroup->keyBy('quarter'),
+                    'average' => $gradeGroup->whereNotNull('grade')->avg('grade'),
+                ];
+            })->values();
+
+            return [
+                'school_year' => $schoolYear,
+                'school_year_id' => $schoolYearId,
+                'subjects' => $subjects,
+            ];
+        })->sortByDesc('school_year_id')->values();
+
+        return view('registrars.student-record', compact('student', 'documents', 'certificates', 'gradesBySchoolYear', 'currentSY'));
     }
 
     public function exportStudentRecordPDF($id)
@@ -273,6 +304,7 @@ class RegistrarController extends Controller
             'user.profile',
             'enrollments.section.gradeLevel',
             'enrollments.schoolYear',
+            'enrollments.createdBy.profile',
         ])->findOrFail($id);
 
         $currentSY = $this->getCurrentSY();
@@ -287,11 +319,47 @@ class RegistrarController extends Controller
             ->latest()
             ->get();
 
-        $grades = Grade::with(['subject', 'enrollment.section.gradeLevel'])
+        // Get all grades grouped by school year, then by subject (same as viewStudentRecord)
+        $allGrades = Grade::with(['subject', 'schoolYear'])
             ->where('student_id', $id)
-            ->get();
+            ->get()
+            ->map(function($grade) {
+                $grade->load(['enrollment' => function($query) use ($grade) {
+                    $query->where('school_year_id', $grade->school_year_id);
+                }, 'enrollment.section.gradeLevel']);
+                return $grade;
+            });
 
-        $pdf = Pdf::loadView('exports.student-record-pdf', compact('student', 'documents', 'certificates', 'grades'))
+        // Group by school year first, then by subject within each school year
+        $gradesBySchoolYear = $allGrades->groupBy('school_year_id')->map(function($schoolYearGrades, $schoolYearId) {
+            $firstGrade = $schoolYearGrades->first();
+            $schoolYear = $firstGrade->schoolYear;
+            
+            // Group subjects within this school year
+            $subjects = $schoolYearGrades->groupBy('subject_id')->map(function($gradeGroup) {
+                $firstGrade = $gradeGroup->first();
+                return [
+                    'subject' => $firstGrade->subject,
+                    'enrollment' => $firstGrade->enrollment,
+                    'quarters' => $gradeGroup->keyBy('quarter'),
+                    'average' => $gradeGroup->whereNotNull('grade')->avg('grade'),
+                ];
+            })->values();
+
+            return [
+                'school_year' => $schoolYear,
+                'school_year_id' => $schoolYearId,
+                'subjects' => $subjects,
+            ];
+        })->sortByDesc('school_year_id')->values();
+
+        $pdf = Pdf::loadView('exports.student-record-pdf', [
+                'student' => $student,
+                'documents' => $documents,
+                'certificates' => $certificates,
+                'gradesBySchoolYear' => $gradesBySchoolYear,
+                'allGrades' => $allGrades,
+            ])
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('Student_Record_' . ($student->user->profile->last_name ?? 'Student') . '.pdf');
@@ -685,6 +753,7 @@ public function printForm138($studentId)
             'section_id'     => $request->section_id,
             'school_year_id' => $activeSY->id,
             'status'         => 'Enrolled', 
+            'created_by'     => Auth::id(),
         ]);
 
         Student::where('id', $request->student_id)->update(['section_id' => $request->section_id]);
@@ -879,7 +948,9 @@ public function printForm138($studentId)
             return back()->withErrors(['email' => 'A student with this name already exists.']);
         }
 
-        DB::transaction(function () use ($request, $currentSchoolYear, $studentNumber, $email, $section) {
+        $registrarId = Auth::id();
+
+        DB::transaction(function () use ($request, $currentSchoolYear, $studentNumber, $email, $section, $registrarId) {
             $lastFour = substr($studentNumber, -4);
             $tempPassword = ucfirst($request->last_name) . ucfirst($request->first_name) . $lastFour;
 
@@ -918,6 +989,7 @@ public function printForm138($studentId)
                 'section_id' => $section->id,
                 'school_year_id' => $currentSchoolYear->id,
                 'status' => 'Enrolled',
+                'created_by' => $registrarId,
             ]);
 
             // Update section adviser if provided
@@ -1335,18 +1407,32 @@ public function printForm138($studentId)
 
         $gradeLevels = GradeLevel::all();
         $teachers    = User::where('role_id', 3)->with('profile')->get();
-        $subjects    = Subject::with('gradeLevel')
-            ->when($currentSY, function ($q) use ($currentSY) {
-                $q->where('school_year_id', $currentSY->id);
-            })
-            ->where('is_archived', false)
-            ->orderBy('grade_level_id')
-            ->orderBy('name')
-            ->get();
+        
+        // Get subjects ONLY from curriculum (no fallback)
+        $subjects = collect();
+        if ($currentSY) {
+            // Get the current curriculum for this school year
+            $currentCurriculum = Curriculum::where('school_year_id', $currentSY->id)
+                ->where('is_template', false)
+                ->orderByDesc('id')
+                ->first();
+
+            if ($currentCurriculum) {
+                // Use ONLY subjects from curriculum
+                $subjects = $currentCurriculum->subjects()
+                    ->where('is_archived', false)
+                    ->with('gradeLevel')
+                    ->orderBy('grade_level_id')
+                    ->orderBy('name')
+                    ->get();
+            }
+        }
         $reusableSchoolYears = SchoolYear::query()
             ->when($currentSY, fn($q) => $q->where('id', '!=', $currentSY->id))
             ->orderBy('start_date', 'desc')
             ->get();
+
+        $canReuseSections = $currentSY && $reusableSchoolYears->isNotEmpty();
 
         $assignedAdviserIds = $currentSY
             ? Section::where('school_year_id', $currentSY->id)
@@ -1378,9 +1464,11 @@ public function printForm138($studentId)
                 'subjects'    => $subjects,
                 'currentSY'   => null,
                 'reusableSchoolYears' => $reusableSchoolYears,
+                'canReuseSections' => false,
                 'allSectionsForDropdown' => collect(),
                 'availableAdvisers' => $availableAdvisers,
                 'sectionSubjectAssignments' => [],
+                'subjectTeachers' => [],
             ]);
         }
 
@@ -1451,6 +1539,7 @@ public function printForm138($studentId)
             'subjects',
             'currentSY',
             'reusableSchoolYears',
+            'canReuseSections',
             'allSectionsForDropdown',
             'availableAdvisers',
             'sectionSubjectAssignments',
@@ -2434,23 +2523,40 @@ public function printForm138($studentId)
     {
         $currentSY = $this->getCurrentSY();
         if (!$currentSY) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot add subjects. No active school year.'
+                ], 400);
+            }
             return back()->withErrors(['msg' => 'Cannot add subjects. No active school year.']);
         }
 
-        $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique('subjects')->where(function ($q) use ($request, $currentSY) {
-                    return $q->where('grade_level_id', $request->grade_level_id)
-                        ->where('school_year_id', $currentSY->id);
-                }),
-            ],
-            'grade_level_id' => 'required|exists:grade_levels,id',
-        ]);
+        try {
+            $request->validate([
+                'name' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    Rule::unique('subjects')->where(function ($q) use ($request, $currentSY) {
+                        return $q->where('grade_level_id', $request->grade_level_id)
+                            ->where('school_year_id', $currentSY->id);
+                    }),
+                ],
+                'grade_level_id' => 'required|exists:grade_levels,id',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $e->errors()
+                ], 422);
+            }
+            throw $e;
+        }
 
-        Subject::create([
+        $subject = Subject::create([
             'name' => $request->name,
             'grade_level_id' => $request->grade_level_id,
             'school_year_id' => $currentSY->id,
@@ -2458,6 +2564,20 @@ public function printForm138($studentId)
         ]);
 
         $this->logActivity('Add Subject', "Added subject {$request->name}");
+        
+        // If request is AJAX, return JSON response
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Subject added successfully.',
+                'subject' => [
+                    'id' => $subject->id,
+                    'name' => $subject->name,
+                    'grade_level_id' => $subject->grade_level_id,
+                ]
+            ]);
+        }
+        
         return back()->with('success', 'Subject added.');
     }
 
@@ -2623,6 +2743,38 @@ public function printForm138($studentId)
             })
             ->values();
 
+        // Get all curriculum templates (for dropdown in Add Curriculum modal)
+        $curriculumTemplates = Curriculum::where('is_template', true)
+            ->whereNull('school_year_id')
+            ->orderBy('name')
+            ->get()
+            ->unique('name')
+            ->values();
+
+        // Find the current curriculum for the active school year and its matching template
+        $currentCurriculumTemplateId = null;
+        if ($currentSY) {
+            $currentCurriculum = Curriculum::where('school_year_id', $currentSY->id)
+                ->where('is_template', false)
+                ->orderByDesc('id')
+                ->first();
+            
+            if ($currentCurriculum) {
+                // Find the template with the same name
+                $matchingTemplate = Curriculum::where('is_template', true)
+                    ->whereNull('school_year_id')
+                    ->where('name', $currentCurriculum->name)
+                    ->first();
+                
+                if ($matchingTemplate) {
+                    $currentCurriculumTemplateId = $matchingTemplate->id;
+                }
+            }
+        }
+
+        // Get all grade levels for the grade level checkboxes
+        $gradeLevels = GradeLevel::orderBy('id')->get();
+
         // Get reusable school years (for reuse functionality)
         $reusableSchoolYears = SchoolYear::query()
             ->when($currentSY, fn($q) => $q->where('id', '!=', $currentSY->id))
@@ -2637,48 +2789,183 @@ public function printForm138($studentId)
             'reusableSchoolYears',
             'canReuseCurricula',
             'currentSY',
-            'allCurricula'
+            'allCurricula',
+            'curriculumTemplates',
+            'gradeLevels',
+            'currentCurriculumTemplateId'
         ));
     }
 
     public function storeCurriculum(Request $request)
     {
         $request->validate([
+            'curriculum_template_id' => 'required|exists:curricula,id',
             'name' => 'required|string|max:255',
             'school_year_id' => 'required|exists:school_years,id',
-            'subjects' => 'required|array|min:1',
+            'subjects' => 'nullable|array',
             'subjects.*' => 'exists:subjects,id',
+            'temp_subjects' => 'nullable|array',
+            'temp_subjects.*' => 'array',
+            'temp_subjects.*.*' => 'string|max:100',
         ]);
 
         $schoolYearId = (int) $request->school_year_id;
 
-        // Ensure the selected school year already has subjects and sections defined.
-        $hasSubjects = Subject::where('school_year_id', $schoolYearId)
-            ->where('is_archived', false)
-            ->exists();
+        // Get the template to ensure it exists and get its name
+        $template = Curriculum::findOrFail($request->curriculum_template_id);
+        if (!$template->is_template || $template->school_year_id !== null) {
+            return back()
+                ->withInput()
+                ->withErrors(['curriculum_template_id' => 'Selected curriculum is not a valid template.']);
+        }
 
+        // Check if we have at least one subject (existing or temporary)
+        $hasExistingSubjects = $request->filled('subjects') && count($request->subjects) > 0;
+        $hasTempSubjects = $request->filled('temp_subjects') && count($request->temp_subjects) > 0;
+        
+        if (!$hasExistingSubjects && !$hasTempSubjects) {
+            return back()
+                ->withInput()
+                ->withErrors(['subjects' => 'Please select at least one subject or add a new subject.']);
+        }
+
+        // Ensure the selected school year has sections defined
         $hasSections = Section::where('school_year_id', $schoolYearId)->exists();
 
-        if (!$hasSubjects || !$hasSections) {
+        if (!$hasSections) {
             return back()
                 ->withInput()
                 ->withErrors([
-                    'school_year_id' => 'Cannot add a curriculum for this school year because it has no subjects and/or sections defined yet. Please create subjects and sections first.',
+                    'school_year_id' => 'Cannot add a curriculum for this school year because it has no sections defined yet. Please create sections first.',
                 ]);
         }
 
-        $curriculum = Curriculum::create([
-            'name' => $request->name,
-            'school_year_id' => $schoolYearId,
-            'is_template' => false,
+        // Check if a curriculum already exists for this school year (update instead of create)
+        $existingCurriculum = Curriculum::where('school_year_id', $schoolYearId)
+            ->where('is_template', false)
+            ->orderByDesc('id')
+            ->first();
+
+        $wasUpdated = false;
+        if ($existingCurriculum) {
+            // Update existing curriculum
+            $existingCurriculum->update([
+                'name' => $request->name,
+            ]);
+            
+            // Detach all existing subjects before attaching new ones
+            $existingCurriculum->subjects()->detach();
+            $curriculum = $existingCurriculum;
+            $wasUpdated = true;
+        } else {
+            // Create new curriculum if none exists
+            $curriculum = Curriculum::create([
+                'name' => $request->name,
+                'school_year_id' => $schoolYearId,
+                'is_template' => false,
+            ]);
+        }
+
+        $subjectIds = [];
+        
+        // Add existing subjects
+        if ($hasExistingSubjects) {
+            $subjectIds = $request->subjects;
+        }
+        
+        // Create and add temporary subjects
+        if ($hasTempSubjects) {
+            foreach ($request->temp_subjects as $gradeLevelId => $subjectNames) {
+                foreach ($subjectNames as $subjectName) {
+                    // Check if subject already exists
+                    $existingSubject = Subject::where('name', $subjectName)
+                        ->where('grade_level_id', $gradeLevelId)
+                        ->where('school_year_id', $schoolYearId)
+                        ->where('is_archived', false)
+                        ->first();
+                    
+                    if ($existingSubject) {
+                        // Use existing subject
+                        if (!in_array($existingSubject->id, $subjectIds)) {
+                            $subjectIds[] = $existingSubject->id;
+                        }
+                    } else {
+                        // Create new subject
+                        $newSubject = Subject::create([
+                            'name' => $subjectName,
+                            'grade_level_id' => $gradeLevelId,
+                            'school_year_id' => $schoolYearId,
+                            'is_archived' => false,
+                        ]);
+                        $subjectIds[] = $newSubject->id;
+                        $this->logActivity('Add Subject', "Added subject {$subjectName} for grade level {$gradeLevelId}");
+                    }
+                }
+            }
+        }
+        
+        // Attach all subjects to curriculum
+        if (!empty($subjectIds)) {
+            $curriculum->subjects()->attach($subjectIds);
+        }
+
+        $action = $wasUpdated ? 'Updated' : 'Added';
+        $this->logActivity('Add Curriculum', "{$action} curriculum {$request->name}");
+
+        return redirect()->route('registrars.curriculum')
+            ->with('success', $wasUpdated ? 'Curriculum updated successfully.' : 'Curriculum added successfully.');
+    }
+
+    public function storeCurriculumName(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'school_year_id' => 'required|exists:school_years,id',
         ]);
 
-        $curriculum->subjects()->attach($request->subjects);
+        $schoolYearId = (int) $request->school_year_id;
 
-        $this->logActivity('Add Curriculum', "Added curriculum {$request->name}");
+        // Check if a curriculum with the same name already exists globally (as a fixed template)
+        $existingTemplate = Curriculum::where('name', $request->name)
+            ->where('is_template', true)
+            ->whereNull('school_year_id')
+            ->first();
 
-        return redirect()->route('registrars.curriculum', ['school_year_id' => $request->school_year_id])
-            ->with('success', 'Curriculum added successfully.');
+        if ($existingTemplate) {
+            // Curriculum name already exists as a fixed template
+            // Check if it's already applied to this school year
+            $existingForSchoolYear = Curriculum::where('name', $request->name)
+                ->where('school_year_id', $schoolYearId)
+                ->where('is_template', false)
+                ->first();
+
+            if ($existingForSchoolYear) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['name' => 'This curriculum name already exists for this school year.']);
+            }
+
+            // Don't create an instance - just return success (template already exists)
+            $this->logActivity('Add Curriculum Name', "Curriculum name '{$request->name}' already exists as a template.");
+
+            return redirect()->route('registrars.curriculum')
+                ->with('success', 'Curriculum name already exists as a template. You can use it when creating a new school year or add it manually via "Add Curriculum".');
+        }
+
+        // Create a new fixed template curriculum name (stored globally, not tied to a school year)
+        $template = Curriculum::create([
+            'name' => $request->name,
+            'school_year_id' => null,
+            'is_template' => true,
+        ]);
+
+        // Don't create an instance for the current school year - only create the template
+        // The curriculum will only appear in the table when explicitly added via "Add Curriculum"
+
+        $this->logActivity('Add Curriculum Name', "Added new fixed curriculum name: {$request->name}");
+
+        return redirect()->route('registrars.curriculum')
+            ->with('success', 'Curriculum name added successfully as a template. It will be available for selection when creating new school years or when adding a curriculum.');
     }
 
     /**

@@ -232,6 +232,7 @@ Route::get('/grades/export/pdf', [RegistrarController::class, 'exportGradesPDF']
     Route::get('/curriculum', [RegistrarController::class, 'curriculum'])->name('registrars.curriculum');
     Route::post('/curriculum', [RegistrarController::class, 'storeCurriculum'])->name('registrars.curriculum.store');
     Route::post('/curriculum/set', [RegistrarController::class, 'applyCurriculum'])->name('registrars.curriculum.templates.store');
+    Route::post('/curriculum/store-name', [RegistrarController::class, 'storeCurriculumName'])->name('registrars.curriculum.storeName');
     Route::post('/curriculum/reuse', [RegistrarController::class, 'reuseCurricula'])->name('registrars.curriculum.reuse');
     Route::get('/curriculum/get-subjects', [RegistrarController::class, 'getSubjectsForCurriculum'])->name('registrars.curriculum.get-subjects');
     Route::get('/curriculum/get-curricula', [RegistrarController::class, 'getCurriculaForSchoolYear'])->name('registrars.curriculum.get-curricula');
