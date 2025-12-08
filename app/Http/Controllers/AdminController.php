@@ -661,7 +661,20 @@ class AdminController extends Controller
             ->when($status, fn($q) => $q->where('status', $status))
             ->paginate(10);
 
-        return view('admins.schoolyear', compact('schoolYears'));
+        // Get all unique curriculum names (grouped by name to show each curriculum only once)
+        $curriculumTemplates = \App\Models\Curriculum::orderBy('name')
+            ->get()
+            ->groupBy('name')
+            ->map(function ($group) {
+                // Prefer a template (is_template = true, school_year_id = null),
+                // otherwise take the first one in the group
+                return $group->firstWhere('is_template', true) 
+                    ?? $group->firstWhere('school_year_id', null) 
+                    ?? $group->first();
+            })
+            ->values();
+
+        return view('admins.schoolyear', compact('schoolYears', 'curriculumTemplates'));
     }
 
     public function storeSchoolYear(Request $request)
@@ -670,6 +683,7 @@ class AdminController extends Controller
             'start_date' => 'required|date',
             'end_date'   => 'required|date|after_or_equal:start_date',
             'name'       => 'nullable|string|max:100|unique:school_years,name',
+            'curriculum_id' => 'nullable|exists:curricula,id',
         ]);
 
         $start = Carbon::parse($request->start_date);
@@ -711,16 +725,168 @@ class AdminController extends Controller
             SchoolYear::where('status', 'active')->update(['status' => 'closed']);
         }
 
-        SchoolYear::create([
+        $schoolYear = SchoolYear::create([
             'name'       => $name,
             'start_date' => $request->start_date,
             'end_date'   => $request->end_date,
             'status'     => $status,
         ]);
 
-        $this->logActivity('Add School Year', "Added school year {$name}");
+        // Automatically create sections for each grade level
+        $gradeLevels = GradeLevel::orderBy('id')->get();
+        $sectionsCreated = 0;
+        
+        foreach ($gradeLevels as $gradeLevel) {
+            // Create Section A for each grade level
+            Section::create([
+                'name'           => "Section A - {$gradeLevel->name}",
+                'gradelevel_id'  => $gradeLevel->id,
+                'school_year_id' => $schoolYear->id,
+                'adviser_id'     => null,
+                'capacity'       => 30, // Default capacity
+            ]);
+            $sectionsCreated++;
+        }
 
-        return back()->with('success', 'School year added.');
+        // If a curriculum template is selected, create a curriculum instance for this school year
+        if ($request->filled('curriculum_id')) {
+            $curriculumTemplate = \App\Models\Curriculum::findOrFail($request->curriculum_id);
+            
+            // Check if curriculum already exists for this school year
+            $existingCurriculum = \App\Models\Curriculum::where('name', $curriculumTemplate->name)
+                ->where('school_year_id', $schoolYear->id)
+                ->where('is_template', false)
+                ->first();
+
+            if (!$existingCurriculum) {
+                // Create a curriculum instance for this school year (even if empty)
+                $newCurriculum = \App\Models\Curriculum::create([
+                    'name' => $curriculumTemplate->name,
+                    'school_year_id' => $schoolYear->id,
+                    'is_template' => false,
+                ]);
+
+                // Get all subjects from the curriculum template
+                $templateSubjects = $curriculumTemplate->subjects()->with('gradeLevel')->get();
+                $subjectsCreated = 0;
+                $subjectIds = [];
+                $usedMatatagFallback = false;
+
+                // If the selected curriculum has no subjects, use Matatag Curriculum subjects for the subjects module only
+                if ($templateSubjects->isEmpty()) {
+                    // Try to find Matatag Curriculum - prefer template, but accept any if template doesn't exist
+                    $matatagCurriculum = \App\Models\Curriculum::where('name', 'Matatag Curriculum')
+                        ->where(function($q) {
+                            $q->where(function($q2) {
+                                $q2->where('is_template', true)
+                                   ->whereNull('school_year_id');
+                            })
+                            ->orWhere(function($q2) {
+                                // Fallback: if no template exists, use any Matatag Curriculum
+                                $q2->whereNull('school_year_id');
+                            });
+                        })
+                        ->orderByDesc('is_template') // Prefer templates first
+                        ->first();
+
+                    // If still not found, try without any restrictions (any Matatag Curriculum)
+                    if (!$matatagCurriculum) {
+                        $matatagCurriculum = \App\Models\Curriculum::where('name', 'Matatag Curriculum')
+                            ->orderByDesc('is_template')
+                            ->orderByDesc('id') // Get the most recent one
+                            ->first();
+                    }
+
+                    if ($matatagCurriculum) {
+                        $matatagSubjects = $matatagCurriculum->subjects()->with('gradeLevel')->get();
+                        if ($matatagSubjects->isNotEmpty()) {
+                            // Use Matatag Curriculum subjects for subjects module only (don't attach to curriculum)
+                            $templateSubjects = $matatagSubjects;
+                            $usedMatatagFallback = true;
+                        }
+                    }
+                }
+
+                // Copy subjects from template to the subjects module (subjects table)
+                foreach ($templateSubjects as $templateSubject) {
+                    // Check if subject already exists for this school year and grade level
+                    $existingSubject = Subject::where('name', $templateSubject->name)
+                        ->where('grade_level_id', $templateSubject->grade_level_id)
+                        ->where('school_year_id', $schoolYear->id)
+                        ->where('is_archived', false)
+                        ->first();
+
+                    if ($existingSubject) {
+                        // Use existing subject
+                        $subjectIds[] = $existingSubject->id;
+                    } else {
+                        // Create new subject for this school year (adds to subjects module)
+                        $newSubject = Subject::create([
+                            'name' => $templateSubject->name,
+                            'description' => $templateSubject->description,
+                            'grade_level_id' => $templateSubject->grade_level_id,
+                            'school_year_id' => $schoolYear->id,
+                            'is_archived' => false,
+                        ]);
+                        $subjectIds[] = $newSubject->id;
+                        $subjectsCreated++;
+                    }
+                }
+
+                // Only attach subjects to curriculum if they came from the selected curriculum (not from Matatag fallback)
+                if (!empty($subjectIds) && !$usedMatatagFallback) {
+                    $newCurriculum->subjects()->attach($subjectIds);
+                }
+
+                if ($subjectsCreated > 0 || !empty($subjectIds)) {
+                    $subjectMessage = $usedMatatagFallback 
+                        ? "{$subjectsCreated} subjects added to subjects module from Matatag Curriculum (curriculum remains empty)"
+                        : "{$subjectsCreated} subjects created and attached to curriculum";
+                    
+                    $this->logActivity('Add School Year', "Added school year {$name} with curriculum '{$curriculumTemplate->name}', {$subjectMessage}, and {$sectionsCreated} sections");
+                } else {
+                    // No subjects were created - template was empty and Matatag fallback didn't work
+                    $this->logActivity('Add School Year', "Added school year {$name} with curriculum '{$curriculumTemplate->name}' (no subjects - template empty, Matatag fallback unavailable), and {$sectionsCreated} sections");
+                }
+            } else {
+                $this->logActivity('Add School Year', "Added school year {$name} with {$sectionsCreated} sections");
+            }
+        } else {
+            $this->logActivity('Add School Year', "Added school year {$name} with {$sectionsCreated} sections");
+        }
+
+        $successMessage = "School year added successfully. {$sectionsCreated} sections created (Section A for each grade level).";
+        
+        // Add warning if curriculum was selected but no subjects were created
+        if ($request->filled('curriculum_id')) {
+            $curriculumTemplate = \App\Models\Curriculum::find($request->curriculum_id);
+            if ($curriculumTemplate) {
+                $templateSubjects = $curriculumTemplate->subjects()->count();
+                // Check if Matatag Curriculum exists (any form)
+                $matatagExists = \App\Models\Curriculum::where('name', 'Matatag Curriculum')
+                    ->exists();
+                
+                // Check if Matatag has subjects
+                $matatagHasSubjects = false;
+                if ($matatagExists) {
+                    $matatag = \App\Models\Curriculum::where('name', 'Matatag Curriculum')
+                        ->orderByDesc('is_template')
+                        ->orderByDesc('id')
+                        ->first();
+                    if ($matatag) {
+                        $matatagHasSubjects = $matatag->subjects()->count() > 0;
+                    }
+                }
+                
+                if ($templateSubjects == 0 && (!$matatagExists || !$matatagHasSubjects)) {
+                    $successMessage .= " Note: No subjects were automatically added. The selected curriculum template has no subjects" . 
+                        (!$matatagExists ? ", and Matatag Curriculum is not available" : ", and Matatag Curriculum has no subjects") . 
+                        ". Please add subjects manually.";
+                }
+            }
+        }
+        
+        return back()->with('success', $successMessage);
     }
 
     public function activateSchoolYear($id)

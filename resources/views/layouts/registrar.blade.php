@@ -113,8 +113,7 @@
     </button>
     <div class="collapse {{ $isAcademicActive ? 'show' : '' }}" id="academicMenu">
       <a href="{{ route('registrars.sections') }}" 
-         class="nav-link ms-3 {{ request()->routeIs('registrars.sections') ? 'active' : '' }}"
-         data-ajax="true">
+         class="nav-link ms-3 {{ request()->routeIs('registrars.sections') ? 'active' : '' }}">
          <i class='bx bx-grid-alt me-2'></i> Sections
       </a>
       <a href="{{ route('registrars.subjects') }}" 

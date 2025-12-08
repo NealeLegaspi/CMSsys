@@ -8,7 +8,6 @@
 @section('content')
 @php
     $syClosed = !$currentSY; // true if no active school year
-    $canReuseSubjects = $currentSY && $reusableSchoolYears->isNotEmpty();
 @endphp
 
 <div class="container-fluid my-4">
@@ -56,14 +55,6 @@
           <a href="{{ route('registrars.subjects.archived') }}" class="btn btn-outline-dark">
             <i class="bi bi-archive"></i> View Archived
           </a>
-
-          <button type="button"
-                  class="btn btn-outline-primary"
-                  data-bs-toggle="modal"
-                  data-bs-target="#reuseSubjectsModal"
-                  @if(!$canReuseSubjects) disabled @endif>
-            <i class="bi bi-arrow-counterclockwise me-1"></i> Reuse Previous
-          </button>
 
           <button type="button"
                   class="btn btn-primary"
@@ -234,42 +225,4 @@
   </div>
 </div>
 
-{{-- ♻️ Reuse Subjects Modal --}}
-<div class="modal fade" id="reuseSubjectsModal" tabindex="-1">
-  <div class="modal-dialog">
-    <form method="POST" action="{{ route('registrars.subjects.reuse') }}">
-      @csrf
-      <div class="modal-content">
-        <div class="modal-header bg-info text-white">
-          <h5 class="modal-title"><i class="bi bi-arrow-counterclockwise me-2"></i>Reuse Subjects</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          @if(!$canReuseSubjects)
-            <div class="alert alert-warning mb-0">
-              No previous school years available for reuse.
-            </div>
-          @else
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Source School Year</label>
-              <select name="source_school_year_id" class="form-select" required>
-                <option value="">-- Select School Year --</option>
-                @foreach($reusableSchoolYears as $sy)
-                  <option value="{{ $sy->id }}">{{ $sy->name }} ({{ ucfirst($sy->status) }})</option>
-                @endforeach
-              </select>
-            </div>
-            <small class="text-muted d-block">
-              Subjects that already exist in the active school year (same name & grade level) will be refreshed.
-            </small>
-          @endif
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button class="btn btn-info text-white" @if(!$canReuseSubjects) disabled @endif>Reuse</button>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
 @endsection

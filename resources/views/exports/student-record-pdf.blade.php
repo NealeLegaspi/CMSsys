@@ -45,6 +45,7 @@
         <th>Grade Level</th>
         <th>Section</th>
         <th>Status</th>
+        <th>Enrolled By</th>
       </tr>
     </thead>
     <tbody>
@@ -54,9 +55,15 @@
           <td>{{ $e->section->gradeLevel->name ?? 'N/A' }}</td>
           <td>{{ $e->section->name ?? 'N/A' }}</td>
           <td>{{ ucfirst($e->status ?? 'N/A') }}</td>
+          <td>
+            @php
+              $regProfile = $e->createdBy->profile ?? null;
+            @endphp
+            {{ $regProfile ? trim($regProfile->first_name . ' ' . ($regProfile->middle_name ? $regProfile->middle_name . ' ' : '') . $regProfile->last_name) : 'N/A' }}
+          </td>
         </tr>
       @empty
-        <tr><td colspan="4" align="center">No enrollment records found.</td></tr>
+        <tr><td colspan="5" align="center">No enrollment records found.</td></tr>
       @endforelse
     </tbody>
   </table>
@@ -72,7 +79,7 @@
       </tr>
     </thead>
     <tbody>
-      @forelse($grades as $grade)
+      @forelse($allGrades as $grade)
         <tr>
           <td>{{ $grade->subject->name ?? 'N/A' }}</td>
           <td>{{ $grade->enrollment->section->gradeLevel->name ?? 'N/A' }}</td>

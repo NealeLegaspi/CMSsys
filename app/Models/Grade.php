@@ -34,4 +34,16 @@ class Grade extends Model
     {
         return $this->belongsTo(SchoolYear::class, 'school_year_id');
     }
+
+    public function enrollment()
+    {
+        return $this->hasOneThrough(
+            Enrollment::class,
+            Student::class,
+            'id',           // Foreign key on students table
+            'student_id',   // Foreign key on enrollments table
+            'student_id',   // Local key on grades table
+            'id'            // Local key on students table
+        );
+    }
 }

@@ -12,6 +12,7 @@ class Enrollment extends Model
         'school_year_id',
         'status',
         'archived',
+        'created_by',
     ];
 
     public function student()
@@ -27,5 +28,10 @@ class Enrollment extends Model
     public function schoolYear()
     {
         return $this->belongsTo(SchoolYear::class, 'school_year_id');
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

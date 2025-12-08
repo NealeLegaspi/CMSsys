@@ -23,16 +23,33 @@
   const renderSubjectsList = (container, subjects, countEl) => {
     if (!container) return;
     if (!subjects || !subjects.length) {
-      container.innerHTML = '<span class="text-muted">No subjects found for this grade level.</span>';
+      container.innerHTML = '<div class="text-center text-muted py-3">No subjects found for this grade level.</div>';
       if (countEl) countEl.textContent = '';
       return;
     }
 
-    const listHtml = subjects
-      .map(sub => `<span class="badge text-bg-secondary me-1 mb-1">${sub.name}</span>`)
-      .join('');
+    const tableHtml = `
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 50px;">#</th>
+              <th>Subject Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${subjects.map((sub, index) => `
+              <tr>
+                <td class="text-center">${index + 1}</td>
+                <td>${sub.name}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
 
-    container.innerHTML = listHtml;
+    container.innerHTML = tableHtml;
     if (countEl) {
       countEl.textContent = `${subjects.length} subject${subjects.length === 1 ? '' : 's'}`;
     }
@@ -55,13 +72,13 @@
     const handleUpdate = () => {
       const gradeId = gradeSelect.value;
       if (!gradeId) {
-        subjectList.innerHTML = 'Select a grade level to view its subjects.';
+        subjectList.innerHTML = '<div class="text-center text-muted py-3">Select a grade level to view its subjects.</div>';
         if (subjectCount) subjectCount.textContent = '';
         return;
       }
       const subjects = gradeSubjectsMap[gradeId] || [];
       if (!subjects.length) {
-        subjectList.innerHTML = '<span class="text-muted">No subjects found for this grade level.</span>';
+        subjectList.innerHTML = '<div class="text-center text-muted py-3">No subjects found for this grade level.</div>';
         if (subjectCount) subjectCount.textContent = '';
         return;
       }
@@ -100,9 +117,6 @@
       </div>
     @endif
 
-    @php
-        $canReuseSections = $currentSY && $reusableSchoolYears->isNotEmpty();
-    @endphp
 
     <form method="GET" action="{{ route('registrars.sections') }}" class="row g-2 mb-3">
       <div class="col-md-4">
@@ -376,8 +390,8 @@
               <span>Subjects for Selected Grade</span>
               <span class="text-muted small" id="add-section-subject-count"></span>
             </label>
-            <div id="add-section-subject-list" class="border rounded p-3 bg-light-subtle small text-muted">
-              Select a grade level to view its subjects.
+            <div id="add-section-subject-list" class="border rounded p-3 bg-light-subtle">
+              <div class="text-center text-muted py-3">Select a grade level to view its subjects.</div>
             </div>
           </div>
           <div class="mb-3">
