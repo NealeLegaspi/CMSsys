@@ -6,6 +6,14 @@
   @php(session()->forget('success'))
 @endif
 
+@if(session('error'))
+  <div class="alert alert-danger alert-dismissible fade show" role="alert" id="alert-error">
+    {{ session('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  @php(session()->forget('error'))
+@endif
+
 @if($errors->any())
   <div class="alert alert-danger alert-dismissible fade show" role="alert" id="alert-error">
     <ul class="mb-0">
