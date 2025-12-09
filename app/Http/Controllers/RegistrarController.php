@@ -230,6 +230,10 @@ class RegistrarController extends Controller
 
             return back()->with('success', 'Students successfully imported and enrolled!');
         } catch (\Exception $e) {
+            \Log::error('Student import failed: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
             return back()->with('error', 'Import failed: ' . $e->getMessage());
         }
     }
